@@ -14,12 +14,29 @@
 
     {
       "name": "macos",
+      "displayName": "macOS Debug",
+      "description": "Configure a regular macOS debug build",
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_C_COMPILER": "/opt/homebrew/opt/llvm/bin/clang",
         "CMAKE_CXX_COMPILER": "/opt/homebrew/opt/llvm/bin/clang++",
         "CMAKE_PREFIX_PATH": "/opt/homebrew/opt/qt"
       }
+    },
+    {
+      "name": "macos-release",
+      "displayName": "macOS Release",
+      "description": "Configure a regular macOS release build",
+      "inherits": "macos",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "macos-dmg",
+      "displayName": "macOS DMG",
+      "description": "Configure a macOS release build intended for DMG packaging",
+      "inherits": "macos-release"
     },
 
     {
@@ -52,7 +69,16 @@
   "buildPresets": [
     {
       "name": "macos",
+      "displayName": "macOS Build",
       "configurePreset": "macos"
+    },
+    {
+      "name": "macos-dmg",
+      "displayName": "macOS DMG",
+      "configurePreset": "macos-dmg",
+      "targets": [
+        "dmg"
+      ]
     },
     {
       "name": "linux",
@@ -61,6 +87,14 @@
     {
       "name": "windows",
       "configurePreset": "windows"
+    },
+    {
+      "name": "windows-package",
+      "displayName": "Windows NSIS Package",
+      "configurePreset": "windows",
+      "targets": [
+        "PACKAGE"
+      ]
     }
   ]
 }
