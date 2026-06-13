@@ -1,0 +1,13 @@
+<RCC>
+    <qresource prefix="/">
+        <file>resources/icons/fitlyzer_logo.png</file>
+        <file>resources/icons/import.png</file>
+        <file>resources/icons/athlete.png</file>
+        <file>resources/icons/calendar.png</file>
+        <file>resources/icons/search.png</file>
+        <file>resources/fonts/Inter-Regular.ttf</file>
+        <file>resources/fonts/Inter-Medium.ttf</file>
+        <file>resources/fonts/Inter-Bold.ttf</file>
+
+    </qresource>
+</RCC>

@@ -1,2 +1,417 @@
-# fitlyzerC
-Modern C++23 and Qt 6 application for Garmin FIT file analysis. Provides interactive charts, map visualization, interval analysis, athlete management, and performance metrics on Windows, macOS, and Linux.
+# FitlyzerC
+
+## Overview
+
+FitlyzerC is a cross-platform desktop application for analyzing Garmin FIT activity files. It is written in modern C++23 and uses Qt 6 for its user interface, charting, networking, and database functionality.
+
+The application is designed for endurance athletes, coaches, and performance analysts who need a native desktop tool for inspecting training sessions, intervals, power data, heart rate data, and GPS tracks.
+
+---
+
+## Key Features
+
+### Activity Analysis
+- Import Garmin FIT files
+- Decode FIT records using the Garmin FIT SDK
+- Analyze power, heart rate, cadence, speed, elevation, and GPS data
+- Interactive charts with zooming and panning
+- Interval inspection and workout review
+- Track visualization on maps
+
+### Athlete Management
+- Athlete profiles
+- Training history
+- Performance tracking
+- FTP-based analysis
+
+### Visualization
+- High-performance Qt Charts rendering
+- Multiple synchronized charts
+- Zoom and selection tools
+- Activity overlays
+- Map display and route inspection
+
+### Cross-Platform
+- macOS
+- Windows
+- Linux 
+
+---
+
+## Technical Details
+
+### Language
+- C++23
+
+### Build System
+- CMake 3.21+
+
+### GUI Framework
+- Qt 6
+
+### Qt Modules Used
+- Qt Widgets
+- Qt Charts
+- Qt SQL
+- Qt Network
+
+### External Dependencies
+
+#### Garmin FIT SDK
+The application automatically downloads the Garmin FIT C++ SDK during configuration using CMake FetchContent when enabled.
+
+SDK Version:
+- 21.205.0
+
+Repository:
+https://github.com/garmin/fit-cpp-sdk
+
+---
+
+## Project Architecture
+
+```text
+FitlyzerC
+├── src/
+│   ├── platform/
+│   │   ├── Platform_linux.cpp
+│   │   ├── Platform_macos.cpp
+│   │   └── Platform_windows.cpp
+│   ├── charts/
+│   ├── database/
+│   ├── fit/
+│   ├── map/
+│   └── ui/
+├── resources/
+│   ├── icons/
+│   └── fonts/
+├── CMakeLists.txt
+└── resources.qrc
+```
+
+The application contains platform-specific implementations for Windows, macOS, and Linux while sharing the majority of its codebase.
+
+---
+
+# Build Requirements
+
+## Common Requirements
+
+### Required Software
+
+| Component | Version |
+|-----------|----------|
+| CMake | 3.21+ |
+| C++ Compiler | C++23 capable |
+| Qt | 6.x |
+| Ninja | Recommended |
+| Git | Latest |
+
+---
+
+# macOS Build
+
+## Install Dependencies
+
+Using Homebrew:
+
+```bash
+brew update
+
+brew install cmake
+brew install ninja
+brew install qt
+```
+
+Add Qt to the environment:
+
+```bash
+export PATH="/opt/homebrew/opt/qt/bin:$PATH"
+```
+
+Verify installation:
+
+```bash
+cmake --version
+qmake --version
+```
+
+## Configure
+
+```bash
+git clone <repository>
+cd FitlyzerC
+
+cmake \
+  -S . \
+  -B build/macos \
+  -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release
+```
+
+## Build
+
+```bash
+cmake --build build/macos
+```
+
+Executable:
+
+```text
+build/macos/FitlyzerC
+```
+
+---
+
+# Windows Build
+
+## Install Dependencies
+
+Install:
+
+1. Visual Studio 2022
+   - Desktop development with C++
+2. CMake
+3. Ninja
+4. Qt 6 (MSVC version)
+
+Recommended Qt installation:
+
+```text
+C:\Qt\
+```
+
+The project automatically attempts to detect Qt installations located under:
+
+```text
+C:\Qt\<version>\msvc*\lib\cmake\Qt6
+```
+
+## Configure
+
+Developer Command Prompt:
+
+```cmd
+cmake ^
+  -S . ^
+  -B build\windows ^
+  -G Ninja ^
+  -DCMAKE_BUILD_TYPE=Release
+```
+
+## Build
+
+```cmd
+cmake --build build\windows
+```
+
+### Deployment
+
+The build system automatically runs:
+
+```text
+windeployqt
+```
+
+when available, copying required Qt DLLs and plugins next to the executable.
+
+Executable:
+
+```text
+build\windows\FitlyzerC.exe
+```
+
+---
+
+# Arch Linux Build
+
+## Install Dependencies
+
+```bash
+sudo pacman -Syu
+
+sudo pacman -S \
+    base-devel \
+    cmake \
+    ninja \
+    qt6-base \
+    qt6-charts \
+    git
+```
+
+## Configure
+
+```bash
+cmake \
+  -S . \
+  -B build/linux \
+  -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release
+```
+
+## Build
+
+```bash
+cmake --build build/linux
+```
+
+Executable:
+
+```text
+build/linux/FitlyzerC
+```
+
+---
+
+# Garmin FIT SDK
+
+The build system supports two modes.
+
+## Automatic Download (Default)
+
+No action required.
+
+During configuration, CMake downloads:
+
+```text
+https://github.com/garmin/fit-cpp-sdk
+```
+
+and builds the SDK automatically.
+
+## Manual SDK Location
+
+```bash
+cmake \
+  -S . \
+  -B build \
+  -DGARMIN_FIT_SDK_DIR=/path/to/fit-sdk
+```
+
+The path may point to:
+
+```text
+fit-sdk/
+fit-sdk/src/
+fit-sdk/cpp-sdk/src/
+```
+
+---
+
+# Running the Application
+
+After building:
+
+```bash
+./FitlyzerC
+```
+
+or on Windows:
+
+```cmd
+FitlyzerC.exe
+```
+
+Typical workflow:
+
+1. Start FitlyzerC.
+2. Create or select an athlete.
+3. Import FIT files.
+4. Inspect charts and maps.
+5. Analyze intervals and training sessions.
+6. Review performance metrics.
+
+---
+
+# Release Builds
+
+## macOS
+
+Typical release workflow:
+
+```bash
+cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release
+cmake --build build/release
+```
+
+Package using:
+
+```bash
+macdeployqt
+```
+
+Optionally create:
+
+```text
+FitlyzerC.app
+FitlyzerC.dmg
+```
+
+## Windows
+
+```cmd
+cmake --build build\windows --config Release
+```
+
+Deploy using:
+
+```cmd
+windeployqt
+```
+
+Create installer using:
+- NSIS
+- Inno Setup
+- WiX
+
+## Linux
+
+Package as:
+- AppImage
+- Flatpak
+- Native packages
+
+---
+
+# Troubleshooting
+
+## Qt Not Found
+
+Specify Qt explicitly:
+
+```bash
+cmake \
+  -DCMAKE_PREFIX_PATH=/path/to/Qt \
+  -S . \
+  -B build
+```
+
+## Garmin SDK Errors
+
+Ensure either:
+
+```text
+FITLYZERC_AUTO_DOWNLOAD_FITSDK=ON
+```
+
+or:
+
+```text
+GARMIN_FIT_SDK_DIR=<valid path>
+```
+
+is configured.
+
+## Clean Build
+
+```bash
+rm -rf build
+```
+
+Then reconfigure and rebuild.
+
+---
+
+# License
+
+Do whatever you want with it, just point to my repository and attibute. Except dopers, they can't use it. 
