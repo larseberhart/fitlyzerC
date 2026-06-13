@@ -223,9 +223,24 @@ build\windows\FitlyzerC.exe
 
 ---
 
-# Arch Linux Build
+# Linux Build
 
-## Install Dependencies
+## Common Linux Requirements
+
+The following tools are required on all Linux distributions:
+
+- C++ compiler with C++23 support (GCC 13+ or Clang 17+ recommended)
+- CMake 3.21+
+- Ninja
+- Qt 6 Base
+- Qt 6 Charts
+- Git
+
+---
+
+## Arch Linux
+
+### Install Dependencies
 
 ```bash
 sudo pacman -Syu
@@ -239,7 +254,7 @@ sudo pacman -S \
     git
 ```
 
-## Configure
+### Configure
 
 ```bash
 cmake \
@@ -249,7 +264,7 @@ cmake \
   -DCMAKE_BUILD_TYPE=Release
 ```
 
-## Build
+### Build
 
 ```bash
 cmake --build build/linux
@@ -259,6 +274,103 @@ Executable:
 
 ```text
 build/linux/FitlyzerC
+```
+
+---
+
+## Debian 12 / Ubuntu 24.04+
+
+### Install Dependencies
+
+```bash
+sudo apt update
+
+sudo apt install -y \
+    build-essential \
+    cmake \
+    ninja-build \
+    qt6-base-dev \
+    libqt6charts6-dev \
+    git
+```
+
+### Configure
+
+```bash
+cmake \
+  -S . \
+  -B build/linux \
+  -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release
+```
+
+### Build
+
+```bash
+cmake --build build/linux
+```
+
+Executable:
+
+```text
+build/linux/FitlyzerC
+```
+
+---
+
+## Fedora
+
+### Install Dependencies
+
+```bash
+sudo dnf update
+
+sudo dnf install -y \
+    gcc-c++ \
+    cmake \
+    ninja-build \
+    qt6-qtbase-devel \
+    qt6-qtcharts-devel \
+    git
+```
+
+### Configure
+
+```bash
+cmake \
+  -S . \
+  -B build/linux \
+  -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release
+```
+
+### Build
+
+```bash
+cmake --build build/linux
+```
+
+Executable:
+
+```text
+build/linux/FitlyzerC
+```
+
+---
+
+## Running
+
+After building:
+
+```bash
+./build/linux/FitlyzerC
+```
+
+or from the build directory:
+
+```bash
+cd build/linux
+./FitlyzerC
 ```
 
 ---
