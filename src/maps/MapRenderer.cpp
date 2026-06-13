@@ -6,6 +6,7 @@
 #include <QWheelEvent>
 
 #include "core/zones/ColorProvider.h"
+#include "maps/MapFitMath.h"
 
 #include <algorithm>
 #include <cmath>
@@ -41,8 +42,6 @@ static ColorMetric routeModeToMetric(RouteColorMode mode)
 
 static constexpr double kPi     = M_PI;
 static constexpr int    kTilePx = 256;
-static constexpr double kMinLatSpan = 0.001;
-static constexpr double kMinLonSpan = 0.001;
 
 QPointF MapRenderer::latLonToTile(double lat, double lon, int zoom)
 {
@@ -164,11 +163,6 @@ QColor MapRenderer::adjustRouteColorForStyle(const QColor& color) const
         case MapStyle::Minimal:
             adjusted = adjusted.darker(120);
             break;
-        case MapStyle::Greyscale:
-        case MapStyle::BlackWhite:
-            adjusted = adjusted.saturation() < 80 ? QColor("#dc2626") : adjusted;
-            adjusted = adjusted.darker(110);
-            break;
         case MapStyle::Terrain:
         case MapStyle::Topographic:
             adjusted = adjusted.lighter(120);
@@ -249,56 +243,21 @@ void MapRenderer::fitToBounds(double minLat, double maxLat, double minLon, doubl
     if (!m_hasGps)
         return;
 
-    if (maxLat < minLat)
-        std::swap(minLat, maxLat);
-    if (maxLon < minLon)
-        std::swap(minLon, maxLon);
+    const auto fit = MapFitMath::computeFitToBounds(minLat,
+                                                     maxLat,
+                                                     minLon,
+                                                     maxLon,
+                                                     width(),
+                                                     height(),
+                                                     std::min(18, m_tileCache.maxZoom()));
 
-    if (maxLat - minLat < kMinLatSpan)
-    {
-        const double centre = (minLat + maxLat) / 2.0;
-        minLat = centre - kMinLatSpan / 2.0;
-        maxLat = centre + kMinLatSpan / 2.0;
-    }
-    if (maxLon - minLon < kMinLonSpan)
-    {
-        const double centre = (minLon + maxLon) / 2.0;
-        minLon = centre - kMinLonSpan / 2.0;
-        maxLon = centre + kMinLonSpan / 2.0;
-    }
-
-    m_minLat = minLat;
-    m_maxLat = maxLat;
-    m_minLon = minLon;
-    m_maxLon = maxLon;
-
-    m_centerLat = (m_minLat + m_maxLat) / 2.0;
-    m_centerLon = (m_minLon + m_maxLon) / 2.0;
-
-    const int w = std::max(width(),  800);
-    const int h = std::max(height(), 400);
-
-    if (m_maxLat <= m_minLat || m_maxLon <= m_minLon)
-    {
-        m_zoom = std::min(15, m_tileCache.maxZoom());
-    }
-    else
-    {
-        const int maxProviderZoom = std::min(18, m_tileCache.maxZoom());
-        m_zoom = 1;
-        for (int z = maxProviderZoom; z >= 1; --z)
-        {
-            const auto tl = latLonToTile(m_maxLat, m_minLon, z);
-            const auto br = latLonToTile(m_minLat, m_maxLon, z);
-            const double pixW = (br.x() - tl.x()) * kTilePx;
-            const double pixH = (br.y() - tl.y()) * kTilePx;
-            if (pixW <= w * 0.85 && pixH <= h * 0.85)
-            {
-                m_zoom = z;
-                break;
-            }
-        }
-    }
+    m_minLat = fit.minLat;
+    m_maxLat = fit.maxLat;
+    m_minLon = fit.minLon;
+    m_maxLon = fit.maxLon;
+    m_centerLat = fit.centerLat;
+    m_centerLon = fit.centerLon;
+    m_zoom = fit.zoom;
 
     if (updateMinZoom)
         m_minZoom = m_zoom;   // track-level minimum zoom; selection fit must not tighten this floor

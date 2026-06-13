@@ -10,9 +10,12 @@
 #include <QDate>
 #include <QDragEnterEvent>
 #include <QDropEvent>
+#include <QDir>
+#include <QDirIterator>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFile>
+#include <QFileSystemWatcher>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -29,10 +32,12 @@
 #include <QSplitter>
 #include <QSqlQuery>
 #include <QStatusBar>
+#include <QStandardPaths>
 #include <QStyle>
 #include <QTableWidgetItem>
 #include <QToolBar>
 #include <QToolButton>
+#include <QTimer>
 #include <QUrl>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -45,6 +50,7 @@
 #include "CreateDatabaseDialog.h"
 #include "EditActivityDialog.h"
 #include "IntervalEditorDialog.h"
+#include "WelcomeWidget.h"
 #include "charts/FitnessChartWidget.h"
 #include "charts/PowerCurveWidget.h"
 #include "charts/PowerHistogramWidget.h"
@@ -88,6 +94,14 @@ static QString formatActivityDateLabel(const QString& isoDate)
         return QStringLiteral("Yesterday");
 
     return QLocale().toString(date, QLocale::ShortFormat);
+}
+
+static QDate activityDateForFtpContext(const Activity& activity)
+{
+    const QString rawDate = !activity.startTime.isEmpty()
+        ? activity.startTime.left(10)
+        : activity.importedAt.left(10);
+    return QDate::fromString(rawDate, Qt::ISODate);
 }
 
 static constexpr int kMaxRecentDatabases = 8;
@@ -142,8 +156,12 @@ MainWindow::MainWindow(QWidget* parent)
     loadSettings();
     applyChartHeight();
 
-    // Re-open last database and athlete
     QSettings s("Fitlyzer", "FitlyzerC");
+    if (!s.contains("firstLaunchCompleted"))
+        s.setValue("firstLaunchCompleted", false);
+    m_firstLaunchCompleted = s.value("firstLaunchCompleted", false).toBool();
+
+    // Re-open last database and athlete
     const QString lastDb = s.value("lastDatabase").toString();
     if (!lastDb.isEmpty())
     {
@@ -173,11 +191,13 @@ MainWindow::MainWindow(QWidget* parent)
         }
     }
 
-            updateRecentDatabaseMenu();
-            refreshAthleteSelector();
-            updateImportAvailability();
-            updateStatsLabel();
-            updateStatusBarInfo();
+    updateRecentDatabaseMenu();
+    refreshAthleteSelector();
+    updateImportAvailability();
+    updateStatsLabel();
+    updateStatusBarInfo();
+    updateWelcomeScreenVisibility();
+    configureFolderWatcher();
 }
 
 // ── Close event ──────────────────────────────────────────────────────────────
@@ -265,6 +285,13 @@ void MainWindow::buildUI()
     m_summaryMetricsLabel->setText("NP 0 W   IF 0.00   TSS 0   VI 0.00   EF 0.00");
     mainLayout->addWidget(m_summaryMetricsLabel);
 
+    m_welcomeWidget = new WelcomeWidget(this);
+    mainLayout->addWidget(m_welcomeWidget, 1);
+    m_welcomeWidget->setVisible(false);
+    connect(m_welcomeWidget, &WelcomeWidget::importRequested, this, &MainWindow::importActivities);
+    connect(m_welcomeWidget, &WelcomeWidget::openDatabaseRequested, this, &MainWindow::openDatabase);
+    connect(m_welcomeWidget, &WelcomeWidget::createDatabaseRequested, this, &MainWindow::createDatabase);
+
     // ── Tab widget ────────────────────────────────────────────────────────
     m_tabWidget = new QTabWidget;
     m_analysisTabWidget = new QTabWidget;
@@ -319,6 +346,9 @@ void MainWindow::buildUI()
         {
             // If the currently loaded activity was deleted, clear the view.
             (void)activityId;
+            updateStatsLabel();
+            updateStatusBarInfo();
+            updateWelcomeScreenVisibility();
         });
     }
 
@@ -365,14 +395,18 @@ void MainWindow::buildUI()
         m_fitChartsButton           = new QPushButton("Reset Zoom");
         m_chartHeightIncreaseButton = new QPushButton("Increase Height");
         m_chartHeightDecreaseButton = new QPushButton("Decrease Height");
+        m_useEstimatedFtpButton     = new QPushButton("Use Estimated FTP");
         auto* editActivityButton    = new QPushButton("Activity Properties");
         m_fitChartsButton->setFixedWidth(110);
         m_chartHeightIncreaseButton->setFixedWidth(130);
         m_chartHeightDecreaseButton->setFixedWidth(130);
+        m_useEstimatedFtpButton->setFixedWidth(150);
         editActivityButton->setFixedWidth(150);
         m_fitChartsButton->setToolTip("Reset all chart zoom to full ride (Ctrl+0)");
         m_chartHeightIncreaseButton->setToolTip("Increase chart height");
         m_chartHeightDecreaseButton->setToolTip("Decrease chart height");
+        m_useEstimatedFtpButton->setToolTip("Estimate FTP as 95% of best 20-minute power");
+        m_useEstimatedFtpButton->setEnabled(false);
 
         connect(m_fitChartsButton, &QPushButton::clicked,
                 this, &MainWindow::resetAllZoom);
@@ -382,6 +416,8 @@ void MainWindow::buildUI()
                 this, &MainWindow::decreaseChartHeight);
         connect(editActivityButton, &QPushButton::clicked,
             this, &MainWindow::editCurrentActivityProperties);
+        connect(m_useEstimatedFtpButton, &QPushButton::clicked,
+            this, &MainWindow::applyEstimatedFtpForCurrentAthlete);
 
         auto* ctrlBar = new QHBoxLayout;
         ctrlBar->setContentsMargins(0, 0, 0, 0);
@@ -406,6 +442,7 @@ void MainWindow::buildUI()
         ctrlBar->addWidget(m_fitChartsButton);
         ctrlBar->addWidget(m_chartHeightIncreaseButton);
         ctrlBar->addWidget(m_chartHeightDecreaseButton);
+        ctrlBar->addWidget(m_useEstimatedFtpButton);
         ctrlBar->addWidget(editActivityButton);
 
         // -- Charts ----------------------------------------------------------
@@ -493,8 +530,6 @@ void MainWindow::buildUI()
         m_mapStyleCombo = new QComboBox(mapPanel);
         m_mapStyleCombo->addItem("Light", static_cast<int>(MapStyle::Light));
         m_mapStyleCombo->addItem("Street Map", static_cast<int>(MapStyle::Street));
-        m_mapStyleCombo->addItem("Greyscale", static_cast<int>(MapStyle::Greyscale));
-        m_mapStyleCombo->addItem("Black & White", static_cast<int>(MapStyle::BlackWhite));
         m_mapStyleCombo->addItem("Satellite", static_cast<int>(MapStyle::Satellite));
         m_mapStyleCombo->addItem("Dark", static_cast<int>(MapStyle::Dark));
         m_mapStyleCombo->addItem("Terrain", static_cast<int>(MapStyle::Terrain));
@@ -1043,6 +1078,123 @@ void MainWindow::dropEvent(QDropEvent* event)
     event->acceptProposedAction();
 }
 
+void MainWindow::configureFolderWatcher()
+{
+    if (!m_watcher)
+    {
+        m_watcher = new QFileSystemWatcher(this);
+        connect(m_watcher, &QFileSystemWatcher::directoryChanged,
+                this, &MainWindow::onWatchDirectoryChanged);
+    }
+
+    if (!m_watchRescanTimer)
+    {
+        m_watchRescanTimer = new QTimer(this);
+        m_watchRescanTimer->setSingleShot(true);
+        m_watchRescanTimer->setInterval(700);
+        connect(m_watchRescanTimer, &QTimer::timeout, this, [this]
+        {
+            scanWatchDirectories(false);
+        });
+    }
+
+    const QStringList current = m_watcher->directories();
+    if (!current.isEmpty())
+        m_watcher->removePaths(current);
+
+    m_knownWatchedFitFiles.clear();
+    if (!m_watchFolderEnabled)
+        return;
+
+    const QStringList dirs = monitoredDirectories();
+    QStringList validDirs;
+    for (const QString& dirPath : dirs)
+    {
+        const QFileInfo info(dirPath);
+        if (info.exists() && info.isDir())
+            validDirs << info.absoluteFilePath();
+    }
+
+    validDirs.removeDuplicates();
+    if (!validDirs.isEmpty())
+    {
+        m_watcher->addPaths(validDirs);
+        scanWatchDirectories(true);
+    }
+}
+
+QStringList MainWindow::monitoredDirectories() const
+{
+    QStringList dirs;
+    const QString downloads = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+    const QString primary = m_watchFolderPath.trimmed().isEmpty() ? downloads : m_watchFolderPath;
+    if (!primary.isEmpty())
+        dirs << QDir::cleanPath(primary);
+
+    const QString home = QDir::homePath();
+    const QStringList candidates = {
+        QDir(home).filePath("Downloads/Garmin"),
+        QDir(home).filePath("Downloads/Garmin Export"),
+        QDir(home).filePath("Garmin/Exports")
+    };
+    for (const QString& candidate : candidates)
+    {
+        if (QFileInfo::exists(candidate))
+            dirs << QDir::cleanPath(candidate);
+    }
+
+    dirs.removeDuplicates();
+    return dirs;
+}
+
+void MainWindow::scanWatchDirectories(bool initialScan)
+{
+    if (!m_watchFolderEnabled)
+        return;
+
+    const QStringList dirs = monitoredDirectories();
+    QSet<QString> currentSet;
+
+    for (const QString& dirPath : dirs)
+    {
+        QDirIterator it(
+            dirPath,
+            QStringList() << "*.fit" << "*.FIT",
+            QDir::Files,
+            QDirIterator::Subdirectories);
+        while (it.hasNext())
+            currentSet.insert(QDir::cleanPath(it.next()));
+    }
+
+    if (initialScan)
+    {
+        m_knownWatchedFitFiles = currentSet;
+        return;
+    }
+
+    QStringList newFiles;
+    for (const QString& path : currentSet)
+    {
+        if (!m_knownWatchedFitFiles.contains(path))
+            newFiles << path;
+    }
+
+    m_knownWatchedFitFiles = currentSet;
+    if (newFiles.isEmpty())
+        return;
+
+    std::sort(newFiles.begin(), newFiles.end());
+    importFilesInternal(newFiles, false, QStringLiteral("Folder watcher"));
+}
+
+void MainWindow::onWatchDirectoryChanged(const QString& path)
+{
+    (void)path;
+    if (!m_watchRescanTimer)
+        return;
+    m_watchRescanTimer->start();
+}
+
 // ── Settings ─────────────────────────────────────────────────────────────────
 
 void MainWindow::saveSettings()
@@ -1072,6 +1224,8 @@ void MainWindow::saveSettings()
     s.setValue("showCadence",        m_showCadence->isChecked());
     s.setValue("showSpeed",          m_showSpeed->isChecked());
     s.setValue("showAltitude",       m_showAltitude->isChecked());
+    s.setValue("watchFolderEnabled", m_watchFolderEnabled);
+    s.setValue("watchFolderPath",    m_watchFolderPath);
     s.setValue("chartHeight",        m_chartHeight);
     s.setValue("currentAthleteId",   m_currentAthleteId);
     if (m_dbManager.isOpen())
@@ -1092,6 +1246,10 @@ void MainWindow::loadSettings()
     m_showCadence->setChecked(s.value("showCadence",true).toBool());
     m_showSpeed->setChecked(  s.value("showSpeed",  true).toBool());
     m_showAltitude->setChecked(s.value("showAltitude", true).toBool());
+    m_watchFolderEnabled = s.value("watchFolderEnabled", true).toBool();
+    m_watchFolderPath = s.value(
+        "watchFolderPath",
+        QStandardPaths::writableLocation(QStandardPaths::DownloadLocation)).toString();
 
     m_chartHeight = std::clamp(s.value("chartHeight", 220).toInt(), 120, 600);
 
@@ -1212,12 +1370,158 @@ void MainWindow::openDatabasePath(const QString& path)
     updateImportAvailability();
     updateStatsLabel();
     updateStatusBarInfo();
+    updateWelcomeScreenVisibility();
     statusBar()->showMessage("Database opened.", 2500);
 }
 
 bool MainWindow::canImportActivities() const
 {
     return m_dbManager.isOpen() && m_currentAthleteId > 0;
+}
+
+bool MainWindow::createOrOpenDefaultDatabase()
+{
+    const QString path = defaultDatabasePathForAutoCreate();
+    if (path.isEmpty())
+        return false;
+
+    const QFileInfo info(path);
+    QDir dir = info.dir();
+    if (!dir.exists() && !dir.mkpath("."))
+    {
+        QMessageBox::critical(this, "Database Error",
+            "Could not create default database folder:\n" + dir.absolutePath());
+        return false;
+    }
+
+    QString err;
+    const bool ok = info.exists()
+        ? m_dbManager.open(path, &err)
+        : m_dbManager.create(path, &err);
+    if (!ok)
+    {
+        QMessageBox::critical(this, "Database Error",
+            QString("Could not open default database:\n%1\n\n%2").arg(path, err));
+        return false;
+    }
+
+    m_controller->setDatabaseManager(&m_dbManager);
+    m_lastOpenDir = info.absolutePath();
+
+    QSettings settings("Fitlyzer", "FitlyzerC");
+    settings.setValue("lastDatabase", path);
+    addRecentDatabase(path);
+    updateRecentDatabaseMenu();
+    return true;
+}
+
+bool MainWindow::ensureDatabase()
+{
+    if (m_dbManager.isOpen())
+        return true;
+
+    if (!createOrOpenDefaultDatabase())
+        return false;
+
+    refreshAthleteSelector();
+    updateAthleteLabel();
+    updateImportAvailability();
+    updateStatsLabel();
+    updateStatusBarInfo();
+    updateWelcomeScreenVisibility();
+
+    statusBar()->showMessage("Created default database for import.", 3500);
+    return true;
+}
+
+bool MainWindow::ensureAthlete()
+{
+    if (!m_dbManager.isOpen())
+        return false;
+
+    auto db = m_dbManager.database();
+    AthleteRepository repo(db);
+    QList<Athlete> athletes = repo.listAthletes();
+
+    bool createdDefaultAthlete = false;
+    if (athletes.isEmpty())
+    {
+        Athlete athlete;
+        athlete.firstName = "Default";
+        athlete.lastName = "Athlete";
+        const int createdId = repo.insertAthlete(athlete);
+        if (createdId <= 0)
+        {
+            QMessageBox::critical(this, "Athlete Error",
+                "Could not create a default athlete for import.");
+            return false;
+        }
+        athletes = repo.listAthletes();
+        createdDefaultAthlete = true;
+    }
+
+    bool hasCurrent = false;
+    for (const Athlete& athlete : athletes)
+    {
+        if (athlete.id == m_currentAthleteId)
+        {
+            hasCurrent = true;
+            break;
+        }
+    }
+
+    if (!hasCurrent)
+    {
+        m_currentAthleteId = athletes.first().id;
+        m_currentAthleteName = athletes.first().fullName();
+        m_controller->setCurrentAthlete(m_currentAthleteId);
+        QSettings("Fitlyzer", "FitlyzerC").setValue("currentAthleteId", m_currentAthleteId);
+    }
+
+    refreshAthleteSelector();
+    updateAthleteLabel();
+    updateImportAvailability();
+    updateStatsLabel();
+    updateStatusBarInfo();
+
+    if (createdDefaultAthlete)
+    {
+        const auto ans = QMessageBox::question(
+            this,
+            "Default Athlete Created",
+            "A default athlete was created. Rename athlete now?",
+            QMessageBox::Yes | QMessageBox::No,
+            QMessageBox::Yes);
+
+        if (ans == QMessageBox::Yes)
+        {
+            AthleteDialog dlg(repo, m_currentAthleteId, this);
+            if (dlg.exec() == QDialog::Accepted)
+            {
+                const Athlete athlete = repo.getAthlete(m_currentAthleteId);
+                m_currentAthleteName = athlete.fullName();
+                refreshAthleteSelector();
+                updateAthleteLabel();
+                updateStatusBarInfo();
+            }
+        }
+    }
+
+    return m_currentAthleteId > 0;
+}
+
+bool MainWindow::ensureImportReady()
+{
+    return ensureDatabase() && ensureAthlete();
+}
+
+QString MainWindow::defaultDatabasePathForAutoCreate() const
+{
+    const QString documentsDir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    const QString baseDir = documentsDir.isEmpty()
+        ? Platform::defaultDatabaseDirectory()
+        : documentsDir;
+    return QDir(baseDir).filePath("Fitlyzer/default.fitlyzerdb");
 }
 
 void MainWindow::updateImportAvailability()
@@ -1242,6 +1546,44 @@ void MainWindow::updateImportAvailability()
     }
 }
 
+void MainWindow::showWelcomeScreen()
+{
+    if (m_welcomeWidget)
+        m_welcomeWidget->setVisible(true);
+    if (m_tabWidget)
+        m_tabWidget->setVisible(false);
+}
+
+void MainWindow::hideWelcomeScreen()
+{
+    if (m_welcomeWidget)
+        m_welcomeWidget->setVisible(false);
+    if (m_tabWidget)
+        m_tabWidget->setVisible(true);
+}
+
+int MainWindow::activityCount() const
+{
+    if (!m_dbManager.isOpen())
+        return 0;
+
+    auto db = m_dbManager.database();
+    ActivityRepository repo(db);
+    return repo.listActivities(-1).size();
+}
+
+void MainWindow::updateWelcomeScreenVisibility()
+{
+    if (!m_welcomeWidget)
+        return;
+
+    m_welcomeWidget->setFirstLaunch(!m_firstLaunchCompleted);
+    if (activityCount() == 0)
+        showWelcomeScreen();
+    else
+        hideWelcomeScreen();
+}
+
 ColorMetric MainWindow::currentColorMetric() const
 {
     if (!m_colorMetricCombo)
@@ -1259,9 +1601,22 @@ ColorContext MainWindow::buildColorContext() const
     {
         auto db = m_dbManager.database();
         AthleteRepository repo(db);
-        const Athlete athlete = repo.getAthlete(m_currentAthleteId);
-        if (athlete.ftpWatts > 0)
-            context.ftp = athlete.ftpWatts;
+
+        int resolvedFtp = 0;
+        if (m_controller->currentActivityId() > 0)
+        {
+            ActivityRepository actRepo(db);
+            const Activity activity = actRepo.getActivity(m_controller->currentActivityId());
+            const QDate ftpDate = activityDateForFtpContext(activity);
+            if (ftpDate.isValid())
+                resolvedFtp = repo.getFtpForDate(m_currentAthleteId, ftpDate);
+        }
+
+        if (resolvedFtp <= 0)
+            resolvedFtp = repo.getAthlete(m_currentAthleteId).ftpWatts;
+
+        if (resolvedFtp > 0)
+            context.ftp = resolvedFtp;
     }
 
     int maxHeartRate = 0;
@@ -1350,7 +1705,17 @@ void MainWindow::updateZoneAvailability()
 
 void MainWindow::importFiles(const QStringList& filePaths)
 {
-    if (!canImportActivities())
+    importFilesInternal(filePaths, true, QStringLiteral("Manual import"));
+}
+
+void MainWindow::importFilesInternal(const QStringList& filePaths,
+                                     bool showResultDialog,
+                                     const QString& sourceLabel)
+{
+    if (filePaths.isEmpty())
+        return;
+
+    if (!ensureImportReady())
     {
         updateImportAvailability();
         return;
@@ -1381,15 +1746,29 @@ void MainWindow::importFiles(const QStringList& filePaths)
         m_activityBrowser->refresh(m_currentAthleteId);
     updateStatsLabel();
     updateStatusBarInfo();
+    updateWelcomeScreenVisibility();
 
-    QMessageBox::information(
-        this,
-        "Import Results",
-        QString("%1 files selected\n\nImported: %2\nDuplicates: %3\nFailed: %4")
-            .arg(filePaths.size())
-            .arg(imported)
-            .arg(duplicates)
-            .arg(failed));
+    if (showResultDialog)
+    {
+        QMessageBox::information(
+            this,
+            "Import Results",
+            QString("%1 files selected\n\nImported: %2\nDuplicates: %3\nFailed: %4")
+                .arg(filePaths.size())
+                .arg(imported)
+                .arg(duplicates)
+                .arg(failed));
+    }
+    else
+    {
+        statusBar()->showMessage(
+            QString("%1: imported %2, duplicates %3, failed %4")
+                .arg(sourceLabel.isEmpty() ? "Auto import" : sourceLabel)
+                .arg(imported)
+                .arg(duplicates)
+                .arg(failed),
+            4000);
+    }
 }
 
 QStringList MainWindow::fitFilesFromMimeData(const QMimeData* mimeData) const
@@ -1472,12 +1851,6 @@ void MainWindow::updateStatusBarInfo()
 
 void MainWindow::importActivities()
 {
-    if (!canImportActivities())
-    {
-        statusBar()->showMessage("Open a database and select an athlete to import activities.", 5000);
-        return;
-    }
-
     const QStringList files = QFileDialog::getOpenFileNames(
             this, "Import Activities",
             m_lastOpenDir,
@@ -1505,6 +1878,12 @@ void MainWindow::previewFitFile()
 void MainWindow::onActivityImported(int activityId)
 {
     (void)activityId;
+    if (!m_firstLaunchCompleted)
+    {
+        m_firstLaunchCompleted = true;
+        QSettings("Fitlyzer", "FitlyzerC").setValue("firstLaunchCompleted", true);
+    }
+
     if (m_activityBrowser)
     {
         m_activityBrowser->refresh(m_currentAthleteId);
@@ -1512,6 +1891,7 @@ void MainWindow::onActivityImported(int activityId)
     }
 
     updateStatusBarInfo();
+    hideWelcomeScreen();
 }
 
 void MainWindow::openDatabase()
@@ -1572,6 +1952,7 @@ void MainWindow::createDatabase()
     updateImportAvailability();
     updateStatsLabel();
     updateStatusBarInfo();
+    updateWelcomeScreenVisibility();
 
     QMessageBox::information(this, "Database Created",
         "Database created successfully.\n" + path);
@@ -1602,6 +1983,7 @@ void MainWindow::manageAthletes()
             m_activityBrowser->refresh(m_currentAthleteId);
         updateImportAvailability();
         updateStatusBarInfo();
+        updateWelcomeScreenVisibility();
     }
 }
 
@@ -1685,6 +2067,7 @@ void MainWindow::onAthleteSelectionChanged(int index)
     updateImportAvailability();
     updateStatsLabel();
     updateStatusBarInfo();
+    updateWelcomeScreenVisibility();
 }
 
 void MainWindow::onWorkoutLoaded()
@@ -1748,17 +2131,31 @@ void MainWindow::updateStatsLabel()
     }
 
     const int ftpWatts = static_cast<int>(m_controller->ftp());
+    const double estimatedFtp = estimatedFtpFromCurrentRide();
+    const int estimatedFtpRounded = estimatedFtp > 0.0 ? static_cast<int>(std::round(estimatedFtp)) : 0;
+    const int ftpDelta = estimatedFtpRounded - ftpWatts;
     m_athleteHeader->setSummary(athleteName, ftpWatts, activityCount, lastActivity);
+
+    if (m_useEstimatedFtpButton)
+        m_useEstimatedFtpButton->setEnabled(m_currentAthleteId > 0 && estimatedFtpRounded > 0);
 
     if (m_summaryMetricsLabel)
     {
+        const QString ftpSummary = estimatedFtpRounded > 0
+            ? QString("FTP %1 W   Est %2 W   Delta %+3")
+                  .arg(ftpWatts)
+                  .arg(estimatedFtpRounded)
+                  .arg(ftpDelta)
+            : QString("FTP %1 W   Est -   Delta -").arg(ftpWatts);
+
         m_summaryMetricsLabel->setText(
-            QString("NP %1 W   IF %2   TSS %3   VI %4   EF %5")
+            QString("NP %1 W   IF %2   TSS %3   VI %4   EF %5   %6")
                 .arg(m_controller->normalizedPower(), 0, 'f', 0)
                 .arg(m_controller->intensityFactor(), 0, 'f', 2)
                 .arg(m_controller->trainingStressScore(), 0, 'f', 0)
                 .arg(m_controller->variabilityIndex(), 0, 'f', 2)
-                .arg(m_controller->efficiencyFactor(), 0, 'f', 2));
+                .arg(m_controller->efficiencyFactor(), 0, 'f', 2)
+                .arg(ftpSummary));
     }
 }
 
@@ -1977,6 +2374,51 @@ void MainWindow::updatePowerCurve()
         currentYear,
         allTime,
         m_controller->ftp());
+}
+
+double MainWindow::estimatedFtpFromCurrentRide() const
+{
+    const double best20m = PowerCurve::bestMeanPower(m_controller->rideData(), 20.0 * 60.0);
+    if (best20m <= 0.0)
+        return 0.0;
+    return best20m * 0.95;
+}
+
+void MainWindow::applyEstimatedFtpForCurrentAthlete()
+{
+    if (!m_dbManager.isOpen() || m_currentAthleteId <= 0)
+        return;
+
+    const int estimated = static_cast<int>(std::round(estimatedFtpFromCurrentRide()));
+    if (estimated <= 0)
+    {
+        QMessageBox::information(this, "Estimated FTP", "Insufficient power data to estimate FTP.");
+        return;
+    }
+
+    auto db = m_dbManager.database();
+    AthleteRepository repo(db);
+    Athlete athlete = repo.getAthlete(m_currentAthleteId);
+    if (!athlete.isValid())
+        return;
+
+    athlete.ftpWatts = estimated;
+    if (!repo.updateAthlete(athlete))
+    {
+        QMessageBox::critical(this, "FTP Update", "Failed to update athlete FTP.");
+        return;
+    }
+
+    FtpEntry entry;
+    entry.athleteId = m_currentAthleteId;
+    entry.ftpWatts = estimated;
+    entry.effectiveFrom = QDate::currentDate().toString(Qt::ISODate);
+    entry.notes = "Estimated from best 20-minute power (95%).";
+    repo.addFtpEntry(entry);
+
+    m_controller->setCurrentAthlete(m_currentAthleteId);
+    updateStatsLabel();
+    statusBar()->showMessage(QString("Estimated FTP applied: %1 W").arg(estimated), 3500);
 }
 
 void MainWindow::updateFitnessChart()

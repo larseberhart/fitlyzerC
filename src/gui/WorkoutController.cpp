@@ -14,6 +14,30 @@
 #include "fit/FitParser.h"
 #include "model/RideDataSerializer.h"
 
+namespace
+{
+QDate activityDateForFtp(const Activity& activity)
+{
+    const QString rawDate = !activity.startTime.isEmpty()
+        ? activity.startTime.left(10)
+        : activity.importedAt.left(10);
+    return QDate::fromString(rawDate, Qt::ISODate);
+}
+
+int resolveAthleteFtpForDate(AthleteRepository& repo, int athleteId, const QDate& date)
+{
+    if (date.isValid())
+    {
+        const int historicalFtp = repo.getFtpForDate(athleteId, date);
+        if (historicalFtp > 0)
+            return historicalFtp;
+    }
+
+    const Athlete athlete = repo.getAthlete(athleteId);
+    return athlete.ftpWatts > 0 ? athlete.ftpWatts : 250;
+}
+}
+
 WorkoutController::WorkoutController(QObject* parent)
     : QObject(parent)
 {}
@@ -37,12 +61,18 @@ void WorkoutController::setCurrentAthlete(int athleteId)
     if (m_dbManager && m_dbManager->isOpen() && athleteId > 0)
     {
         auto db = m_dbManager->database();
+        QDate ftpDate = QDate::currentDate();
+        if (m_currentActivityId > 0)
+        {
+            ActivityRepository actRepo(db);
+            const Activity activity = actRepo.getActivity(m_currentActivityId);
+            const QDate activityDate = activityDateForFtp(activity);
+            if (activityDate.isValid())
+                ftpDate = activityDate;
+        }
+
         AthleteRepository repo(db);
-        const int storedFtp = repo.getFtpForDate(athleteId, QDate::currentDate());
-        if (storedFtp > 0)
-            setFTP(static_cast<double>(storedFtp));
-        else
-            setFTP(static_cast<double>(repo.getAthlete(athleteId).ftpWatts));
+        setFTP(static_cast<double>(resolveAthleteFtpForDate(repo, athleteId, ftpDate)));
     }
 }
 
@@ -138,12 +168,15 @@ bool WorkoutController::loadActivity(int activityId, QString& errorOut)
     if (m_currentAthleteId > 0)
     {
         auto db = m_dbManager->database();
+        ActivityRepository actRepo(db);
+        const Activity activity = actRepo.getActivity(activityId);
+        const QDate ftpDate = activityDateForFtp(activity);
+
         AthleteRepository repo(db);
-        const int storedFtp = repo.getFtpForDate(m_currentAthleteId, QDate::currentDate());
-        if (storedFtp > 0)
-            m_ftp = storedFtp;
-        else
-            m_ftp = repo.getAthlete(m_currentAthleteId).ftpWatts;
+        m_ftp = resolveAthleteFtpForDate(
+            repo,
+            m_currentAthleteId,
+            ftpDate.isValid() ? ftpDate : QDate::currentDate());
     }
 
     reanalyze();

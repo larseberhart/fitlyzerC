@@ -9,6 +9,7 @@
 #include <QMenu>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSet>
 #include <QTabWidget>
 #include <QTableWidget>
 #include <QTextEdit>
@@ -29,8 +30,11 @@ class MapRenderer;
 class ActivityBrowser;
 class AthleteHeaderWidget;
 class CalendarWidget;
+class WelcomeWidget;
 class QCloseEvent;
+class QFileSystemWatcher;
 class QMimeData;
+class QTimer;
 
 class MainWindow : public QMainWindow
 {
@@ -93,6 +97,13 @@ private:
     void clearIntervalSummary();
     bool ensureDatabase();
     bool ensureAthlete();
+    bool ensureImportReady();
+    bool createOrOpenDefaultDatabase();
+    QString defaultDatabasePathForAutoCreate() const;
+    void showWelcomeScreen();
+    void hideWelcomeScreen();
+    void updateWelcomeScreenVisibility();
+    int activityCount() const;
     void updateAthleteLabel();
     void updateStatusBarInfo();
     ColorMetric currentColorMetric() const;
@@ -101,6 +112,15 @@ private:
     void updateZoneAvailability();
     void applyChartPreset(int presetId);
     void editCurrentActivityProperties();
+    double estimatedFtpFromCurrentRide() const;
+    void applyEstimatedFtpForCurrentAthlete();
+    void importFilesInternal(const QStringList& filePaths,
+                             bool showResultDialog,
+                             const QString& sourceLabel);
+    void configureFolderWatcher();
+    QStringList monitoredDirectories() const;
+    void scanWatchDirectories(bool initialScan);
+    void onWatchDirectoryChanged(const QString& path);
 
     // -- Controller ---------------------------------------------------------
     WorkoutController* m_controller = nullptr;
@@ -119,6 +139,17 @@ private:
     QAction* m_previewAct      = nullptr;
     QMenu*   m_recentDbMenu    = nullptr;
     QString  m_lastOpenDir;
+
+    // -- Welcome / onboarding ----------------------------------------------
+    WelcomeWidget* m_welcomeWidget = nullptr;
+    bool m_firstLaunchCompleted = false;
+
+    // -- Folder monitoring --------------------------------------------------
+    QFileSystemWatcher* m_watcher = nullptr;
+    QTimer* m_watchRescanTimer = nullptr;
+    bool m_watchFolderEnabled = true;
+    QString m_watchFolderPath;
+    QSet<QString> m_knownWatchedFitFiles;
 
     // -- Toolbar/Header -----------------------------------------------------
     QComboBox* m_athleteCombo = nullptr;
@@ -165,6 +196,7 @@ private:
     QPushButton* m_fitChartsButton            = nullptr;
     QPushButton* m_chartHeightIncreaseButton  = nullptr;
     QPushButton* m_chartHeightDecreaseButton  = nullptr;
+    QPushButton* m_useEstimatedFtpButton      = nullptr;
     QWidget*     m_colorLegendWidget          = nullptr;
     QHBoxLayout* m_colorLegendLayout          = nullptr;
 

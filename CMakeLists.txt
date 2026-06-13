@@ -14,6 +14,7 @@ set(FITLYZER_VERSION
     "${FITLYZER_VERSION_MAJOR}.${FITLYZER_VERSION_MINOR}.${FITLYZER_VERSION_PATCH}")
 
 include(FetchContent)
+include(CTest)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -326,6 +327,19 @@ else()
 endif()
 
 include(CPack)
+
+if(BUILD_TESTING)
+    add_executable(FitlyzerC_MapFitMathTests
+        tests/MapFitMathTests.cpp
+        src/maps/MapFitMath.cpp
+    )
+
+    target_include_directories(FitlyzerC_MapFitMathTests PRIVATE
+        ${CMAKE_SOURCE_DIR}/src
+    )
+
+    add_test(NAME FitlyzerC.MapFitMath COMMAND FitlyzerC_MapFitMathTests)
+endif()
 
 if(APPLE)
     # Convenience target so macOS packaging is explicit and easy to invoke.

@@ -13,8 +13,6 @@ QString TileCache::styleKey(MapStyle style)
     {
         case MapStyle::Street:      return "street";
         case MapStyle::Light:       return "light";
-        case MapStyle::Greyscale:   return "greyscale";
-        case MapStyle::BlackWhite:  return "blackwhite";
         case MapStyle::Dark:        return "dark";
         case MapStyle::Satellite:   return "satellite";
         case MapStyle::Terrain:     return "terrain";
@@ -30,8 +28,6 @@ QString TileCache::styleDisplayName(MapStyle style)
     {
         case MapStyle::Street:      return "Street Map";
         case MapStyle::Light:       return "Light";
-        case MapStyle::Greyscale:   return "Greyscale";
-        case MapStyle::BlackWhite:  return "Black & White";
         case MapStyle::Dark:        return "Dark";
         case MapStyle::Satellite:   return "Satellite";
         case MapStyle::Terrain:     return "Terrain";
@@ -58,20 +54,6 @@ TileProvider TileCache::providerForStyle(MapStyle style)
                 "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
                 20,
                 "© OpenStreetMap contributors © CARTO"
-            };
-        case MapStyle::Greyscale:
-            return {
-                "Wikimedia B/W",
-                "https://tiles.wmflabs.org/bw-mapnik/{z}/{x}/{y}.png",
-                18,
-                "© OpenStreetMap contributors"
-            };
-        case MapStyle::BlackWhite:
-            return {
-                "Wikimedia B/W",
-                "https://tiles.wmflabs.org/bw-mapnik/{z}/{x}/{y}.png",
-                18,
-                "© OpenStreetMap contributors"
             };
         case MapStyle::Dark:
             return {
@@ -170,10 +152,10 @@ QPixmap TileCache::tile(int z, int x, int y)
     {
         m_pending.insert(k);
 
-        const QString urlStr = m_provider.urlTemplate
-            .replace("{z}", QString::number(z))
-            .replace("{x}", QString::number(x))
-            .replace("{y}", QString::number(y));
+        QString urlStr = m_provider.urlTemplate;
+        urlStr.replace("{z}", QString::number(z));
+        urlStr.replace("{x}", QString::number(x));
+        urlStr.replace("{y}", QString::number(y));
         const QUrl url(urlStr);
 
         QNetworkRequest req(url);

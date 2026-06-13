@@ -1,5 +1,11 @@
 # FitlyzerC
 
+## Engineering Roadmap
+
+Implementation roadmap (phased, architecture-aware):
+
+- [docs/engineering-roadmap.md](docs/engineering-roadmap.md)
+
 ## Overview
 
 FitlyzerC is a cross-platform desktop application for analyzing Garmin FIT activity files. It is written in modern C++23 and uses Qt 6 for its user interface, charting, networking, and database functionality.

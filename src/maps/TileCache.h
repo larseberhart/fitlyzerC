@@ -9,15 +9,13 @@
 
 enum class MapStyle
 {
-    Street,
-    Light,
-    Greyscale,
-    BlackWhite,
-    Dark,
-    Satellite,
-    Terrain,
-    Topographic,
-    Minimal
+    Street = 0,
+    Light = 1,
+    Dark = 4,
+    Satellite = 5,
+    Terrain = 6,
+    Topographic = 7,
+    Minimal = 8
 };
 
 struct TileProvider
