@@ -155,6 +155,22 @@ cmake \
 cmake --build build/macos
 ```
 
+## Build + Package DMG (Automatic)
+
+Use the preset below to build Release and generate a DMG in one command:
+
+```bash
+cmake --build --preset macos-dmg
+```
+
+In VS Code with CMake Tools, select the `macos-dmg` configure preset first, then select the `macos-dmg` build preset. The plain `macos` preset is a normal app build and does not create a DMG.
+
+This runs the custom `dmg` target (backed by CPack DragNDrop) and produces:
+
+```text
+FitlyzerC-<version>.dmg
+```
+
 Executable:
 
 ```text
@@ -205,6 +221,22 @@ cmake ^
 cmake --build build\windows
 ```
 
+## Build + Package NSIS Installer
+
+Use the dedicated packaging preset to build Release and generate the NSIS installer in one command:
+
+```cmd
+cmake --build --preset windows-package
+```
+
+In VS Code with CMake Tools, select the `windows` configure preset first, then select the `windows-package` build preset. The plain `windows` build preset only builds the app binary and does not create the installer.
+
+This runs the CPack `PACKAGE` target and produces:
+
+```text
+FitlyzerC-<version>-Setup.exe
+```
+
 ### Deployment
 
 The build system automatically runs:
@@ -220,6 +252,33 @@ Executable:
 ```text
 build\windows\FitlyzerC.exe
 ```
+
+---
+
+# Packaging (One Command)
+
+Use the packaging driver script to configure, build, and run CPack for the current platform:
+
+```bash
+cmake -P scripts/package.cmake
+```
+
+Default preset mapping:
+
+- macOS -> `macos`
+- Windows -> `windows`
+- Linux -> `linux`
+
+You can override the preset when needed (for example MinGW on Windows):
+
+```bash
+cmake -DFITLYZER_PRESET=windows-mingw -P scripts/package.cmake
+```
+
+Expected package outputs:
+
+- Windows: `FitlyzerC-<version>-Setup.exe`
+- macOS: `FitlyzerC-<version>.dmg`
 
 ---
 
