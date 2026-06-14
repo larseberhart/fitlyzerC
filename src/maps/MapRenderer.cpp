@@ -71,8 +71,15 @@ MapRenderer::MapRenderer(QWidget* parent)
     : QWidget(parent)
 {
     setMinimumHeight(300);
+
+    // Coalesce tile-download repaints: many tiles arriving at once
+    // produce one repaint 50 ms after the last arrival, not one per tile.
+    m_tileRepaintTimer.setSingleShot(true);
+    m_tileRepaintTimer.setInterval(50);
+    connect(&m_tileRepaintTimer, &QTimer::timeout, this, [this] { update(); });
+
     connect(&m_tileCache, &TileCache::tileLoaded,
-            this, [this](int, int, int) { update(); });
+            this, [this](int, int, int) { m_tileRepaintTimer.start(); });
 }
 
 void MapRenderer::rebuildGpsCache()

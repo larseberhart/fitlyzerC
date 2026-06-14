@@ -2,6 +2,7 @@
 
 #include <QPointF>
 #include <QRectF>
+#include <QTimer>
 #include <QWidget>
 
 #include "core/zones/ZoneDefinition.h"
@@ -102,4 +103,5 @@ private:
     double  m_visibleStartSeconds = -1.0;
     double  m_visibleEndSeconds = -1.0;
     double  m_currentTimeSeconds = -1.0;
+    QTimer  m_tileRepaintTimer;
 };
