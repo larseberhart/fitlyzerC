@@ -56,7 +56,7 @@ AthleteListDialog::AthleteListDialog(AthleteRepository& repo, QWidget* parent)
     connect(closeBtn,    &QDialogButtonBox::rejected, this, &QDialog::reject);
 
     connect(m_table, &QTableWidget::cellDoubleClicked,
-            this, [this](int, int){ selectAthlete(); });
+            this, [this](int, int){ editAthlete(); });
     connect(m_table, &QTableWidget::itemSelectionChanged, this, [this]{
         const bool hasSel = m_table->currentRow() >= 0;
         m_editBtn->setEnabled(hasSel);
