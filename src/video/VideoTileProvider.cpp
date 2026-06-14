@@ -42,6 +42,7 @@ void VideoTileProvider::setRequiredTiles(const std::unordered_set<VideoTileId, V
 {
     m_requiredTiles = required;
     m_requiredTilesOnDisk = 0;
+    m_downloadedTiles = 0;
 
     for (const VideoTileId& tileId : m_requiredTiles)
     {
@@ -62,7 +63,20 @@ int VideoTileProvider::requiredTilesAvailableOnDisk() const
 
 QPixmap VideoTileProvider::getTile(const VideoTileId& id, bool allowNetwork)
 {
-    return m_tileCache.tileBlocking(id.z, id.x, id.y, allowNetwork);
+    const bool cachedBefore = isTileCachedOnDisk(id);
+    const QPixmap px = m_tileCache.tileBlocking(id.z, id.x, id.y, allowNetwork);
+    if (allowNetwork && !cachedBefore && !px.isNull() && isTileCachedOnDisk(id))
+        ++m_downloadedTiles;
+    return px;
+}
+
+VideoTileStats VideoTileProvider::stats() const
+{
+    VideoTileStats s;
+    s.requiredTiles = static_cast<int>(m_requiredTiles.size());
+    s.onDiskTiles = m_requiredTilesOnDisk;
+    s.downloadedTiles = m_downloadedTiles;
+    return s;
 }
 
 bool VideoTileProvider::isTileCachedOnDisk(const VideoTileId& id) const

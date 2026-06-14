@@ -20,6 +20,7 @@ signals:
     void stageChanged(const QString& stage);
     void progressChanged(int value, int maximum);
     void frameProgressChanged(int currentFrame, int totalFrames, const QString& etaText);
+    void tileStatsChanged(const QString& statsText);
     void finished(bool success, const QString& message, bool canceled);
 
 private:

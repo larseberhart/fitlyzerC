@@ -37,6 +37,13 @@ struct VideoTileIdHash
     }
 };
 
+struct VideoTileStats
+{
+    int requiredTiles = 0;
+    int onDiskTiles = 0;
+    int downloadedTiles = 0;
+};
+
 class VideoTileProvider
 {
 public:
@@ -48,6 +55,7 @@ public:
 
     QPixmap getTile(const VideoTileId& id, bool allowNetwork);
     bool isTileCachedOnDisk(const VideoTileId& id) const;
+    VideoTileStats stats() const;
 
     void clearMemoryCache();
     void cleanupExportCache();
@@ -59,4 +67,5 @@ private:
     bool m_deleteTemporaryTilesAfterExport = true;
     std::unordered_set<VideoTileId, VideoTileIdHash> m_requiredTiles;
     int m_requiredTilesOnDisk = 0;
+    int m_downloadedTiles = 0;
 };

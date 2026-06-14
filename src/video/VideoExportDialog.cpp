@@ -242,6 +242,7 @@ VideoExportDialog::VideoExportDialog(const VideoExportSettings& defaults, QWidge
     m_stageLabel = new QLabel("Ready", progressGroup);
     m_frameLabel = new QLabel("Frame: -", progressGroup);
     m_etaLabel = new QLabel("ETA: -", progressGroup);
+    m_tileStatsLabel = new QLabel("Tiles: required - | on-disk - | downloaded -", progressGroup);
     m_progressBar = new QProgressBar(progressGroup);
     m_progressBar->setRange(0, 100);
     m_progressBar->setValue(0);
@@ -249,6 +250,7 @@ VideoExportDialog::VideoExportDialog(const VideoExportSettings& defaults, QWidge
     progressLayout->addWidget(m_stageLabel);
     progressLayout->addWidget(m_frameLabel);
     progressLayout->addWidget(m_etaLabel);
+    progressLayout->addWidget(m_tileStatsLabel);
     progressLayout->addWidget(m_progressBar);
 
     auto* buttons = new QHBoxLayout;
@@ -357,6 +359,7 @@ void VideoExportDialog::startExport()
     connect(m_job, &VideoRenderJob::stageChanged, this, &VideoExportDialog::onStageChanged);
     connect(m_job, &VideoRenderJob::progressChanged, this, &VideoExportDialog::onProgressChanged);
     connect(m_job, &VideoRenderJob::frameProgressChanged, this, &VideoExportDialog::onFrameProgressChanged);
+    connect(m_job, &VideoRenderJob::tileStatsChanged, this, &VideoExportDialog::onTileStatsChanged);
     connect(m_job, &VideoRenderJob::finished, this, &VideoExportDialog::onFinished);
     connect(m_job, &VideoRenderJob::finished, m_thread, &QThread::quit);
     connect(m_thread, &QThread::finished, m_job, &QObject::deleteLater);
@@ -369,6 +372,7 @@ void VideoExportDialog::startExport()
     m_stageLabel->setText("Preparing data...");
     m_frameLabel->setText("Frame: 0 / 0");
     m_etaLabel->setText("ETA: --:--");
+    m_tileStatsLabel->setText("Tiles: required - | on-disk - | downloaded -");
     m_progressBar->setValue(0);
 
     m_thread->start();
@@ -401,6 +405,12 @@ void VideoExportDialog::onFrameProgressChanged(int currentFrame, int totalFrames
 {
     m_frameLabel->setText(QString("Frame: %1 / %2").arg(currentFrame).arg(totalFrames));
     m_etaLabel->setText(QString("ETA: %1").arg(etaText));
+}
+
+void VideoExportDialog::onTileStatsChanged(const QString& statsText)
+{
+    if (m_tileStatsLabel)
+        m_tileStatsLabel->setText(statsText);
 }
 
 void VideoExportDialog::onFinished(bool success, const QString& message, bool canceled)

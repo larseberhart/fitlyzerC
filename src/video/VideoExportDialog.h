@@ -34,6 +34,7 @@ private slots:
     void onStageChanged(const QString& stage);
     void onProgressChanged(int value, int maximum);
     void onFrameProgressChanged(int currentFrame, int totalFrames, const QString& etaText);
+    void onTileStatsChanged(const QString& statsText);
     void onFinished(bool success, const QString& message, bool canceled);
 
 private:
@@ -72,6 +73,7 @@ private:
     QLabel* m_stageLabel = nullptr;
     QLabel* m_frameLabel = nullptr;
     QLabel* m_etaLabel = nullptr;
+    QLabel* m_tileStatsLabel = nullptr;
     QProgressBar* m_progressBar = nullptr;
 
     QPushButton* m_exportButton = nullptr;

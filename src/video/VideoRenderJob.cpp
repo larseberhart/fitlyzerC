@@ -436,6 +436,12 @@ void VideoRenderJob::run()
     }
 
     tileProvider.setRequiredTiles(requiredTiles);
+    {
+        const VideoTileStats s = tileProvider.stats();
+        emit tileStatsChanged(QString("Tiles: required %1 | on-disk %2 | downloaded 0")
+                                  .arg(s.requiredTiles)
+                                  .arg(s.onDiskTiles));
+    }
     emit stageChanged(QString("Analyzed %1 required tiles (%2 available on disk)")
                           .arg(tileProvider.requiredTileCount())
                           .arg(tileProvider.requiredTilesAvailableOnDisk()));
@@ -900,6 +906,15 @@ void VideoRenderJob::run()
         const double remainingMs = avgPerFrameMs * static_cast<double>(totalFrames - done);
         const QString eta = fmtDuration(remainingMs / 1000.0);
 
+        if (done == 1 || done % 60 == 0 || done == totalFrames)
+        {
+            const VideoTileStats s = tileProvider.stats();
+            emit tileStatsChanged(QString("Tiles: required %1 | on-disk %2 | downloaded %3")
+                                      .arg(s.requiredTiles)
+                                      .arg(s.onDiskTiles)
+                                      .arg(s.downloadedTiles));
+        }
+
         emit progressChanged(done, totalFrames);
         emit frameProgressChanged(done, totalFrames, eta);
     }
@@ -920,5 +935,19 @@ void VideoRenderJob::run()
 
     emit stageChanged("Finalizing...");
     emit progressChanged(totalFrames, totalFrames);
-    emit finished(true, QString("Video exported to %1").arg(m_settings.outputPath), false);
+    {
+        const VideoTileStats s = tileProvider.stats();
+        emit tileStatsChanged(QString("Tiles: required %1 | on-disk %2 | downloaded %3")
+                                  .arg(s.requiredTiles)
+                                  .arg(s.onDiskTiles)
+                                  .arg(s.downloadedTiles));
+        emit finished(
+            true,
+            QString("Video exported to %1\n\nTile stats: required %2, on-disk %3, downloaded %4")
+                .arg(m_settings.outputPath)
+                .arg(s.requiredTiles)
+                .arg(s.onDiskTiles)
+                .arg(s.downloadedTiles),
+            false);
+    }
 }
