@@ -75,6 +75,7 @@
 #include <cfloat>
 #include <cmath>
 #include <map>
+#include <numeric>
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -552,7 +553,7 @@ void MainWindow::buildUI()
 
         m_chartScroll = new QScrollArea;
         m_chartScroll->setWidget(m_chartsContainer);
-        m_chartScroll->setWidgetResizable(false);
+        m_chartScroll->setWidgetResizable(true);
         m_chartScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         m_chartScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
         m_chartScroll->viewport()->installEventFilter(this);
@@ -690,11 +691,16 @@ void MainWindow::buildUI()
         topSplit->addWidget(mapPanel);
         topSplit->setStretchFactor(0, 1);
         topSplit->setStretchFactor(1, 1);
+        topSplit->setCollapsible(0, false);
+        topSplit->setCollapsible(1, false);
+        
+        // Initialize 50/50 split after layout is complete
         QTimer::singleShot(0, topSplit, [topSplit]()
         {
-            const int totalWidth = topSplit->size().width();
+            const QList<int> sizes = topSplit->sizes();
+            const int totalWidth = std::accumulate(sizes.begin(), sizes.end(), 0);
             if (totalWidth > 0)
-                topSplit->setSizes({ totalWidth / 2, totalWidth - (totalWidth / 2) });
+                topSplit->setSizes({ totalWidth / 2, totalWidth / 2 });
         });
 
         auto* bottomSplit = new QSplitter(Qt::Horizontal, chartsTab);
@@ -1119,12 +1125,10 @@ void MainWindow::applyChartHeight()
                         + std::max(0, visibleCount - 1) * spacing;
     m_chartsContainer->setFixedHeight(std::max(totalH, 1));
 
-    // Sync width to the viewport if it is already sized (post-show).
-    if (m_chartScroll) {
-        const int vpW = m_chartScroll->viewport()->width();
-        if (vpW > 0)
-            m_chartsContainer->setFixedWidth(vpW);
-    }
+    // Don't set a fixed width - let the splitter handle horizontal sizing.
+    // The charts will naturally fill their allocated space in the splitter.
+    if (m_chartsContainer)
+        m_chartsContainer->setMaximumWidth(QWIDGETSIZE_MAX);
 }
 
 bool MainWindow::eventFilter(QObject* watched, QEvent* event)
