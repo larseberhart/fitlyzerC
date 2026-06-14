@@ -340,8 +340,9 @@ Release builds are configured to bundle FFmpeg with the app so end users do not 
 Bundling priority:
 
 1. Build from FFmpeg source in `third_party/ffmpeg`
-2. Use prebuilt executable in `resources/ffmpeg/<platform>/`
-3. Fallback to system `ffmpeg` if neither is available
+2. Auto-download FFmpeg from `https://git.ffmpeg.org/ffmpeg.git` when the local source tree is missing
+3. Use prebuilt executable in `resources/ffmpeg/<platform>/`
+4. Fallback to system `ffmpeg` if neither source nor bundled binary is available
 
 Default prebuilt lookup paths:
 
@@ -356,8 +357,13 @@ Useful CMake options:
 ```bash
 -DFITLYZERC_BUNDLE_FFMPEG=ON
 -DFITLYZERC_FFMPEG_SOURCE_DIR=third_party/ffmpeg
+-DFITLYZERC_AUTO_DOWNLOAD_FFMPEG=ON
+-DFITLYZERC_FFMPEG_GIT_REPOSITORY=https://git.ffmpeg.org/ffmpeg.git
+-DFITLYZERC_FFMPEG_GIT_TAG=master
 -DFITLYZERC_FFMPEG_BINARY_PATH=/absolute/path/to/ffmpeg
 ```
+
+If you want fully reproducible builds, point `FITLYZERC_FFMPEG_SOURCE_DIR` at a local FFmpeg checkout or pin `FITLYZERC_FFMPEG_GIT_TAG` to a specific release tag/commit.
 
 Disable bundling (not recommended for release artifacts):
 

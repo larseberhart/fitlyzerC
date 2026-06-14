@@ -102,11 +102,31 @@ option(
     ON
 )
 
+option(
+    FITLYZERC_AUTO_DOWNLOAD_FFMPEG
+    "Automatically download FFmpeg source when a local tree is unavailable"
+    ON
+)
+
 set(
     FITLYZERC_FFMPEG_SOURCE_DIR
     "${CMAKE_SOURCE_DIR}/third_party/ffmpeg"
     CACHE PATH
-    "Path to FFmpeg source tree (expects a configure script)"
+    "Path to FFmpeg source tree (expects a configure script; auto-download is used if absent)"
+)
+
+set(
+    FITLYZERC_FFMPEG_GIT_REPOSITORY
+    "https://git.ffmpeg.org/ffmpeg.git"
+    CACHE STRING
+    "Git repository used to fetch FFmpeg source when auto-download is enabled"
+)
+
+set(
+    FITLYZERC_FFMPEG_GIT_TAG
+    "master"
+    CACHE STRING
+    "Git branch, tag, or commit used when auto-downloading FFmpeg source"
 )
 
 set(
@@ -276,7 +296,22 @@ if(FITLYZERC_BUNDLE_FFMPEG)
         get_filename_component(_ffmpeg_source_dir "${_ffmpeg_source_dir}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
     endif()
 
+    set(_ffmpeg_download_args)
     if(_ffmpeg_source_dir AND EXISTS "${_ffmpeg_source_dir}/configure")
+        message(STATUS "FFmpeg source tree found: ${_ffmpeg_source_dir}")
+    elseif(FITLYZERC_AUTO_DOWNLOAD_FFMPEG)
+        set(_ffmpeg_source_dir "${CMAKE_BINARY_DIR}/_deps/ffmpeg-src")
+        set(_ffmpeg_download_args
+            GIT_REPOSITORY "${FITLYZERC_FFMPEG_GIT_REPOSITORY}"
+            GIT_TAG "${FITLYZERC_FFMPEG_GIT_TAG}"
+            GIT_SHALLOW TRUE
+        )
+        message(STATUS
+            "FFmpeg source tree not found; cloning ${FITLYZERC_FFMPEG_GIT_REPOSITORY} (${FITLYZERC_FFMPEG_GIT_TAG})"
+        )
+    endif()
+
+    if(_ffmpeg_source_dir)
         find_program(FITLYZERC_BASH_EXECUTABLE NAMES bash)
         find_program(FITLYZERC_MAKE_EXECUTABLE NAMES make gmake mingw32-make)
 
@@ -299,10 +334,12 @@ if(FITLYZERC_BUNDLE_FFMPEG)
             ExternalProject_Add(FitlyzerFFmpeg
                 SOURCE_DIR "${_ffmpeg_source_dir}"
                 BINARY_DIR "${FITLYZERC_FFMPEG_BUILD_DIR}"
+                ${_ffmpeg_download_args}
                 CONFIGURE_COMMAND ${_ffmpeg_configure}
                 BUILD_COMMAND "${FITLYZERC_MAKE_EXECUTABLE}" -j
                 INSTALL_COMMAND "${FITLYZERC_MAKE_EXECUTABLE}" install
                 BUILD_BYPRODUCTS "${FITLYZERC_FFMPEG_INSTALL_DIR}/bin/ffmpeg${_ffmpeg_suffix}"
+                LOG_DOWNLOAD ON
                 LOG_CONFIGURE ON
                 LOG_BUILD ON
                 LOG_INSTALL ON
@@ -310,7 +347,11 @@ if(FITLYZERC_BUNDLE_FFMPEG)
 
             add_dependencies(FitlyzerC FitlyzerFFmpeg)
             set(FITLYZERC_BUNDLED_FFMPEG_BINARY "${FITLYZERC_FFMPEG_INSTALL_DIR}/bin/ffmpeg${_ffmpeg_suffix}")
-            message(STATUS "FFmpeg will be built from source: ${_ffmpeg_source_dir}")
+            if(_ffmpeg_download_args)
+                message(STATUS "FFmpeg will be downloaded and built from source into ${_ffmpeg_source_dir}")
+            else()
+                message(STATUS "FFmpeg will be built from source: ${_ffmpeg_source_dir}")
+            endif()
         else()
             message(WARNING "FFmpeg source was found but build tools are missing (bash/make). Falling back to prebuilt FFmpeg lookup.")
         endif()
@@ -365,7 +406,7 @@ if(FITLYZERC_BUNDLE_FFMPEG)
 
         if(NOT WIN32)
             add_custom_command(TARGET FitlyzerC POST_BUILD
-                COMMAND "${CMAKE_COMMAND}" -E chmod +x "${FITLYZERC_RUNTIME_FFMPEG_DEST}"
+                COMMAND chmod +x "${FITLYZERC_RUNTIME_FFMPEG_DEST}"
                 COMMENT "Ensuring bundled FFmpeg is executable"
                 VERBATIM
             )
