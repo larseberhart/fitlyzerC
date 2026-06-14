@@ -4,6 +4,14 @@
 <img src="images/logo.png" alt="My Image" width="400">
 </p>
 
+> [!WARNING]
+> **FitlyzerC is currently in pre-release / beta status.**
+>
+> Breaking changes may occur between releases. In particular, database schemas, file formats, and internal data structures may change without backward compatibility. Updating to a newer version may require recreating your database or re-importing data.
+>
+
+---
+
 ## Download
 
 Pre-built installers are available on the [Releases](../../releases) page.
@@ -15,6 +23,8 @@ Pre-built installers are available on the [Releases](../../releases) page.
 | Linux (x64) | AppImage |
 
 ---
+
+
 
 ## Overview
 
