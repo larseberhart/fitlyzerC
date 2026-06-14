@@ -1,5 +1,6 @@
 #include "ActivityBrowser.h"
 #include "EditNotesDialog.h"
+#include "core/settings/DateFormatter.h"
 
 #include <QHeaderView>
 #include <QHBoxLayout>
@@ -15,6 +16,13 @@
 #include <QVBoxLayout>
 #include <QFileInfo>
 #include <QDate>
+
+namespace
+{
+constexpr int kNotesRole = Qt::UserRole + 1;
+constexpr int kWeatherRole = Qt::UserRole + 2;
+constexpr int kIsoDateRole = Qt::UserRole + 3;
+}
 
 static QString fmtDurAB(double seconds)
 {
@@ -161,10 +169,15 @@ void ActivityBrowser::refresh(int athleteId)
         const int row = m_table->rowCount();
         m_table->insertRow(row);
 
-        auto* dateItem = new QTableWidgetItem(a.importedAt.left(10));
-        dateItem->setData(Qt::UserRole,       a.id);
-        dateItem->setData(Qt::UserRole + 1,   a.notes);
-        dateItem->setData(Qt::UserRole + 2,   a.weatherNotes);
+        const QString isoDate = !a.startTime.isEmpty() ? a.startTime.left(10) : a.importedAt.left(10);
+        const QDate parsedDate = QDate::fromString(isoDate, Qt::ISODate);
+        const QString displayDate = parsedDate.isValid() ? DateFormatter::formatDate(parsedDate) : isoDate;
+
+        auto* dateItem = new QTableWidgetItem(displayDate);
+        dateItem->setData(Qt::UserRole, a.id);
+        dateItem->setData(kNotesRole, a.notes);
+        dateItem->setData(kWeatherRole, a.weatherNotes);
+        dateItem->setData(kIsoDateRole, isoDate);
         m_table->setItem(row, 0, dateItem);
 
         m_table->setItem(row, 1, new QTableWidgetItem(a.fileName));
@@ -210,14 +223,14 @@ void ActivityBrowser::applyFilters()
             }
             auto* dateItem = m_table->item(row, 0);
             if (dateItem)
-                rowText += dateItem->data(Qt::UserRole + 1).toString().toLower() + " ";
+                rowText += dateItem->data(kNotesRole).toString().toLower() + " ";
             matchesText = rowText.contains(term);
         }
 
         bool matchesDate = true;
         auto* dateItem = m_table->item(row, 0);
         const QDate rowDate = dateItem
-            ? QDate::fromString(dateItem->text(), Qt::ISODate)
+            ? QDate::fromString(dateItem->data(kIsoDateRole).toString(), Qt::ISODate)
             : QDate();
 
         if (rowDate.isValid() && range != "All")
@@ -294,8 +307,8 @@ void ActivityBrowser::editNotes(int activityId)
         auto* item = m_table->item(row, 0);
         if (item && item->data(Qt::UserRole).toInt() == activityId)
         {
-            notes   = item->data(Qt::UserRole + 1).toString();
-            weather = item->data(Qt::UserRole + 2).toString();
+            notes   = item->data(kNotesRole).toString();
+            weather = item->data(kWeatherRole).toString();
             break;
         }
     }

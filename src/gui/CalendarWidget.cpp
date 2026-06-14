@@ -1,6 +1,7 @@
 #include "CalendarWidget.h"
 
 #include "PlannedWorkoutDialog.h"
+#include "core/settings/DateFormatter.h"
 #include "database/DatabaseManager.h"
 
 #include <QCalendarWidget>
@@ -108,7 +109,7 @@ void CalendarWidget::addPlannedWorkout()
         "INSERT INTO planned_workouts(athlete_id, workout_date, title, type, duration_sec, target_tss, notes) "
         "VALUES(:athlete_id, :workout_date, :title, :type, :duration_sec, :target_tss, :notes)");
     q.bindValue(":athlete_id", m_athleteId);
-    q.bindValue(":workout_date", saved.date.toString(Qt::ISODate));
+    q.bindValue(":workout_date", DateFormatter::toIsoDate(saved.date));
     q.bindValue(":title", saved.title);
     q.bindValue(":type", saved.type);
     q.bindValue(":duration_sec", saved.durationSeconds);
@@ -162,7 +163,7 @@ void CalendarWidget::editSelectedWorkout()
     update.prepare(
         "UPDATE planned_workouts SET workout_date=:workout_date, title=:title, type=:type, "
         "duration_sec=:duration_sec, target_tss=:target_tss, notes=:notes WHERE id=:id");
-    update.bindValue(":workout_date", saved.date.toString(Qt::ISODate));
+    update.bindValue(":workout_date", DateFormatter::toIsoDate(saved.date));
     update.bindValue(":title", saved.title);
     update.bindValue(":type", saved.type);
     update.bindValue(":duration_sec", saved.durationSeconds);
@@ -225,7 +226,7 @@ void CalendarWidget::reloadDayList(const QDate& date)
         "SELECT id, title, type, duration_sec, target_tss FROM planned_workouts "
         "WHERE athlete_id=:athlete_id AND workout_date=:workout_date ORDER BY id ASC");
     q.bindValue(":athlete_id", m_athleteId);
-    q.bindValue(":workout_date", date.toString(Qt::ISODate));
+    q.bindValue(":workout_date", DateFormatter::toIsoDate(date));
     q.exec();
 
     bool hasRows = false;
@@ -273,8 +274,8 @@ void CalendarWidget::updateMonthFormatting()
         "WHERE athlete_id=:athlete_id AND workout_date>=:start_date AND workout_date<=:end_date "
         "GROUP BY workout_date");
     q.bindValue(":athlete_id", m_athleteId);
-    q.bindValue(":start_date", monthStart.toString(Qt::ISODate));
-    q.bindValue(":end_date", monthEnd.toString(Qt::ISODate));
+    q.bindValue(":start_date", DateFormatter::toIsoDate(monthStart));
+    q.bindValue(":end_date", DateFormatter::toIsoDate(monthEnd));
     q.exec();
 
     while (q.next())

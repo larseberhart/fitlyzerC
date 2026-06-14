@@ -1,4 +1,5 @@
 #include "AthleteDialog.h"
+#include "core/settings/DateFormatter.h"
 
 #include <QDate>
 #include <QDialogButtonBox>
@@ -16,6 +17,23 @@
 #include <QTableWidgetItem>
 #include <QVBoxLayout>
 
+namespace
+{
+constexpr int kEntryIdRole = Qt::UserRole;
+
+QString displayDateOrRaw(const QString& raw)
+{
+    const QDate parsed = QDate::fromString(raw, Qt::ISODate);
+    return parsed.isValid() ? DateFormatter::formatDate(parsed) : raw;
+}
+
+QString toIsoOrRaw(const QString& text)
+{
+    const QDate parsed = DateFormatter::parseDate(text);
+    return parsed.isValid() ? DateFormatter::toIsoDate(parsed) : text.trimmed();
+}
+}
+
 AthleteDialog::AthleteDialog(AthleteRepository& repo, int athleteId, QWidget* parent)
     : QDialog(parent)
     , m_repo(repo)
@@ -31,7 +49,7 @@ AthleteDialog::AthleteDialog(AthleteRepository& repo, int athleteId, QWidget* pa
     m_firstName = new QLineEdit;
     m_lastName  = new QLineEdit;
     m_dob       = new QLineEdit;
-    m_dob->setPlaceholderText("YYYY-MM-DD");
+    m_dob->setPlaceholderText(QString("Date format: %1").arg(DateFormatter::qtDatePattern()));
     m_email     = new QLineEdit;
     m_height    = new QDoubleSpinBox;
     m_ftp       = new QSpinBox;
@@ -113,7 +131,7 @@ void AthleteDialog::loadAthlete()
     Athlete a = m_repo.getAthlete(m_athleteId);
     m_firstName->setText(a.firstName);
     m_lastName->setText(a.lastName);
-    m_dob->setText(a.dateOfBirth);
+    m_dob->setText(displayDateOrRaw(a.dateOfBirth));
     m_email->setText(a.email);
     m_height->setValue(a.heightCm);
     m_ftp->setValue(a.ftpWatts > 0 ? a.ftpWatts : 250);
@@ -129,11 +147,11 @@ void AthleteDialog::populateFtpTable(const QList<FtpEntry>& entries)
     {
         const int row = m_ftpTable->rowCount();
         m_ftpTable->insertRow(row);
-        m_ftpTable->setItem(row, 0, new QTableWidgetItem(e.effectiveFrom));
+        m_ftpTable->setItem(row, 0, new QTableWidgetItem(displayDateOrRaw(e.effectiveFrom)));
         m_ftpTable->setItem(row, 1, new QTableWidgetItem(QString::number(e.ftpWatts)));
         m_ftpTable->setItem(row, 2, new QTableWidgetItem(e.notes));
         // Store the entry id in the row's first item
-        m_ftpTable->item(row, 0)->setData(Qt::UserRole, e.id);
+        m_ftpTable->item(row, 0)->setData(kEntryIdRole, e.id);
     }
 }
 
@@ -144,10 +162,10 @@ void AthleteDialog::populateWeightTable(const QList<WeightEntry>& entries)
     {
         const int row = m_weightTable->rowCount();
         m_weightTable->insertRow(row);
-        m_weightTable->setItem(row, 0, new QTableWidgetItem(e.effectiveFrom));
+        m_weightTable->setItem(row, 0, new QTableWidgetItem(displayDateOrRaw(e.effectiveFrom)));
         m_weightTable->setItem(row, 1, new QTableWidgetItem(
             QString::number(e.weightKg, 'f', 1)));
-        m_weightTable->item(row, 0)->setData(Qt::UserRole, e.id);
+        m_weightTable->item(row, 0)->setData(kEntryIdRole, e.id);
     }
 }
 
@@ -155,11 +173,10 @@ void AthleteDialog::addFtpRow()
 {
     const int row = m_ftpTable->rowCount();
     m_ftpTable->insertRow(row);
-    m_ftpTable->setItem(row, 0, new QTableWidgetItem(
-        QDate::currentDate().toString(Qt::ISODate)));
+    m_ftpTable->setItem(row, 0, new QTableWidgetItem(DateFormatter::formatDate(QDate::currentDate())));
     m_ftpTable->setItem(row, 1, new QTableWidgetItem("250"));
     m_ftpTable->setItem(row, 2, new QTableWidgetItem(""));
-    m_ftpTable->item(row, 0)->setData(Qt::UserRole, -1); // new, no db id yet
+    m_ftpTable->item(row, 0)->setData(kEntryIdRole, -1); // new, no db id yet
     m_ftpTable->editItem(m_ftpTable->item(row, 0));
 }
 
@@ -167,7 +184,7 @@ void AthleteDialog::deleteFtpRow()
 {
     const int row = m_ftpTable->currentRow();
     if (row < 0) return;
-    const int entryId = m_ftpTable->item(row, 0)->data(Qt::UserRole).toInt();
+    const int entryId = m_ftpTable->item(row, 0)->data(kEntryIdRole).toInt();
     if (entryId > 0 && m_athleteId > 0)
         m_repo.deleteFtpEntry(entryId);
     m_ftpTable->removeRow(row);
@@ -177,10 +194,9 @@ void AthleteDialog::addWeightRow()
 {
     const int row = m_weightTable->rowCount();
     m_weightTable->insertRow(row);
-    m_weightTable->setItem(row, 0, new QTableWidgetItem(
-        QDate::currentDate().toString(Qt::ISODate)));
+    m_weightTable->setItem(row, 0, new QTableWidgetItem(DateFormatter::formatDate(QDate::currentDate())));
     m_weightTable->setItem(row, 1, new QTableWidgetItem("70.0"));
-    m_weightTable->item(row, 0)->setData(Qt::UserRole, -1);
+    m_weightTable->item(row, 0)->setData(kEntryIdRole, -1);
     m_weightTable->editItem(m_weightTable->item(row, 0));
 }
 
@@ -188,7 +204,7 @@ void AthleteDialog::deleteWeightRow()
 {
     const int row = m_weightTable->currentRow();
     if (row < 0) return;
-    const int entryId = m_weightTable->item(row, 0)->data(Qt::UserRole).toInt();
+    const int entryId = m_weightTable->item(row, 0)->data(kEntryIdRole).toInt();
     if (entryId > 0 && m_athleteId > 0)
         m_repo.deleteWeightEntry(entryId);
     m_weightTable->removeRow(row);
@@ -208,7 +224,7 @@ void AthleteDialog::onAccepted()
     a.id          = m_athleteId;
     a.firstName   = m_firstName->text().trimmed();
     a.lastName    = m_lastName->text().trimmed();
-    a.dateOfBirth = m_dob->text().trimmed();
+    a.dateOfBirth = toIsoOrRaw(m_dob->text());
     a.email       = m_email->text().trimmed();
     a.heightCm    = m_height->value();
     a.ftpWatts    = m_ftp->value();
@@ -230,12 +246,12 @@ void AthleteDialog::onAccepted()
     // Save new FTP entries (those with id == -1)
     for (int row = 0; row < m_ftpTable->rowCount(); ++row)
     {
-        const int entryId = m_ftpTable->item(row, 0)->data(Qt::UserRole).toInt();
+        const int entryId = m_ftpTable->item(row, 0)->data(kEntryIdRole).toInt();
         if (entryId < 0)
         {
             FtpEntry e;
             e.athleteId     = m_savedId;
-            e.effectiveFrom = m_ftpTable->item(row, 0)->text();
+            e.effectiveFrom = toIsoOrRaw(m_ftpTable->item(row, 0)->text());
             e.ftpWatts      = m_ftpTable->item(row, 1)->text().toInt();
             e.notes         = m_ftpTable->item(row, 2)->text();
             m_repo.addFtpEntry(e);
@@ -245,12 +261,12 @@ void AthleteDialog::onAccepted()
     // Save new weight entries
     for (int row = 0; row < m_weightTable->rowCount(); ++row)
     {
-        const int entryId = m_weightTable->item(row, 0)->data(Qt::UserRole).toInt();
+        const int entryId = m_weightTable->item(row, 0)->data(kEntryIdRole).toInt();
         if (entryId < 0)
         {
             WeightEntry e;
             e.athleteId     = m_savedId;
-            e.effectiveFrom = m_weightTable->item(row, 0)->text();
+            e.effectiveFrom = toIsoOrRaw(m_weightTable->item(row, 0)->text());
             e.weightKg      = m_weightTable->item(row, 1)->text().toDouble();
             m_repo.addWeightEntry(e);
         }

@@ -1,5 +1,8 @@
 #include "AthleteListDialog.h"
 #include "AthleteDialog.h"
+#include "core/settings/DateFormatter.h"
+
+#include <QDate>
 
 #include <QDialogButtonBox>
 #include <QHBoxLayout>
@@ -78,7 +81,9 @@ void AthleteListDialog::refresh()
         auto* nameItem = new QTableWidgetItem(a.fullName());
         nameItem->setData(Qt::UserRole, a.id);
         m_table->setItem(row, 0, nameItem);
-        m_table->setItem(row, 1, new QTableWidgetItem(a.dateOfBirth));
+        const QDate dob = QDate::fromString(a.dateOfBirth, Qt::ISODate);
+        const QString dobText = dob.isValid() ? DateFormatter::formatDate(dob) : a.dateOfBirth;
+        m_table->setItem(row, 1, new QTableWidgetItem(dobText));
         m_table->setItem(row, 2, new QTableWidgetItem(a.email));
     }
 }

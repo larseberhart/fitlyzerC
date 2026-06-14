@@ -1,4 +1,5 @@
 #include "PlannedWorkoutDialog.h"
+#include "core/settings/DateFormatter.h"
 
 #include <QDate>
 #include <QDateEdit>
@@ -24,6 +25,7 @@ PlannedWorkoutDialog::PlannedWorkoutDialog(const PlannedWorkoutDraft& draft, QWi
 
     m_dateEdit = new QDateEdit(this);
     m_dateEdit->setCalendarPopup(true);
+    m_dateEdit->setDisplayFormat(DateFormatter::qtDatePattern());
     m_dateEdit->setDate(draft.date.isValid() ? draft.date : QDate::currentDate());
 
     m_titleEdit = new QLineEdit(draft.title, this);

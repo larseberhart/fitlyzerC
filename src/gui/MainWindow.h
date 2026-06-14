@@ -58,6 +58,7 @@ private slots:
     void createDatabase();
     void manageAthletes();
     void backupDatabase();
+    void openSettingsDialog();
     void openRecentDatabase();
     void onAthleteSelectionChanged(int index);
     void createVideo();

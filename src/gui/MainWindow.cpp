@@ -9,6 +9,8 @@
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QDate>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QDir>
@@ -17,6 +19,7 @@
 #include <QFileInfo>
 #include <QFile>
 #include <QFileSystemWatcher>
+#include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -24,7 +27,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMimeData>
-#include <QLocale>
+#include <QKeySequence>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QSettings>
@@ -57,6 +60,8 @@
 #include "charts/PowerCurveWidget.h"
 #include "charts/PowerHistogramWidget.h"
 #include "charts/RideChartWidget.h"
+#include "core/settings/AppSettings.h"
+#include "core/settings/DateFormatter.h"
 #include "core/zones/ZoneCalculator.h"
 #include "database/AthleteRepository.h"
 #include "database/IntervalRepository.h"
@@ -97,7 +102,7 @@ static QString formatActivityDateLabel(const QString& isoDate)
     if (date == today.addDays(-1))
         return QStringLiteral("Yesterday");
 
-    return QLocale().toString(date, QLocale::ShortFormat);
+    return DateFormatter::formatDate(date);
 }
 
 static QDate activityDateForFtpContext(const Activity& activity)
@@ -307,6 +312,11 @@ void MainWindow::buildUI()
         m_previewAct = new QAction("Preview FIT File...", this);
         connect(m_previewAct, &QAction::triggered, this, &MainWindow::previewFitFile);
         toolsMenu->addAction(m_previewAct);
+        toolsMenu->addSeparator();
+        auto* settingsAct = new QAction("Settings...", this);
+        settingsAct->setShortcut(QKeySequence::Preferences);
+        connect(settingsAct, &QAction::triggered, this, &MainWindow::openSettingsDialog);
+        toolsMenu->addAction(settingsAct);
 
         // View and Help placeholders for expected desktop structure
         auto* viewMenu = menuBar()->addMenu("&View");
@@ -1988,7 +1998,7 @@ void MainWindow::createVideo()
     const QDate date = !activity.startTime.isEmpty()
         ? QDate::fromString(activity.startTime.left(10), Qt::ISODate)
         : QDate::fromString(activity.importedAt.left(10), Qt::ISODate);
-    const QString dateText = (date.isValid() ? date : QDate::currentDate()).toString("yyyy-MM-dd");
+    const QString dateText = DateFormatter::toIsoDate(date.isValid() ? date : QDate::currentDate());
 
     const QString defaultName = QString("%1-%2-%3.mp4")
         .arg(dateText,
@@ -2142,6 +2152,50 @@ void MainWindow::manageAthletes()
         updateStatusBarInfo();
         updateWelcomeScreenVisibility();
     }
+}
+
+void MainWindow::openSettingsDialog()
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle("Settings");
+    dialog.setModal(true);
+
+    auto* layout = new QVBoxLayout(&dialog);
+    auto* generalGroup = new QGroupBox("General", &dialog);
+    auto* form = new QFormLayout(generalGroup);
+
+    auto* dateFormatCombo = new QComboBox(generalGroup);
+    dateFormatCombo->addItem("DD-MM-YYYY (14-06-2026)", static_cast<int>(DateFormat::DD_MM_YYYY));
+    dateFormatCombo->addItem("YYYY-MM-DD (2026-06-14)", static_cast<int>(DateFormat::YYYY_MM_DD));
+    dateFormatCombo->addItem("DD.MM.YYYY (14.06.2026)", static_cast<int>(DateFormat::DD_DOT_MM_DOT_YYYY));
+    dateFormatCombo->addItem("MM/DD/YYYY (06/14/2026)", static_cast<int>(DateFormat::MM_DD_YYYY));
+
+    const DateFormat currentFormat = AppSettings::instance().dateFormat();
+    const int currentIndex = dateFormatCombo->findData(static_cast<int>(currentFormat));
+    dateFormatCombo->setCurrentIndex(currentIndex >= 0 ? currentIndex : 0);
+
+    form->addRow("Date Format:", dateFormatCombo);
+    layout->addWidget(generalGroup);
+
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    layout->addWidget(buttons);
+
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    const DateFormat selectedFormat = static_cast<DateFormat>(dateFormatCombo->currentData().toInt());
+    if (selectedFormat == currentFormat)
+        return;
+
+    AppSettings::instance().setDateFormat(selectedFormat);
+
+    if (m_activityBrowser)
+        m_activityBrowser->refresh(m_currentAthleteId);
+
+    updateStatsLabel();
 }
 
 void MainWindow::backupDatabase()
@@ -2569,7 +2623,7 @@ void MainWindow::applyEstimatedFtpForCurrentAthlete()
     FtpEntry entry;
     entry.athleteId = m_currentAthleteId;
     entry.ftpWatts = estimated;
-    entry.effectiveFrom = QDate::currentDate().toString(Qt::ISODate);
+    entry.effectiveFrom = DateFormatter::toIsoDate(QDate::currentDate());
     entry.notes = "Estimated from best 20-minute power (95%).";
     repo.addFtpEntry(entry);
 

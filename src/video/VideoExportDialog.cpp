@@ -1,5 +1,7 @@
 #include "VideoExportDialog.h"
 
+#include "core/settings/DateFormatter.h"
+
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDate>
@@ -50,7 +52,7 @@ QString makeDefaultFilename(const VideoExportSettings& defaults)
     if (athlete.isEmpty())
         athlete = "Athlete";
 
-    const QString date = QDate::currentDate().toString("yyyy-MM-dd");
+    const QString date = DateFormatter::toIsoDate(QDate::currentDate());
     QString name = QString("%1-%2-%3.mp4").arg(date, activity, athlete);
 
     static const QString invalid = QStringLiteral("\\/:*?\"<>|");
