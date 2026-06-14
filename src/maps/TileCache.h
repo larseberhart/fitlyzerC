@@ -36,6 +36,8 @@ public:
 
     // Returns the cached tile pixmap (may be null while downloading)
     QPixmap tile(int z, int x, int y);
+    QPixmap tileBlocking(int z, int x, int y, bool allowNetwork = true);
+    bool isTileCachedOnDisk(int z, int x, int y) const;
     void setMapStyle(MapStyle style);
     MapStyle mapStyle() const { return m_mapStyle; }
     QString mapStyleName() const;
@@ -50,6 +52,7 @@ private slots:
 
 private:
     QString key(int z, int x, int y) const;
+    QString diskTilePath(int z, int x, int y) const;
     static QString styleKey(MapStyle style);
     static QString styleDisplayName(MapStyle style);
     static TileProvider providerForStyle(MapStyle style);

@@ -214,6 +214,16 @@ RideChartWidget::RideChartWidget(Metric metric, QWidget* parent)
 
 }
 
+double RideChartWidget::visibleRangeStartMinutes() const
+{
+    return m_axisX ? m_axisX->min() : 0.0;
+}
+
+double RideChartWidget::visibleRangeEndMinutes() const
+{
+    return m_axisX ? m_axisX->max() : 0.0;
+}
+
 void RideChartWidget::setPowerSmoothingSeconds(int seconds)
 {
     const int normalized = std::max(0, seconds);

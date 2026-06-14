@@ -1,9 +1,15 @@
 #include "TileCache.h"
 
+#include <QDir>
+#include <QEventLoop>
+#include <QFileInfo>
 #include <QImage>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QStandardPaths>
 #include <QUrl>
+
+#include <algorithm>
 
 static constexpr int kCacheMaxTiles = 512;
 
@@ -114,6 +120,25 @@ QString TileCache::key(int z, int x, int y) const
     return QString("%1/%2/%3/%4").arg(styleKey(m_mapStyle)).arg(z).arg(x).arg(y);
 }
 
+QString TileCache::diskTilePath(int z, int x, int y) const
+{
+    const QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    const QString root = appData.isEmpty()
+        ? QDir::home().filePath(".fitlyzerc/tiles")
+        : QDir(appData).filePath("tiles");
+    return QDir(root).filePath(QString("%1/%2/%3/%4.png")
+                                   .arg(styleKey(m_mapStyle))
+                                   .arg(z)
+                                   .arg(x)
+                                   .arg(y));
+}
+
+bool TileCache::isTileCachedOnDisk(int z, int x, int y) const
+{
+    z = std::clamp(z, 1, m_provider.maxZoom);
+    return QFileInfo::exists(diskTilePath(z, x, y));
+}
+
 void TileCache::setMapStyle(MapStyle style)
 {
     if (m_mapStyle == style)
@@ -148,6 +173,14 @@ QPixmap TileCache::tile(int z, int x, int y)
     if (auto* px = m_cache.object(k))
         return *px;
 
+    const QString diskPath = diskTilePath(z, x, y);
+    QPixmap diskPixmap;
+    if (diskPixmap.load(diskPath))
+    {
+        m_cache.insert(k, new QPixmap(diskPixmap));
+        return diskPixmap;
+    }
+
     if (!m_pending.contains(k))
     {
         m_pending.insert(k);
@@ -175,6 +208,59 @@ QPixmap TileCache::tile(int z, int x, int y)
     return {};   // empty until the download completes
 }
 
+QPixmap TileCache::tileBlocking(int z, int x, int y, bool allowNetwork)
+{
+    z = std::clamp(z, 1, m_provider.maxZoom);
+    const QString k = key(z, x, y);
+
+    if (auto* px = m_cache.object(k))
+        return *px;
+
+    const QString diskPath = diskTilePath(z, x, y);
+    QPixmap diskPixmap;
+    if (diskPixmap.load(diskPath))
+    {
+        m_cache.insert(k, new QPixmap(diskPixmap));
+        return diskPixmap;
+    }
+
+    if (!allowNetwork)
+        return {};
+
+    QString urlStr = m_provider.urlTemplate;
+    urlStr.replace("{z}", QString::number(z));
+    urlStr.replace("{x}", QString::number(x));
+    urlStr.replace("{y}", QString::number(y));
+
+    QNetworkAccessManager nam;
+    QNetworkRequest req{ QUrl(urlStr) };
+    req.setHeader(QNetworkRequest::UserAgentHeader, "FitlyzerC/1.0");
+    req.setAttribute(
+        QNetworkRequest::RedirectPolicyAttribute,
+        QNetworkRequest::NoLessSafeRedirectPolicy);
+
+    QNetworkReply* reply = nam.get(req);
+    QEventLoop loop;
+    connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    loop.exec();
+
+    QPixmap px;
+    if (reply->error() == QNetworkReply::NoError)
+    {
+        const QByteArray bytes = reply->readAll();
+        if (px.loadFromData(bytes))
+        {
+            const QFileInfo fi(diskPath);
+            QDir().mkpath(fi.path());
+            px.save(diskPath);
+            m_cache.insert(k, new QPixmap(px));
+        }
+    }
+
+    reply->deleteLater();
+    return px;
+}
+
 void TileCache::onReplyFinished(QNetworkReply* reply)
 {
     reply->deleteLater();
@@ -195,6 +281,11 @@ void TileCache::onReplyFinished(QNetworkReply* reply)
     QPixmap px;
     if (!px.loadFromData(reply->readAll()))
         return;
+
+    const QString diskPath = diskTilePath(z, x, y);
+    const QFileInfo fi(diskPath);
+    QDir().mkpath(fi.path());
+    px.save(diskPath);
 
     m_cache.insert(k, new QPixmap(px));
     emit tileLoaded(z, x, y);

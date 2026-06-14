@@ -32,6 +32,8 @@ public:
     void clearChart();
 
     bool hasData() const { return m_hasData; }
+    double visibleRangeStartMinutes() const;
+    double visibleRangeEndMinutes() const;
 
 public slots:
     void setXRange(double min, double max);

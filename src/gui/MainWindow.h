@@ -60,6 +60,7 @@ private slots:
     void backupDatabase();
     void openRecentDatabase();
     void onAthleteSelectionChanged(int index);
+    void createVideo();
 
 private:
     void buildUI();

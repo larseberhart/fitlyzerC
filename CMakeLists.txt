@@ -52,6 +52,13 @@ option(
 )
 
 set(
+    FITLYZER_FFMPEG_PATH
+    ""
+    CACHE STRING
+    "Path to bundled FFmpeg executable (absolute or relative to app directory)"
+)
+
+set(
     GARMIN_FIT_SDK_VERSION
     "21.205.0"
     CACHE STRING
@@ -195,6 +202,10 @@ target_link_libraries(FitlyzerC PRIVATE
     Qt6::Charts
     FitSDK
 )
+
+if(FITLYZER_FFMPEG_PATH)
+    target_compile_definitions(FitlyzerC PRIVATE FITLYZER_FFMPEG_PATH="${FITLYZER_FFMPEG_PATH}")
+endif()
 
 if(WIN32)
     # Deploy Qt runtime DLLs/plugins next to the built executable.
