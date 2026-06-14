@@ -537,7 +537,7 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Import FIT rides, analyze training data, 
 
 # Keep packaging self-contained: do not depend on repository README/LICENSE files.
 set(FITLYZERC_CPACK_LICENSE_FILE "${CMAKE_BINARY_DIR}/CPackLicense.txt")
-file(WRITE "${FITLYZERC_CPACK_LICENSE_FILE}" "Do whatever you want!\n")
+file(WRITE "${FITLYZERC_CPACK_LICENSE_FILE}" "Do whatever you want with this software!\nExcept dopers, they can't use this...")
 set(CPACK_RESOURCE_FILE_LICENSE "${FITLYZERC_CPACK_LICENSE_FILE}")
 
 if(WIN32)
