@@ -496,11 +496,20 @@ set(CPACK_PACKAGE_VENDOR "Fitlyzer")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 set(CPACK_PACKAGE_FILE_NAME "FitlyzerC")
 set(CPACK_PACKAGE_INSTALL_DIRECTORY "FitlyzerC")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Import FIT rides, analyze training data, and export ride videos.")
+
+# Keep packaging self-contained: do not depend on repository README/LICENSE files.
+set(FITLYZERC_CPACK_LICENSE_FILE "${CMAKE_BINARY_DIR}/CPackLicense.txt")
+file(WRITE "${FITLYZERC_CPACK_LICENSE_FILE}" "Do whatever you want!\n")
+set(CPACK_RESOURCE_FILE_LICENSE "${FITLYZERC_CPACK_LICENSE_FILE}")
 
 if(WIN32)
     set(CPACK_GENERATOR NSIS)
     set(CPACK_PACKAGE_FILE_NAME "FitlyzerC-Setup")
     set(CPACK_NSIS_DISPLAY_NAME "FitlyzerC")
+    set(CPACK_NSIS_HELP_LINK "https://fitlyzer.com/help")
+    set(CPACK_NSIS_URL_INFO_ABOUT "https://fitlyzer.com")
+    set(CPACK_NSIS_CONTACT "support@fitlyzer.com")
     set(CPACK_NSIS_MUI_ICON "${CMAKE_SOURCE_DIR}/resources/icons/appicon.ico")
     set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
     set(CPACK_NSIS_CREATE_ICONS_EXTRA
