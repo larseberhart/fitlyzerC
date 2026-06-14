@@ -75,6 +75,45 @@ MapRenderer::MapRenderer(QWidget* parent)
             this, [this](int, int, int) { update(); });
 }
 
+void MapRenderer::rebuildGpsCache()
+{
+    m_gpsRecords.clear();
+    m_firstGpsRecord = nullptr;
+    m_lastGpsRecord  = nullptr;
+
+    for (const auto& r : m_rideData.records)
+    {
+        if (!r.hasGps)
+            continue;
+        m_gpsRecords.push_back(&r);
+        if (!m_firstGpsRecord)
+            m_firstGpsRecord = &r;
+        m_lastGpsRecord = &r;
+    }
+    // Records are already in elapsedSeconds order from FIT parsing.
+}
+
+// Nearest GPS record to a given elapsed time: O(log N).
+const RideRecord* MapRenderer::gpsRecordAtTime(double elapsedSeconds) const
+{
+    if (m_gpsRecords.empty())
+        return nullptr;
+
+    auto it = std::lower_bound(
+        m_gpsRecords.begin(), m_gpsRecords.end(), elapsedSeconds,
+        [](const RideRecord* r, double t) { return r->elapsedSeconds < t; });
+
+    if (it == m_gpsRecords.end())
+        return m_gpsRecords.back();
+    if (it == m_gpsRecords.begin())
+        return m_gpsRecords.front();
+
+    auto prev = std::prev(it);
+    return (std::abs((*prev)->elapsedSeconds - elapsedSeconds) <=
+            std::abs((*it)->elapsedSeconds  - elapsedSeconds))
+        ? *prev : *it;
+}
+
 void MapRenderer::setRideData(const RideData& rideData,
                               ColorMetric colorMetric,
                               const ColorContext& colorContext)
@@ -104,8 +143,8 @@ void MapRenderer::setRideData(const RideData& rideData,
                         : RouteColorMode::Altitude;
     m_colorContext = colorContext;
 
-    for (const auto& r : rideData.records)
-        if (r.hasGps) { m_hasGps = true; break; }
+    rebuildGpsCache();
+    m_hasGps = !m_gpsRecords.empty();
 
     if (m_hasGps)
         fitToTrack();
@@ -183,23 +222,20 @@ QColor MapRenderer::adjustRouteColorForStyle(const QColor& color) const
 
 const RideRecord* MapRenderer::nearestGpsRecord(const QPointF& screenPos) const
 {
-    if (!m_hasGps)
+    if (m_gpsRecords.empty())
         return nullptr;
 
     const RideRecord* nearest = nullptr;
     double bestDistance = std::numeric_limits<double>::max();
 
-    for (const RideRecord& record : m_rideData.records)
+    for (const RideRecord* record : m_gpsRecords)
     {
-        if (!record.hasGps)
-            continue;
-
-        const QPointF point = tileToScreen(latLonToTile(record.latitude, record.longitude, m_zoom));
+        const QPointF point = tileToScreen(latLonToTile(record->latitude, record->longitude, m_zoom));
         const double distance = QLineF(screenPos, point).length();
         if (distance < bestDistance)
         {
             bestDistance = distance;
-            nearest = &record;
+            nearest = record;
         }
     }
 
@@ -218,14 +254,12 @@ void MapRenderer::fitToTrack()
     double minLon = 180.0;
     double maxLon = -180.0;
 
-    for (const auto& record : m_rideData.records)
+    for (const RideRecord* record : m_gpsRecords)
     {
-        if (!record.hasGps)
-            continue;
-        minLat = std::min(minLat, record.latitude);
-        maxLat = std::max(maxLat, record.latitude);
-        minLon = std::min(minLon, record.longitude);
-        maxLon = std::max(maxLon, record.longitude);
+        minLat = std::min(minLat, record->latitude);
+        maxLat = std::max(maxLat, record->latitude);
+        minLon = std::min(minLon, record->longitude);
+        maxLon = std::max(maxLon, record->longitude);
     }
 
     m_userMovedMap = false;
@@ -246,19 +280,25 @@ void MapRenderer::fitToVisibleRange()
     double maxLon = -180.0;
     int count = 0;
 
-    for (const auto& record : m_rideData.records)
+    // Use lower_bound to skip records before the visible range start.
+    auto rangeBegin = m_gpsRecords.begin();
+    if (m_visibleStartSeconds >= 0.0)
     {
-        if (!record.hasGps)
-            continue;
-        if (m_visibleStartSeconds >= 0.0 && record.elapsedSeconds < m_visibleStartSeconds)
-            continue;
-        if (m_visibleEndSeconds >= 0.0 && record.elapsedSeconds > m_visibleEndSeconds)
-            continue;
+        rangeBegin = std::lower_bound(
+            m_gpsRecords.begin(), m_gpsRecords.end(), m_visibleStartSeconds,
+            [](const RideRecord* r, double t) { return r->elapsedSeconds < t; });
+    }
 
-        minLat = std::min(minLat, record.latitude);
-        maxLat = std::max(maxLat, record.latitude);
-        minLon = std::min(minLon, record.longitude);
-        maxLon = std::max(maxLon, record.longitude);
+    for (auto it = rangeBegin; it != m_gpsRecords.end(); ++it)
+    {
+        const RideRecord* record = *it;
+        if (m_visibleEndSeconds >= 0.0 && record->elapsedSeconds > m_visibleEndSeconds)
+            break;
+
+        minLat = std::min(minLat, record->latitude);
+        maxLat = std::max(maxLat, record->latitude);
+        minLon = std::min(minLon, record->longitude);
+        maxLon = std::max(maxLon, record->longitude);
         ++count;
     }
 
@@ -367,13 +407,8 @@ void MapRenderer::paintEvent(QPaintEvent*)
         }
     }
 
-    std::vector<const RideRecord*> gpsRecords;
-    gpsRecords.reserve(m_rideData.records.size());
-    for (const auto& record : m_rideData.records)
-    {
-        if (record.hasGps)
-            gpsRecords.push_back(&record);
-    }
+    // Use precomputed GPS record list — no per-frame allocation.
+    const auto& gpsRecords = m_gpsRecords;
 
     auto gpsValueForMode = [this](const RideRecord& record, const RideRecord* next, double& outValue, bool& outHasValue)
     {
@@ -435,23 +470,10 @@ void MapRenderer::paintEvent(QPaintEvent*)
         p.drawLine(a, b);
     };
 
-    auto gpsPointAtTime = [&gpsRecords](double elapsedSeconds) -> const RideRecord*
+    // O(log N) time lookup using precomputed sorted GPS records.
+    auto gpsPointAtTime = [this](double elapsedSeconds) -> const RideRecord*
     {
-        if (gpsRecords.empty())
-            return nullptr;
-
-        const RideRecord* nearest = nullptr;
-        double bestDist = std::numeric_limits<double>::max();
-        for (const RideRecord* record : gpsRecords)
-        {
-            const double dist = std::abs(record->elapsedSeconds - elapsedSeconds);
-            if (dist < bestDist)
-            {
-                bestDist = dist;
-                nearest = record;
-            }
-        }
-        return nearest;
+        return gpsRecordAtTime(elapsedSeconds);
     };
 
     const bool hasVisibleRange = m_visibleStartSeconds >= 0.0 && m_visibleEndSeconds >= 0.0;
@@ -561,26 +583,14 @@ void MapRenderer::paintEvent(QPaintEvent*)
         p.setBrush(c);
         p.drawEllipse(sp, 6.0, 6.0);
     };
-    for (const auto& r : m_rideData.records)
-        if (r.hasGps) { drawDot(r.latitude, r.longitude, QColor(50,180,50)); break; }
-    for (auto it = m_rideData.records.rbegin(); it != m_rideData.records.rend(); ++it)
-        if (it->hasGps) { drawDot(it->latitude, it->longitude, QColor(220,50,50)); break; }
+    if (m_firstGpsRecord)
+        drawDot(m_firstGpsRecord->latitude, m_firstGpsRecord->longitude, QColor(50,180,50));
+    if (m_lastGpsRecord)
+        drawDot(m_lastGpsRecord->latitude, m_lastGpsRecord->longitude, QColor(220,50,50));
 
     if (m_currentTimeSeconds >= 0.0)
     {
-        const RideRecord* nearest = nullptr;
-        double bestDist = std::numeric_limits<double>::max();
-        for (const RideRecord& r : m_rideData.records)
-        {
-            if (!r.hasGps)
-                continue;
-            const double d = std::abs(r.elapsedSeconds - m_currentTimeSeconds);
-            if (d < bestDist)
-            {
-                bestDist = d;
-                nearest = &r;
-            }
-        }
+        const RideRecord* nearest = gpsRecordAtTime(m_currentTimeSeconds);
 
         if (nearest)
         {

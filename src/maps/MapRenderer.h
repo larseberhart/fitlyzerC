@@ -68,9 +68,15 @@ private:
     QPointF        tileToScreen(const QPointF& tilePt) const;
     QColor adjustRouteColorForStyle(const QColor& color) const;
     const RideRecord* nearestGpsRecord(const QPointF& screenPos) const;
+    void rebuildGpsCache();
+    const RideRecord* gpsRecordAtTime(double elapsedSeconds) const;
 
     TileCache m_tileCache;
     RideData  m_rideData;
+    // Pre-filtered, time-ordered GPS-only records. Rebuilt once in setRideData().
+    std::vector<const RideRecord*> m_gpsRecords;
+    const RideRecord* m_firstGpsRecord = nullptr;
+    const RideRecord* m_lastGpsRecord  = nullptr;
     bool      m_hasGps = false;
     RouteColorMode m_routeColorMode = RouteColorMode::None;
     ColorContext m_colorContext;
