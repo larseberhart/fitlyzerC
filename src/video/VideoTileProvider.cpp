@@ -1,0 +1,96 @@
+#include "VideoTileProvider.h"
+
+#include <QDir>
+#include <QStandardPaths>
+
+#include <algorithm>
+
+namespace
+{
+QString defaultVideoExportCacheRoot()
+{
+    const QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    return appData.isEmpty()
+        ? QDir::home().filePath(".fitlyzerc/video-export-cache")
+        : QDir(appData).filePath("video-export-cache");
+}
+
+QString defaultPrimaryTileCacheRoot()
+{
+    const QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    return appData.isEmpty()
+        ? QDir::home().filePath(".fitlyzerc/tiles")
+        : QDir(appData).filePath("tiles");
+}
+}
+
+VideoTileProvider::VideoTileProvider(const VideoTileProviderConfig& config)
+    : m_tileCache(
+          TileCacheConfig{
+              std::max(1, config.memoryCacheTiles),
+              config.exportCacheRoot.trimmed().isEmpty()
+                  ? defaultVideoExportCacheRoot()
+                  : config.exportCacheRoot,
+              QStringList{ defaultPrimaryTileCacheRoot() }
+          })
+    , m_deleteTemporaryTilesAfterExport(config.deleteTemporaryTilesAfterExport)
+{
+    m_tileCache.setMapStyle(config.style);
+}
+
+void VideoTileProvider::setRequiredTiles(const std::unordered_set<VideoTileId, VideoTileIdHash>& required)
+{
+    m_requiredTiles = required;
+    m_requiredTilesOnDisk = 0;
+
+    for (const VideoTileId& tileId : m_requiredTiles)
+    {
+        if (m_tileCache.isTileCachedOnDisk(tileId.z, tileId.x, tileId.y))
+            ++m_requiredTilesOnDisk;
+    }
+}
+
+int VideoTileProvider::requiredTileCount() const
+{
+    return static_cast<int>(m_requiredTiles.size());
+}
+
+int VideoTileProvider::requiredTilesAvailableOnDisk() const
+{
+    return m_requiredTilesOnDisk;
+}
+
+QPixmap VideoTileProvider::getTile(const VideoTileId& id, bool allowNetwork)
+{
+    return m_tileCache.tileBlocking(id.z, id.x, id.y, allowNetwork);
+}
+
+bool VideoTileProvider::isTileCachedOnDisk(const VideoTileId& id) const
+{
+    return m_tileCache.isTileCachedOnDisk(id.z, id.x, id.y);
+}
+
+void VideoTileProvider::clearMemoryCache()
+{
+    m_tileCache.clearMemoryCache();
+}
+
+void VideoTileProvider::cleanupExportCache()
+{
+    if (!m_deleteTemporaryTilesAfterExport)
+        return;
+
+    QDir cacheRoot(m_tileCache.diskCacheRoot());
+    if (cacheRoot.exists())
+        cacheRoot.removeRecursively();
+}
+
+bool VideoTileProvider::shouldDeleteExportCacheAfterExport() const
+{
+    return m_deleteTemporaryTilesAfterExport;
+}
+
+QString VideoTileProvider::exportCacheRoot() const
+{
+    return m_tileCache.diskCacheRoot();
+}

@@ -19,6 +19,7 @@
 #include <QProgressBar>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QSettings>
 #include <QSpinBox>
 #include <QThread>
 #include <QVBoxLayout>
@@ -226,6 +227,16 @@ VideoExportDialog::VideoExportDialog(const VideoExportSettings& defaults, QWidge
     overlayButtons->addStretch(1);
     telemetryLayout->addLayout(overlayButtons, 4, 0, 1, 3);
 
+    auto* tileGroup = new QGroupBox("Tiles", this);
+    auto* tileLayout = new QVBoxLayout(tileGroup);
+    m_deleteTemporaryTilesCheck = new QCheckBox("Delete temporary video tiles after export", tileGroup);
+    m_deleteTemporaryTilesCheck->setToolTip(
+        "When enabled, tiles downloaded during export are removed after export finishes or is canceled.");
+    QSettings settings("Fitlyzer", "FitlyzerC");
+    m_deleteTemporaryTilesCheck->setChecked(
+        settings.value("video/deleteTemporaryTilesAfterExport", true).toBool());
+    tileLayout->addWidget(m_deleteTemporaryTilesCheck);
+
     auto* progressGroup = new QGroupBox("Export Progress", this);
     auto* progressLayout = new QVBoxLayout(progressGroup);
     m_stageLabel = new QLabel("Ready", progressGroup);
@@ -255,6 +266,7 @@ VideoExportDialog::VideoExportDialog(const VideoExportSettings& defaults, QWidge
     root->addWidget(mapGroup);
     root->addWidget(routeGroup);
     root->addWidget(telemetryGroup);
+    root->addWidget(tileGroup);
     root->addWidget(progressGroup);
     root->addLayout(buttons);
 
@@ -312,6 +324,12 @@ VideoExportSettings VideoExportDialog::collectSettings() const
     s.overlayTelemetryPanel = m_telemetryPanelCheck->isChecked();
     s.overlayRouteLegend = m_legendCheck->isChecked();
     s.overlayCharts = m_chartsCheck->isChecked();
+    s.deleteTemporaryTilesAfterExport = m_deleteTemporaryTilesCheck
+        ? m_deleteTemporaryTilesCheck->isChecked()
+        : true;
+
+    QSettings appSettings("Fitlyzer", "FitlyzerC");
+    appSettings.setValue("video/deleteTemporaryTilesAfterExport", s.deleteTemporaryTilesAfterExport);
 
     return s;
 }

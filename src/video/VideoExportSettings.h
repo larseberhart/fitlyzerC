@@ -39,6 +39,7 @@ struct VideoExportSettings
     bool overlayTelemetryPanel = true;
     bool overlayRouteLegend = true;
     bool overlayCharts = true;
+    bool deleteTemporaryTilesAfterExport = true;
 
     QString athleteName;
     QString activityName;

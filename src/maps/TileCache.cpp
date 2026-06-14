@@ -11,7 +11,16 @@
 
 #include <algorithm>
 
-static constexpr int kCacheMaxTiles = 512;
+namespace
+{
+QString defaultDiskCacheRoot()
+{
+    const QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    return appData.isEmpty()
+        ? QDir::home().filePath(".fitlyzerc/tiles")
+        : QDir(appData).filePath("tiles");
+}
+}
 
 QString TileCache::styleKey(MapStyle style)
 {
@@ -106,9 +115,13 @@ TileProvider TileCache::providerForStyle(MapStyle style)
     };
 }
 
-TileCache::TileCache(QObject* parent)
+TileCache::TileCache(const TileCacheConfig& config, QObject* parent)
     : QObject(parent)
-    , m_cache(kCacheMaxTiles)
+    , m_cache(std::max(1, config.maxTilesInMemory))
+    , m_diskCacheRoot(config.diskCacheRoot.trimmed().isEmpty()
+          ? defaultDiskCacheRoot()
+          : config.diskCacheRoot)
+    , m_diskFallbackRoots(config.diskFallbackRoots)
 {
     m_provider = providerForStyle(m_mapStyle);
     connect(&m_nam, &QNetworkAccessManager::finished,
@@ -120,12 +133,8 @@ QString TileCache::key(int z, int x, int y) const
     return QString("%1/%2/%3/%4").arg(styleKey(m_mapStyle)).arg(z).arg(x).arg(y);
 }
 
-QString TileCache::diskTilePath(int z, int x, int y) const
+QString TileCache::diskTilePathForRoot(const QString& root, int z, int x, int y) const
 {
-    const QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    const QString root = appData.isEmpty()
-        ? QDir::home().filePath(".fitlyzerc/tiles")
-        : QDir(appData).filePath("tiles");
     return QDir(root).filePath(QString("%1/%2/%3/%4.png")
                                    .arg(styleKey(m_mapStyle))
                                    .arg(z)
@@ -133,10 +142,32 @@ QString TileCache::diskTilePath(int z, int x, int y) const
                                    .arg(y));
 }
 
+QString TileCache::diskTilePath(int z, int x, int y) const
+{
+    return diskTilePathForRoot(m_diskCacheRoot, z, x, y);
+}
+
 bool TileCache::isTileCachedOnDisk(int z, int x, int y) const
 {
     z = std::clamp(z, 1, m_provider.maxZoom);
-    return QFileInfo::exists(diskTilePath(z, x, y));
+    if (QFileInfo::exists(diskTilePath(z, x, y)))
+        return true;
+
+    for (const QString& fallbackRoot : m_diskFallbackRoots)
+    {
+        if (fallbackRoot.trimmed().isEmpty())
+            continue;
+        if (QFileInfo::exists(diskTilePathForRoot(fallbackRoot, z, x, y)))
+            return true;
+    }
+
+    return false;
+}
+
+void TileCache::clearMemoryCache()
+{
+    m_cache.clear();
+    m_pending.clear();
 }
 
 void TileCache::setMapStyle(MapStyle style)
@@ -146,8 +177,7 @@ void TileCache::setMapStyle(MapStyle style)
 
     m_mapStyle = style;
     m_provider = providerForStyle(style);
-    m_cache.clear();
-    m_pending.clear();
+    clearMemoryCache();
 }
 
 QString TileCache::mapStyleName() const
@@ -165,6 +195,11 @@ int TileCache::maxZoom() const
     return m_provider.maxZoom;
 }
 
+QString TileCache::diskCacheRoot() const
+{
+    return m_diskCacheRoot;
+}
+
 QPixmap TileCache::tile(int z, int x, int y)
 {
     z = std::clamp(z, 1, m_provider.maxZoom);
@@ -177,6 +212,22 @@ QPixmap TileCache::tile(int z, int x, int y)
     QPixmap diskPixmap;
     if (diskPixmap.load(diskPath))
     {
+        m_cache.insert(k, new QPixmap(diskPixmap));
+        return diskPixmap;
+    }
+
+    for (const QString& fallbackRoot : m_diskFallbackRoots)
+    {
+        if (fallbackRoot.trimmed().isEmpty())
+            continue;
+
+        const QString fallbackPath = diskTilePathForRoot(fallbackRoot, z, x, y);
+        if (!diskPixmap.load(fallbackPath))
+            continue;
+
+        const QFileInfo fi(diskPath);
+        QDir().mkpath(fi.path());
+        diskPixmap.save(diskPath);
         m_cache.insert(k, new QPixmap(diskPixmap));
         return diskPixmap;
     }
@@ -220,6 +271,22 @@ QPixmap TileCache::tileBlocking(int z, int x, int y, bool allowNetwork)
     QPixmap diskPixmap;
     if (diskPixmap.load(diskPath))
     {
+        m_cache.insert(k, new QPixmap(diskPixmap));
+        return diskPixmap;
+    }
+
+    for (const QString& fallbackRoot : m_diskFallbackRoots)
+    {
+        if (fallbackRoot.trimmed().isEmpty())
+            continue;
+
+        const QString fallbackPath = diskTilePathForRoot(fallbackRoot, z, x, y);
+        if (!diskPixmap.load(fallbackPath))
+            continue;
+
+        const QFileInfo fi(diskPath);
+        QDir().mkpath(fi.path());
+        diskPixmap.save(diskPath);
         m_cache.insert(k, new QPixmap(diskPixmap));
         return diskPixmap;
     }

@@ -6,6 +6,7 @@
 #include <QPixmap>
 #include <QSet>
 #include <QString>
+#include <QStringList>
 
 enum class MapStyle
 {
@@ -28,21 +29,30 @@ struct TileProvider
 
 class QNetworkReply;
 
+struct TileCacheConfig
+{
+    int maxTilesInMemory = 512;
+    QString diskCacheRoot;
+    QStringList diskFallbackRoots;
+};
+
 class TileCache : public QObject
 {
     Q_OBJECT
 public:
-    explicit TileCache(QObject* parent = nullptr);
+    explicit TileCache(const TileCacheConfig& config = {}, QObject* parent = nullptr);
 
     // Returns the cached tile pixmap (may be null while downloading)
     QPixmap tile(int z, int x, int y);
     QPixmap tileBlocking(int z, int x, int y, bool allowNetwork = true);
     bool isTileCachedOnDisk(int z, int x, int y) const;
+    void clearMemoryCache();
     void setMapStyle(MapStyle style);
     MapStyle mapStyle() const { return m_mapStyle; }
     QString mapStyleName() const;
     QString attribution() const;
     int maxZoom() const;
+    QString diskCacheRoot() const;
 
 signals:
     void tileLoaded(int z, int x, int y);
@@ -52,6 +62,7 @@ private slots:
 
 private:
     QString key(int z, int x, int y) const;
+    QString diskTilePathForRoot(const QString& root, int z, int x, int y) const;
     QString diskTilePath(int z, int x, int y) const;
     static QString styleKey(MapStyle style);
     static QString styleDisplayName(MapStyle style);
@@ -60,6 +71,8 @@ private:
     QNetworkAccessManager      m_nam;
     QCache<QString, QPixmap>   m_cache;
     QSet<QString>              m_pending;
+    QString                    m_diskCacheRoot;
+    QStringList                m_diskFallbackRoots;
     MapStyle                   m_mapStyle = MapStyle::Light;
     TileProvider               m_provider;
 };

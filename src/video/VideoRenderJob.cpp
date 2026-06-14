@@ -10,20 +10,70 @@
 #include <QPen>
 #include <QProcess>
 #include <QSet>
+#include <QStringList>
 
 #include "core/zones/ColorProvider.h"
 #include "core/zones/ZoneCalculator.h"
 #include "maps/MapFitMath.h"
-#include "maps/TileCache.h"
+#include "video/VideoTileProvider.h"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <unordered_set>
 
 namespace
 {
 static constexpr int kTilePx = 256;
 static constexpr double kPi = 3.14159265358979323846;
+static constexpr int kVideoExportTileCache = 96;
+
+struct TileViewport
+{
+    int tileX0 = 0;
+    int tileY0 = 0;
+    int nX = 0;
+    int nY = 0;
+
+    bool operator==(const TileViewport& other) const
+    {
+        return tileX0 == other.tileX0 &&
+               tileY0 == other.tileY0 &&
+               nX == other.nX &&
+               nY == other.nY;
+    }
+};
+
+TileViewport computeTileViewport(const QPointF& centerTile, int width, int height)
+{
+    TileViewport viewport;
+    viewport.tileX0 = static_cast<int>(std::floor(centerTile.x() - static_cast<double>(width) / (2.0 * kTilePx))) - 1;
+    viewport.tileY0 = static_cast<int>(std::floor(centerTile.y() - static_cast<double>(height) / (2.0 * kTilePx))) - 1;
+    viewport.nX = static_cast<int>(std::ceil(static_cast<double>(width) / kTilePx)) + 3;
+    viewport.nY = static_cast<int>(std::ceil(static_cast<double>(height) / kTilePx)) + 3;
+    return viewport;
+}
+
+std::vector<VideoTileId> tilesForViewport(const TileViewport& viewport, int zoom)
+{
+    std::vector<VideoTileId> tiles;
+    const int maxTile = (1 << zoom) - 1;
+    tiles.reserve(static_cast<size_t>((viewport.nX + 1) * (viewport.nY + 1)));
+
+    for (int ty = 0; ty <= viewport.nY; ++ty)
+    {
+        for (int tx = 0; tx <= viewport.nX; ++tx)
+        {
+            const int tileX = viewport.tileX0 + tx;
+            const int tileY = viewport.tileY0 + ty;
+            if (tileX < 0 || tileY < 0 || tileX > maxTile || tileY > maxTile)
+                continue;
+            tiles.push_back({ zoom, tileX, tileY });
+        }
+    }
+
+    return tiles;
+}
 
 QPointF latLonToTile(double lat, double lon, int zoom)
 {
@@ -179,6 +229,23 @@ QColor routeColor(const RideRecord& rec,
                                          metric == ColorMetric::Altitude ? rec.altitude : 0.0,
                                          context);
 }
+
+class ExportTileCleanupGuard
+{
+public:
+    explicit ExportTileCleanupGuard(VideoTileProvider& provider)
+        : m_provider(provider)
+    {}
+
+    ~ExportTileCleanupGuard()
+    {
+        m_provider.clearMemoryCache();
+        m_provider.cleanupExportCache();
+    }
+
+private:
+    VideoTileProvider& m_provider;
+};
 }
 
 VideoRenderJob::VideoRenderJob(VideoExportSettings settings, QObject* parent)
@@ -313,10 +380,15 @@ void VideoRenderJob::run()
         m_settings.routeColorMetric != ColorMetric::None &&
         !routeLegendZones.empty();
 
-    TileCache tileCache;
-    tileCache.setMapStyle(m_settings.mapStyle);
+    VideoTileProvider tileProvider(VideoTileProviderConfig{
+        m_settings.mapStyle,
+        kVideoExportTileCache,
+        m_settings.deleteTemporaryTilesAfterExport,
+        QString()
+    });
+    ExportTileCleanupGuard tileCleanupGuard(tileProvider);
 
-    int zoom = std::clamp(m_settings.fixedZoom, 1, std::min(18, tileCache.maxZoom()));
+    int zoom = std::clamp(m_settings.fixedZoom, 1, 18);
     if (m_settings.autoZoom)
     {
         const auto fit = MapFitMath::computeFitToBounds(minLat,
@@ -325,16 +397,20 @@ void VideoRenderJob::run()
                                                         maxLon,
                                                         m_settings.width,
                                                         mapHeight,
-                                                        std::min(18, tileCache.maxZoom()));
+                                                        18);
         zoom = fit.zoom;
     }
 
-    emit stageChanged("Loading tiles...");
+    std::vector<QPointF> gpsTilePoints;
+    gpsTilePoints.reserve(gpsRecords.size());
+    for (const RideRecord* rec : gpsRecords)
+        gpsTilePoints.push_back(latLonToTile(rec->latitude, rec->longitude, zoom));
 
-    QSet<QString> tileKeys;
-    tileKeys.reserve(totalFrames * 3);
-    const int preloadStep = std::max(1, totalFrames / 240);
-    for (int frame = 0; frame < totalFrames; frame += preloadStep)
+    emit stageChanged("Analyzing required tiles...");
+
+    std::unordered_set<VideoTileId, VideoTileIdHash> requiredTiles;
+    requiredTiles.reserve(static_cast<size_t>(std::max(256, totalFrames / 3)));
+    for (int frame = 0; frame < totalFrames; ++frame)
     {
         if (canceled())
         {
@@ -351,48 +427,18 @@ void VideoRenderJob::run()
             continue;
 
         const QPointF centerTile = latLonToTile(centerLat, centerLon, zoom);
+        const TileViewport viewport = computeTileViewport(centerTile, m_settings.width, mapHeight);
+        const std::vector<VideoTileId> tiles = tilesForViewport(viewport, zoom);
+        requiredTiles.insert(tiles.begin(), tiles.end());
 
-        const int tileX0 = static_cast<int>(std::floor(centerTile.x() - static_cast<double>(m_settings.width) / (2.0 * kTilePx))) - 1;
-        const int tileY0 = static_cast<int>(std::floor(centerTile.y() - static_cast<double>(mapHeight) / (2.0 * kTilePx))) - 1;
-        const int nX = static_cast<int>(std::ceil(static_cast<double>(m_settings.width) / kTilePx)) + 3;
-        const int nY = static_cast<int>(std::ceil(static_cast<double>(mapHeight) / kTilePx)) + 3;
-        const int maxTile = (1 << zoom) - 1;
-
-        for (int ty = 0; ty <= nY; ++ty)
-        {
-            for (int tx = 0; tx <= nX; ++tx)
-            {
-                const int tileX = tileX0 + tx;
-                const int tileY = tileY0 + ty;
-                if (tileX < 0 || tileY < 0 || tileX > maxTile || tileY > maxTile)
-                    continue;
-                tileKeys.insert(QString("%1/%2/%3").arg(zoom).arg(tileX).arg(tileY));
-            }
-        }
+        if (frame % 120 == 0)
+            emit progressChanged(frame, totalFrames);
     }
 
-    int tileIndex = 0;
-    const int totalTiles = std::max(1, static_cast<int>(tileKeys.size()));
-    for (const QString& tileKey : tileKeys)
-    {
-        if (canceled())
-        {
-            emit finished(false, "Export canceled.", true);
-            return;
-        }
-
-        const QStringList parts = tileKey.split('/');
-        if (parts.size() != 3)
-            continue;
-
-        const int z = parts[0].toInt();
-        const int x = parts[1].toInt();
-        const int y = parts[2].toInt();
-        tileCache.tileBlocking(z, x, y, true);
-
-        ++tileIndex;
-        emit progressChanged(tileIndex, totalTiles);
-    }
+    tileProvider.setRequiredTiles(requiredTiles);
+    emit stageChanged(QString("Analyzed %1 required tiles (%2 available on disk)")
+                          .arg(tileProvider.requiredTileCount())
+                          .arg(tileProvider.requiredTilesAvailableOnDisk()));
 
     emit stageChanged("Encoding video...");
 
@@ -427,6 +473,11 @@ void VideoRenderJob::run()
     QElapsedTimer timer;
     timer.start();
 
+    TileViewport lastViewport;
+    bool hasLastViewport = false;
+    std::vector<VideoTileId> viewportTiles;
+    int currentGpsIndex = 0;
+
     for (int frame = 0; frame < totalFrames; ++frame)
     {
         if (canceled())
@@ -451,6 +502,20 @@ void VideoRenderJob::run()
             continue;
         const QPointF centerTile = latLonToTile(centerLat, centerLon, zoom);
 
+        const TileViewport viewport = computeTileViewport(centerTile, m_settings.width, mapHeight);
+        if (!hasLastViewport || !(viewport == lastViewport))
+        {
+            viewportTiles = tilesForViewport(viewport, zoom);
+            lastViewport = viewport;
+            hasLastViewport = true;
+        }
+
+        while (currentGpsIndex + 1 < static_cast<int>(gpsRecords.size()) &&
+               gpsRecords[static_cast<size_t>(currentGpsIndex + 1)]->elapsedSeconds <= sourceSeconds)
+        {
+            ++currentGpsIndex;
+        }
+
         QImage image(m_settings.width, m_settings.height, QImage::Format_RGBA8888);
         image.fill(QColor("#0f172a"));
 
@@ -460,76 +525,68 @@ void VideoRenderJob::run()
         const QRect mapRect(0, 0, m_settings.width, mapHeight);
         p.fillRect(mapRect, QColor("#111827"));
 
-        const int tileX0 = static_cast<int>(std::floor(centerTile.x() - static_cast<double>(m_settings.width) / (2.0 * kTilePx))) - 1;
-        const int tileY0 = static_cast<int>(std::floor(centerTile.y() - static_cast<double>(mapHeight) / (2.0 * kTilePx))) - 1;
-        const int nX = static_cast<int>(std::ceil(static_cast<double>(m_settings.width) / kTilePx)) + 3;
-        const int nY = static_cast<int>(std::ceil(static_cast<double>(mapHeight) / kTilePx)) + 3;
-        const int maxTile = (1 << zoom) - 1;
-
-        for (int ty = 0; ty <= nY; ++ty)
+        for (const VideoTileId& tileId : viewportTiles)
         {
-            for (int tx = 0; tx <= nX; ++tx)
-            {
-                const int tileX = tileX0 + tx;
-                const int tileY = tileY0 + ty;
-                if (tileX < 0 || tileY < 0 || tileX > maxTile || tileY > maxTile)
-                    continue;
-
-                const QPointF topLeft = tileToScreen({ static_cast<double>(tileX), static_cast<double>(tileY) },
-                                                     centerTile,
-                                                     m_settings.width,
-                                                     mapHeight);
-                const QPixmap px = tileCache.tileBlocking(zoom, tileX, tileY, false);
-                if (px.isNull())
-                    p.fillRect(QRectF(topLeft, QSizeF(kTilePx, kTilePx)), QColor("#334155"));
-                else
-                    p.drawPixmap(static_cast<int>(topLeft.x()), static_cast<int>(topLeft.y()), kTilePx, kTilePx, px);
-            }
+            const QPointF topLeft = tileToScreen({ static_cast<double>(tileId.x), static_cast<double>(tileId.y) },
+                                                 centerTile,
+                                                 m_settings.width,
+                                                 mapHeight);
+            const QPixmap px = tileProvider.getTile(tileId, true);
+            if (px.isNull())
+                p.fillRect(QRectF(topLeft, QSizeF(kTilePx, kTilePx)), QColor("#334155"));
+            else
+                p.drawPixmap(static_cast<int>(topLeft.x()), static_cast<int>(topLeft.y()), kTilePx, kTilePx, px);
         }
 
         p.setPen(QPen(QColor(220, 220, 220, 110), 1.5));
-        for (size_t i = 1; i < gpsRecords.size(); ++i)
+        for (size_t i = 1; i < gpsTilePoints.size(); ++i)
         {
-            const RideRecord& a = *gpsRecords[i - 1];
-            const RideRecord& b = *gpsRecords[i];
-            const QPointF ap = tileToScreen(latLonToTile(a.latitude, a.longitude, zoom), centerTile, m_settings.width, mapHeight);
-            const QPointF bp = tileToScreen(latLonToTile(b.latitude, b.longitude, zoom), centerTile, m_settings.width, mapHeight);
+            const QPointF ap = tileToScreen(gpsTilePoints[i - 1], centerTile, m_settings.width, mapHeight);
+            const QPointF bp = tileToScreen(gpsTilePoints[i], centerTile, m_settings.width, mapHeight);
             p.drawLine(ap, bp);
         }
 
-        for (size_t i = 1; i < gpsRecords.size(); ++i)
+        const size_t maxColoredSegment = static_cast<size_t>(std::clamp(currentGpsIndex + 1, 1, static_cast<int>(gpsRecords.size()) - 1));
+        for (size_t i = 1; i <= maxColoredSegment; ++i)
         {
             const RideRecord& a = *gpsRecords[i - 1];
-            const RideRecord& b = *gpsRecords[i];
-
-            const QPointF ap = tileToScreen(latLonToTile(a.latitude, a.longitude, zoom), centerTile, m_settings.width, mapHeight);
-            const QPointF bp = tileToScreen(latLonToTile(b.latitude, b.longitude, zoom), centerTile, m_settings.width, mapHeight);
+            const QPointF ap = tileToScreen(gpsTilePoints[i - 1], centerTile, m_settings.width, mapHeight);
+            const QPointF bp = tileToScreen(gpsTilePoints[i], centerTile, m_settings.width, mapHeight);
             const QColor c = routeColor(a,
                                         m_settings.routeColorMetric,
                                         m_settings.colorContext,
                                         m_settings.singleRouteColor);
             p.setPen(QPen(c, 4.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
 
-            if (b.elapsedSeconds <= sourceSeconds)
-            {
-                p.drawLine(ap, bp);
-                continue;
-            }
+            p.drawLine(ap, bp);
+        }
 
-            if (a.elapsedSeconds < sourceSeconds)
+        if (currentGpsIndex + 1 < static_cast<int>(gpsRecords.size()))
+        {
+            const RideRecord& a = *gpsRecords[static_cast<size_t>(currentGpsIndex)];
+            const RideRecord& b = *gpsRecords[static_cast<size_t>(currentGpsIndex + 1)];
+            if (sourceSeconds > a.elapsedSeconds && sourceSeconds < b.elapsedSeconds)
             {
                 const double dt = b.elapsedSeconds - a.elapsedSeconds;
                 const double alpha = dt > 1e-6
                     ? std::clamp((sourceSeconds - a.elapsedSeconds) / dt, 0.0, 1.0)
                     : 0.0;
-                const double lat = a.latitude + (b.latitude - a.latitude) * alpha;
-                const double lon = a.longitude + (b.longitude - a.longitude) * alpha;
-                const QPointF ip = tileToScreen(latLonToTile(lat, lon, zoom), centerTile, m_settings.width, mapHeight);
+                const QPointF ap = tileToScreen(gpsTilePoints[static_cast<size_t>(currentGpsIndex)],
+                                                centerTile,
+                                                m_settings.width,
+                                                mapHeight);
+                const QPointF bp = tileToScreen(gpsTilePoints[static_cast<size_t>(currentGpsIndex + 1)],
+                                                centerTile,
+                                                m_settings.width,
+                                                mapHeight);
+                const QPointF ip = ap + (bp - ap) * alpha;
+                const QColor c = routeColor(a,
+                                            m_settings.routeColorMetric,
+                                            m_settings.colorContext,
+                                            m_settings.singleRouteColor);
+                p.setPen(QPen(c, 4.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
                 p.drawLine(ap, ip);
-                break;
             }
-
-            break;
         }
 
         const QPointF currentPos = tileToScreen(latLonToTile(centerLat, centerLon, zoom),

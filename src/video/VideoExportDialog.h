@@ -67,6 +67,7 @@ private:
     QCheckBox* m_telemetryPanelCheck = nullptr;
     QCheckBox* m_legendCheck = nullptr;
     QCheckBox* m_chartsCheck = nullptr;
+    QCheckBox* m_deleteTemporaryTilesCheck = nullptr;
 
     QLabel* m_stageLabel = nullptr;
     QLabel* m_frameLabel = nullptr;
