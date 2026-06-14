@@ -19,6 +19,7 @@
 #include <QProgressBar>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QScrollArea>
 #include <QSettings>
 #include <QSpinBox>
 #include <QThread>
@@ -87,8 +88,18 @@ VideoExportDialog::VideoExportDialog(const VideoExportSettings& defaults, QWidge
     resize(620, 720);
 
     auto* root = new QVBoxLayout(this);
+    auto* scrollArea = new QScrollArea(this);
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
-    auto* outputGroup = new QGroupBox("General", this);
+    auto* contentWidget = new QWidget(scrollArea);
+    auto* contentLayout = new QVBoxLayout(contentWidget);
+    contentLayout->setContentsMargins(0, 0, 0, 0);
+    contentLayout->setSpacing(root->spacing());
+
+    scrollArea->setWidget(contentWidget);
+
+    auto* outputGroup = new QGroupBox("General", contentWidget);
     auto* outputLayout = new QGridLayout(outputGroup);
     m_outputEdit = new QLineEdit(outputGroup);
     if (defaults.outputPath.isEmpty())
@@ -110,7 +121,7 @@ VideoExportDialog::VideoExportDialog(const VideoExportSettings& defaults, QWidge
     outputLayout->addWidget(m_selectedSegmentRadio, 1, 0, 1, 3);
     outputLayout->addWidget(m_entireActivityRadio, 2, 0, 1, 3);
 
-    auto* videoGroup = new QGroupBox("Video", this);
+    auto* videoGroup = new QGroupBox("Video", contentWidget);
     auto* videoLayout = new QFormLayout(videoGroup);
 
     m_resolutionCombo = new QComboBox(videoGroup);
@@ -144,7 +155,7 @@ VideoExportDialog::VideoExportDialog(const VideoExportSettings& defaults, QWidge
     connect(m_entireActivityRadio, &QRadioButton::toggled, this, &VideoExportDialog::updateVideoLengthLabel);
     connect(m_speedSpin, qOverload<double>(&QDoubleSpinBox::valueChanged), this, &VideoExportDialog::updateVideoLengthLabel);
 
-    auto* mapGroup = new QGroupBox("Map", this);
+    auto* mapGroup = new QGroupBox("Map", contentWidget);
     auto* mapLayout = new QGridLayout(mapGroup);
 
     m_mapStyleCombo = new QComboBox(mapGroup);
@@ -169,7 +180,7 @@ VideoExportDialog::VideoExportDialog(const VideoExportSettings& defaults, QWidge
     auto* followLabel = new QLabel("Follow athlete: enabled", mapGroup);
     mapLayout->addWidget(followLabel, 2, 0, 1, 3);
 
-    auto* routeGroup = new QGroupBox("Route", this);
+    auto* routeGroup = new QGroupBox("Route", contentWidget);
     auto* routeLayout = new QFormLayout(routeGroup);
     m_routeColorCombo = new QComboBox(routeGroup);
     m_routeColorCombo->addItem("FTP Zone", static_cast<int>(ColorMetric::Power));
@@ -181,7 +192,7 @@ VideoExportDialog::VideoExportDialog(const VideoExportSettings& defaults, QWidge
     m_routeColorCombo->addItem("Single Color", static_cast<int>(ColorMetric::None));
     routeLayout->addRow("Color route by:", m_routeColorCombo);
 
-    auto* telemetryGroup = new QGroupBox("Telemetry Overlays", this);
+    auto* telemetryGroup = new QGroupBox("Telemetry Overlays", contentWidget);
     auto* telemetryLayout = new QGridLayout(telemetryGroup);
 
     m_powerCheck = new QCheckBox("Power", telemetryGroup);
@@ -227,7 +238,7 @@ VideoExportDialog::VideoExportDialog(const VideoExportSettings& defaults, QWidge
     overlayButtons->addStretch(1);
     telemetryLayout->addLayout(overlayButtons, 4, 0, 1, 3);
 
-    auto* tileGroup = new QGroupBox("Tiles", this);
+    auto* tileGroup = new QGroupBox("Tiles", contentWidget);
     auto* tileLayout = new QVBoxLayout(tileGroup);
     m_deleteTemporaryTilesCheck = new QCheckBox("Delete temporary video tiles after export", tileGroup);
     m_deleteTemporaryTilesCheck->setToolTip(
@@ -237,7 +248,7 @@ VideoExportDialog::VideoExportDialog(const VideoExportSettings& defaults, QWidge
         settings.value("video/deleteTemporaryTilesAfterExport", true).toBool());
     tileLayout->addWidget(m_deleteTemporaryTilesCheck);
 
-    auto* progressGroup = new QGroupBox("Export Progress", this);
+    auto* progressGroup = new QGroupBox("Export Progress", contentWidget);
     auto* progressLayout = new QVBoxLayout(progressGroup);
     m_stageLabel = new QLabel("Ready", progressGroup);
     m_frameLabel = new QLabel("Frame: -", progressGroup);
@@ -263,13 +274,15 @@ VideoExportDialog::VideoExportDialog(const VideoExportSettings& defaults, QWidge
     connect(m_exportButton, &QPushButton::clicked, this, &VideoExportDialog::startExport);
     connect(m_cancelButton, &QPushButton::clicked, this, &VideoExportDialog::cancelOrClose);
 
-    root->addWidget(outputGroup);
-    root->addWidget(videoGroup);
-    root->addWidget(mapGroup);
-    root->addWidget(routeGroup);
-    root->addWidget(telemetryGroup);
-    root->addWidget(tileGroup);
-    root->addWidget(progressGroup);
+    contentLayout->addWidget(outputGroup);
+    contentLayout->addWidget(videoGroup);
+    contentLayout->addWidget(mapGroup);
+    contentLayout->addWidget(routeGroup);
+    contentLayout->addWidget(telemetryGroup);
+    contentLayout->addWidget(tileGroup);
+    contentLayout->addWidget(progressGroup);
+    contentLayout->addStretch(1);
+    root->addWidget(scrollArea);
     root->addLayout(buttons);
 
     updateVideoLengthLabel();
