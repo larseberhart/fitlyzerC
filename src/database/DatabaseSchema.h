@@ -5,7 +5,7 @@
 
 namespace DatabaseSchema {
 
-static constexpr int kCurrentVersion = 4;
+static constexpr int kCurrentVersion = 5;
 
 // Each string is one DDL statement (no semicolons needed for exec()).
 inline constexpr std::array kStatements = {
@@ -80,6 +80,10 @@ inline constexpr std::array kStatements = {
     std::string_view{
         "CREATE INDEX IF NOT EXISTS idx_activities_activity_start_time"
         "  ON activities(activity_start_time DESC)"
+    },
+    std::string_view{
+        "CREATE INDEX IF NOT EXISTS idx_activities_athlete_start_time"
+        "  ON activities(athlete_id, activity_start_time DESC)"
     },
     std::string_view{
         "CREATE TABLE IF NOT EXISTS activity_samples ("

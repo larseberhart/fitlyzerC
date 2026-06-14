@@ -182,6 +182,14 @@ bool DatabaseManager::upgradeSchema(int fromVersion, QString* errorOut)
             return false;
     }
 
+    if (fromVersion < 5)
+    {
+        QSqlQuery q(m_db);
+        q.exec(
+            "CREATE INDEX IF NOT EXISTS idx_activities_athlete_start_time"
+            " ON activities(athlete_id, activity_start_time DESC)");
+    }
+
     return applySchema(errorOut);
 }
 
