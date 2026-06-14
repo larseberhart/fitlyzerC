@@ -1,5 +1,9 @@
 # FitlyzerC
 
+<p align="center">
+<img src="images/logo.png" alt="My Image" width="400">
+</p>
+
 ## Engineering Roadmap
 
 Implementation roadmap (phased, architecture-aware):
@@ -41,6 +45,10 @@ The application is designed for endurance athletes, coaches, and performance ana
 - macOS
 - Windows
 - Linux 
+
+<p align="center">
+<img src="images/main.png" alt="Main Window">
+</p>
 
 ---
 
