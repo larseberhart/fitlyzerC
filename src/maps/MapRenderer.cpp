@@ -1,5 +1,6 @@
 #include "MapRenderer.h"
 
+#include <QLineF>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
@@ -42,6 +43,10 @@ static ColorMetric routeModeToMetric(RouteColorMode mode)
 
 static constexpr double kPi     = 3.14159265358979323846;
 static constexpr int    kTilePx = 256;
+static constexpr qreal  kMarkerHitSizePx = 24.0;
+static constexpr qreal  kMarkerRadiusPx = 6.5;
+static constexpr qreal  kNearestRecordMaxDistancePx = 40.0;
+static constexpr int    kEdgePanMargin = 60;
 
 QPointF MapRenderer::latLonToTile(double lat, double lon, int zoom)
 {
@@ -82,6 +87,10 @@ void MapRenderer::setRideData(const RideData& rideData,
     m_visibleEndSeconds = -1.0;
     m_currentTimeSeconds = -1.0;
     m_highlightElapsedSeconds = -1.0;
+    m_dragHandle = DragHandle::None;
+    m_startMarkerRect = QRectF();
+    m_endMarkerRect = QRectF();
+    m_draggingSelection = false;
     m_routeColorMode = colorMetric == ColorMetric::None
         ? RouteColorMode::None
         : colorMetric == ColorMetric::Power
@@ -170,6 +179,34 @@ QColor MapRenderer::adjustRouteColorForStyle(const QColor& color) const
     }
 
     return adjusted;
+}
+
+const RideRecord* MapRenderer::nearestGpsRecord(const QPointF& screenPos) const
+{
+    if (!m_hasGps)
+        return nullptr;
+
+    const RideRecord* nearest = nullptr;
+    double bestDistance = std::numeric_limits<double>::max();
+
+    for (const RideRecord& record : m_rideData.records)
+    {
+        if (!record.hasGps)
+            continue;
+
+        const QPointF point = tileToScreen(latLonToTile(record.latitude, record.longitude, m_zoom));
+        const double distance = QLineF(screenPos, point).length();
+        if (distance < bestDistance)
+        {
+            bestDistance = distance;
+            nearest = &record;
+        }
+    }
+
+    if (bestDistance > kNearestRecordMaxDistancePx)
+        return nullptr;
+
+    return nearest;
 }
 
 void MapRenderer::fitToTrack()
@@ -488,23 +525,33 @@ void MapRenderer::paintEvent(QPaintEvent*)
         }
     }
 
+    m_startMarkerRect = QRectF();
+    m_endMarkerRect = QRectF();
+
     if (hasVisibleRange)
     {
         const RideRecord* startRecord = gpsPointAtTime(m_visibleStartSeconds);
         const RideRecord* endRecord = gpsPointAtTime(m_visibleEndSeconds);
 
-        auto drawMarker = [&](const RideRecord* record, const QColor& color)
+        auto drawMarker = [&](const RideRecord* record, const QColor& color, QRectF* markerRect)
         {
             if (!record)
                 return;
             const QPointF point = tileToScreen(latLonToTile(record->latitude, record->longitude, m_zoom));
+            if (markerRect)
+            {
+                *markerRect = QRectF(point.x() - kMarkerHitSizePx / 2.0,
+                                     point.y() - kMarkerHitSizePx / 2.0,
+                                     kMarkerHitSizePx,
+                                     kMarkerHitSizePx);
+            }
             p.setPen(QPen(QColor("#ffffff"), 2.0));
             p.setBrush(color);
-            p.drawEllipse(point, 6.5, 6.5);
+            p.drawEllipse(point, kMarkerRadiusPx, kMarkerRadiusPx);
         };
 
-        drawMarker(startRecord, QColor("#22c55e"));
-        drawMarker(endRecord, QColor("#ef4444"));
+        drawMarker(startRecord, QColor("#22c55e"), &m_startMarkerRect);
+        drawMarker(endRecord, QColor("#ef4444"), &m_endMarkerRect);
     }
 
     auto drawDot = [&](double lat, double lon, QColor c)
@@ -625,14 +672,90 @@ void MapRenderer::mousePressEvent(QMouseEvent* event)
 {
     if (event->button() == Qt::LeftButton)
     {
+        const QPointF pos = event->position();
+        if (m_startMarkerRect.contains(pos))
+        {
+            m_dragHandle = DragHandle::Start;
+            m_draggingSelection = true;
+            m_panning = false;
+            event->accept();
+            return;
+        }
+
+        if (m_endMarkerRect.contains(pos))
+        {
+            m_dragHandle = DragHandle::End;
+            m_draggingSelection = true;
+            m_panning = false;
+            event->accept();
+            return;
+        }
+
         m_panning  = true;
         m_panStart = event->position();
+        event->accept();
+        return;
     }
+
+    QWidget::mousePressEvent(event);
 }
 
 void MapRenderer::mouseMoveEvent(QMouseEvent* event)
 {
-    if (!m_panning) return;
+    if (m_draggingSelection)
+    {
+        const QPointF pos = event->position();
+
+        double panX = 0.0;
+        double panY = 0.0;
+        if (pos.x() < kEdgePanMargin)
+            panX = -0.05;
+        else if (pos.x() > width() - kEdgePanMargin)
+            panX = 0.05;
+
+        if (pos.y() < kEdgePanMargin)
+            panY = -0.05;
+        else if (pos.y() > height() - kEdgePanMargin)
+            panY = 0.05;
+
+        if (panX != 0.0 || panY != 0.0)
+        {
+            const QPointF prevTile = latLonToTile(m_centerLat, m_centerLon, m_zoom);
+            const QPointF newTile = prevTile + QPointF(panX, panY);
+            const double n = std::pow(2.0, m_zoom);
+            m_centerLon = newTile.x() / n * 360.0 - 180.0;
+            const double mercN = kPi * (1.0 - 2.0 * newTile.y() / n);
+            m_centerLat = std::atan(std::sinh(mercN)) * 180.0 / kPi;
+            m_centerLat = std::clamp(m_centerLat, -85.051129, 85.051129);
+            m_userMovedMap = true;
+            m_autoFitVisibleRange = false;
+        }
+
+        const RideRecord* record = nearestGpsRecord(pos);
+        if (!record)
+        {
+            update();
+            event->accept();
+            return;
+        }
+
+        if (m_dragHandle == DragHandle::Start)
+            m_visibleStartSeconds = std::min(record->elapsedSeconds, m_visibleEndSeconds);
+        else if (m_dragHandle == DragHandle::End)
+            m_visibleEndSeconds = std::max(record->elapsedSeconds, m_visibleStartSeconds);
+
+        emit segmentSelectionChanged(m_visibleStartSeconds, m_visibleEndSeconds);
+        update();
+        event->accept();
+        return;
+    }
+
+    if (!m_panning)
+    {
+        QWidget::mouseMoveEvent(event);
+        return;
+    }
+
     const QPointF delta = event->position() - m_panStart;
     m_panStart = event->position();
 
@@ -648,10 +771,26 @@ void MapRenderer::mouseMoveEvent(QMouseEvent* event)
     m_userMovedMap = true;
     m_autoFitVisibleRange = false;
     update();
+    event->accept();
 }
 
 void MapRenderer::mouseReleaseEvent(QMouseEvent* event)
 {
     if (event->button() == Qt::LeftButton)
+    {
+        if (m_draggingSelection)
+        {
+            emit segmentSelectionFinished(m_visibleStartSeconds, m_visibleEndSeconds);
+            m_draggingSelection = false;
+            m_dragHandle = DragHandle::None;
+            event->accept();
+            return;
+        }
+
         m_panning = false;
+        event->accept();
+        return;
+    }
+
+    QWidget::mouseReleaseEvent(event);
 }

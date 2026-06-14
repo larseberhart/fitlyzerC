@@ -634,8 +634,14 @@ void MainWindow::buildUI()
         auto* topSplit = new QSplitter(Qt::Horizontal, chartsTab);
         topSplit->addWidget(m_chartScroll);
         topSplit->addWidget(mapPanel);
-        topSplit->setStretchFactor(0, 3);
-        topSplit->setStretchFactor(1, 2);
+        topSplit->setStretchFactor(0, 1);
+        topSplit->setStretchFactor(1, 1);
+        QTimer::singleShot(0, topSplit, [topSplit]()
+        {
+            const int totalWidth = topSplit->size().width();
+            if (totalWidth > 0)
+                topSplit->setSizes({ totalWidth / 2, totalWidth - (totalWidth / 2) });
+        });
 
         auto* bottomSplit = new QSplitter(Qt::Horizontal, chartsTab);
         bottomSplit->addWidget(intervalsPanel);
@@ -701,6 +707,29 @@ void MainWindow::buildUI()
             if (!m_mapRenderer)
                 return;
             m_mapRenderer->setVisibleTimeRange(startMinutes * 60.0, endMinutes * 60.0);
+        });
+
+        auto syncChartsToMapSelection = [this](double startSeconds, double endSeconds)
+        {
+            const double startMinutes = std::min(startSeconds, endSeconds) / 60.0;
+            const double endMinutes = std::max(startSeconds, endSeconds) / 60.0;
+            m_powerChart->setXRange(startMinutes, endMinutes);
+            m_hrChart->setXRange(startMinutes, endMinutes);
+            m_cadenceChart->setXRange(startMinutes, endMinutes);
+            m_speedChart->setXRange(startMinutes, endMinutes);
+            m_altitudeChart->setXRange(startMinutes, endMinutes);
+        };
+
+        connect(m_mapRenderer, &MapRenderer::segmentSelectionChanged,
+                this, [syncChartsToMapSelection](double startSeconds, double endSeconds)
+        {
+            syncChartsToMapSelection(startSeconds, endSeconds);
+        });
+
+        connect(m_mapRenderer, &MapRenderer::segmentSelectionFinished,
+                this, [syncChartsToMapSelection](double startSeconds, double endSeconds)
+        {
+            syncChartsToMapSelection(startSeconds, endSeconds);
         });
 
         connect(m_powerChart, &RideChartWidget::intervalSelectionRequested,

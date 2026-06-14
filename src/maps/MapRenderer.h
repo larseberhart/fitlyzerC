@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QPointF>
+#include <QRectF>
 #include <QWidget>
 
 #include "core/zones/ZoneDefinition.h"
@@ -35,6 +36,10 @@ public:
     void setAutoRouteContrast(bool enabled);
     bool autoRouteContrast() const { return m_autoRouteContrast; }
 
+signals:
+    void segmentSelectionChanged(double startSeconds, double endSeconds);
+    void segmentSelectionFinished(double startSeconds, double endSeconds);
+
 public slots:
     void fitToTrack();
     void fitToVisibleRange();
@@ -51,10 +56,18 @@ protected:
     void mouseReleaseEvent(QMouseEvent* event) override;
 
 private:
+    enum class DragHandle
+    {
+        None,
+        Start,
+        End
+    };
+
     static QPointF latLonToTile(double lat, double lon, int zoom);
     void fitToBounds(double minLat, double maxLat, double minLon, double maxLon, bool updateMinZoom);
     QPointF        tileToScreen(const QPointF& tilePt) const;
     QColor adjustRouteColorForStyle(const QColor& color) const;
+    const RideRecord* nearestGpsRecord(const QPointF& screenPos) const;
 
     TileCache m_tileCache;
     RideData  m_rideData;
@@ -72,6 +85,10 @@ private:
 
     QPointF m_panStart;
     bool    m_panning = false;
+    DragHandle m_dragHandle = DragHandle::None;
+    QRectF  m_startMarkerRect;
+    QRectF  m_endMarkerRect;
+    bool    m_draggingSelection = false;
     bool    m_userMovedMap = false;
     bool    m_autoFitVisibleRange = true;
     bool    m_autoRouteContrast = true;
