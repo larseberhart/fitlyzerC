@@ -687,6 +687,7 @@ void MainWindow::buildUI()
         notesVL->addWidget(m_activityNotesView, 1);
 
         auto* topSplit = new QSplitter(Qt::Horizontal, chartsTab);
+        m_chartMapSplit = topSplit;
         topSplit->addWidget(m_chartScroll);
         topSplit->addWidget(mapPanel);
         topSplit->setStretchFactor(0, 1);
@@ -694,7 +695,8 @@ void MainWindow::buildUI()
         topSplit->setCollapsible(0, false);
         topSplit->setCollapsible(1, false);
         
-        // Initialize 50/50 split after layout is complete
+        // Initialize 50/50 split after layout is complete and keep it balanced
+        // when the available width changes.
         QTimer::singleShot(0, topSplit, [topSplit]()
         {
             const QList<int> sizes = topSplit->sizes();
@@ -1140,6 +1142,18 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
             && event->type() == QEvent::Resize) {
         applyChartHeight();
     }
+
+    if (m_chartMapSplit && watched == m_chartMapSplit && event->type() == QEvent::Resize)
+    {
+        const QList<int> sizes = m_chartMapSplit->sizes();
+        if (sizes.size() == 2 && std::abs(sizes[0] - sizes[1]) > 1)
+        {
+            const int totalWidth = sizes[0] + sizes[1];
+            if (totalWidth > 0)
+                m_chartMapSplit->setSizes({ totalWidth / 2, totalWidth / 2 });
+        }
+    }
+
     return QMainWindow::eventFilter(watched, event);
 }
 

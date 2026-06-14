@@ -7,6 +7,7 @@
 #include <QLabel>
 #include <QMainWindow>
 #include <QMenu>
+#include <QSplitter>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSet>
@@ -187,6 +188,7 @@ private:
     QScrollArea*     m_chartScroll      = nullptr;
     QWidget*         m_chartsContainer  = nullptr;
     QVBoxLayout*     m_chartsLayout     = nullptr;
+    QSplitter*       m_chartMapSplit    = nullptr;
     int              m_chartHeight      = 220;
     RideChartWidget* m_powerChart       = nullptr;
     RideChartWidget* m_hrChart          = nullptr;
