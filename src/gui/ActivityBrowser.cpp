@@ -22,6 +22,30 @@ namespace
 constexpr int kNotesRole = Qt::UserRole + 1;
 constexpr int kWeatherRole = Qt::UserRole + 2;
 constexpr int kIsoDateRole = Qt::UserRole + 3;
+
+class ActivityDateTableItem : public QTableWidgetItem
+{
+public:
+    using QTableWidgetItem::QTableWidgetItem;
+
+    bool operator<(const QTableWidgetItem& other) const override
+    {
+        const QString lhsIso = data(kIsoDateRole).toString();
+        const QString rhsIso = other.data(kIsoDateRole).toString();
+
+        const QDate lhsDate = QDate::fromString(lhsIso, Qt::ISODate);
+        const QDate rhsDate = QDate::fromString(rhsIso, Qt::ISODate);
+        if (lhsDate.isValid() && rhsDate.isValid())
+            return lhsDate < rhsDate;
+
+        // Fall back to ISO lexical compare for partial values and then display text.
+        const int isoCmp = QString::compare(lhsIso, rhsIso, Qt::CaseInsensitive);
+        if (isoCmp != 0)
+            return isoCmp < 0;
+
+        return QTableWidgetItem::operator<(other);
+    }
+};
 }
 
 static QString fmtDurAB(double seconds)
@@ -173,7 +197,7 @@ void ActivityBrowser::refresh(int athleteId)
         const QDate parsedDate = QDate::fromString(isoDate, Qt::ISODate);
         const QString displayDate = parsedDate.isValid() ? DateFormatter::formatDate(parsedDate) : isoDate;
 
-        auto* dateItem = new QTableWidgetItem(displayDate);
+        auto* dateItem = new ActivityDateTableItem(displayDate);
         dateItem->setData(Qt::UserRole, a.id);
         dateItem->setData(kNotesRole, a.notes);
         dateItem->setData(kWeatherRole, a.weatherNotes);
