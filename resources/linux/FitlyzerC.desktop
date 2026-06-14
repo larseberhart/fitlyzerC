@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=FitlyzerC
+Comment=Analyze Garmin FIT activity files
+Exec=FitlyzerC %F
+TryExec=FitlyzerC
+Icon=appicon
+Terminal=false
+Categories=Utility;Sports;X-Fitness;

@@ -47,6 +47,16 @@
         "CMAKE_CXX_COMPILER": "clang++"
       }
     },
+    {
+      "name": "linux-appimage",
+      "displayName": "Linux AppImage",
+      "description": "Configure a Linux release build intended for AppImage packaging",
+      "inherits": "linux",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "FITLYZERC_ENABLE_APPIMAGE_PACKAGE": "ON"
+      }
+    },
 
     {
       "name": "windows",
@@ -83,6 +93,14 @@
     {
       "name": "linux",
       "configurePreset": "linux"
+    },
+    {
+      "name": "linux-appimage",
+      "displayName": "Linux AppImage",
+      "configurePreset": "linux-appimage",
+      "targets": [
+        "appimage"
+      ]
     },
     {
       "name": "windows",

@@ -2,16 +2,9 @@ cmake_minimum_required(VERSION 3.21)
 
 project(
     FitlyzerC
-    VERSION 0.1.0
+    VERSION 0.2.0
     LANGUAGES CXX
 )
-
-set(FITLYZER_VERSION_MAJOR 0)
-set(FITLYZER_VERSION_MINOR 1)
-set(FITLYZER_VERSION_PATCH 0)
-
-set(FITLYZER_VERSION
-    "${FITLYZER_VERSION_MAJOR}.${FITLYZER_VERSION_MINOR}.${FITLYZER_VERSION_PATCH}")
 
 include(FetchContent)
 include(CTest)
@@ -19,6 +12,7 @@ include(CTest)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 
 if(WIN32 AND NOT Qt6_DIR AND NOT CMAKE_PREFIX_PATH)
     # Try common Qt installation locations for MSVC builds.
@@ -181,7 +175,6 @@ if(APPLE)
     set_source_files_properties(
         ${MACOS_ICON}
         PROPERTIES
-        MACOSX_PACKAGE_LOCATION "Resources"
     )
 
     set_target_properties(
@@ -268,11 +261,48 @@ endif()
 
 include(GNUInstallDirs)
 
+option(
+    FITLYZERC_ENABLE_APPIMAGE_PACKAGE
+    "Enable Linux AppImage packaging"
+    OFF
+)
+
 install(
     TARGETS FitlyzerC
     BUNDLE DESTINATION .
     RUNTIME DESTINATION .
 )
+
+if(UNIX AND NOT APPLE AND FITLYZERC_ENABLE_APPIMAGE_PACKAGE)
+    if(COMMAND qt_generate_deploy_app_script)
+        qt_generate_deploy_app_script(
+            TARGET FitlyzerC
+            OUTPUT_SCRIPT FITLYZERC_DEPLOY_SCRIPT
+            NO_UNSUPPORTED_PLATFORM_ERROR
+            DEPLOY_TOOL_OPTIONS --no-translations
+        )
+        install(SCRIPT ${FITLYZERC_DEPLOY_SCRIPT})
+    else()
+        message(WARNING "qt_generate_deploy_app_script is unavailable; AppImage may miss runtime dependencies.")
+    endif()
+
+    install(FILES
+        "${CMAKE_SOURCE_DIR}/resources/linux/FitlyzerC.desktop"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/applications"
+    )
+
+    install(FILES
+        "${CMAKE_SOURCE_DIR}/resources/appicon.png"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps"
+        RENAME "appicon"
+    )
+
+    install(FILES
+        "${CMAKE_SOURCE_DIR}/resources/appicon.png"
+        DESTINATION "."
+        RENAME "appicon.png"
+    )
+endif()
 
 if(WIN32)
     # Ensure CPack installer contains all Qt/MSVC runtime dependencies.
@@ -322,26 +352,36 @@ CreateShortCut '$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\FitlyzerC.lnk' '$INSTDIR\\\\
 elseif(APPLE)
     set(CPACK_GENERATOR DragNDrop)
     set(CPACK_PACKAGE_FILE_NAME "FitlyzerC-${PROJECT_VERSION}")
-else()
+elseif(UNIX AND FITLYZERC_ENABLE_APPIMAGE_PACKAGE)
+    find_program(CPACK_APPIMAGE_TOOL_EXECUTABLE appimagetool)
+    if(NOT CPACK_APPIMAGE_TOOL_EXECUTABLE)
+        message(FATAL_ERROR "appimagetool was not found in PATH. Install appimagetool-bin or add appimagetool to your PATH.")
+    endif()
+
+    find_program(CPACK_APPIMAGE_PATCHELF_EXECUTABLE patchelf)
+    if(NOT CPACK_APPIMAGE_PATCHELF_EXECUTABLE)
+        message(FATAL_ERROR "patchelf was not found in PATH. Install patchelf to build AppImages.")
+    endif()
+
+    set(CPACK_PACKAGE_ICON "appicon")
+    set(CPACK_GENERATOR AppImage)
+    set(CPACK_APPIMAGE_DESKTOP_FILE "FitlyzerC.desktop")
+    set(CPACK_APPIMAGE_NO_APPSTREAM ON)
+    set(CPACK_APPIMAGE_TOOL_EXECUTABLE "${CPACK_APPIMAGE_TOOL_EXECUTABLE}")
+    set(CPACK_APPIMAGE_PATCHELF_EXECUTABLE "${CPACK_APPIMAGE_PATCHELF_EXECUTABLE}")
     set(CPACK_PACKAGE_FILE_NAME "FitlyzerC-${PROJECT_VERSION}")
 endif()
 
 include(CPack)
 
-if(BUILD_TESTING)
-    add_executable(FitlyzerC_MapFitMathTests
-        tests/MapFitMathTests.cpp
-        src/maps/MapFitMath.cpp
-    )
 
-    target_include_directories(FitlyzerC_MapFitMathTests PRIVATE
-        ${CMAKE_SOURCE_DIR}/src
-    )
-
-    add_test(NAME FitlyzerC.MapFitMath COMMAND FitlyzerC_MapFitMathTests)
-endif()
 
 if(APPLE)
     # Convenience target so macOS packaging is explicit and easy to invoke.
     add_custom_target(dmg DEPENDS package)
+endif()
+
+if(UNIX AND NOT APPLE AND FITLYZERC_ENABLE_APPIMAGE_PACKAGE)
+    # Convenience target so Linux packaging is explicit and easy to invoke.
+    add_custom_target(appimage DEPENDS package)
 endif()

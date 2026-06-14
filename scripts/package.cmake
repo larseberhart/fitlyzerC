@@ -12,7 +12,7 @@ if(NOT DEFINED FITLYZER_PRESET OR FITLYZER_PRESET STREQUAL "")
     elseif(APPLE)
         set(FITLYZER_PRESET "macos")
     else()
-        set(FITLYZER_PRESET "linux")
+        set(FITLYZER_PRESET "linux-appimage")
     endif()
 endif()
 
@@ -30,7 +30,7 @@ message(STATUS "Build dir: ${FITLYZER_BUILD_DIR}")
 
 # Configure for Release by default so package outputs use release binaries.
 execute_process(
-    COMMAND "${CMAKE_COMMAND}" --preset "${FITLYZER_PRESET}" -DCMAKE_BUILD_TYPE=Release
+    COMMAND "${CMAKE_COMMAND}" --preset "${FITLYZER_PRESET}"
     WORKING_DIRECTORY "${FITLYZER_SOURCE_DIR}"
     RESULT_VARIABLE FITLYZER_CONFIGURE_RESULT
 )
