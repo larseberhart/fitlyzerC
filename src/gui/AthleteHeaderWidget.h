@@ -16,8 +16,11 @@ public:
                     int activityCount,
                     const QString& lastActivityDate);
 
+    // Per-ride computed metrics shown on the right side of the bar.
+    void setRideMetrics(const QString& metricsText);
+
 private:
-    QLabel* m_titleLabel = nullptr;
-    QLabel* m_nameLabel = nullptr;
-    QLabel* m_metricsLabel = nullptr;
-};
+    QLabel* m_nameLabel    = nullptr;   // left: athlete name
+    QLabel* m_statsLabel   = nullptr;   // middle: FTP / activities / last ride
+    QLabel* m_metricsLabel = nullptr;   // right: NP / IF / TSS …
+};;

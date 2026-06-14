@@ -337,11 +337,6 @@ void MainWindow::buildUI()
     m_athleteHeader = new AthleteHeaderWidget(this);
     mainLayout->addWidget(m_athleteHeader);
 
-    m_summaryMetricsLabel = new QLabel(this);
-    m_summaryMetricsLabel->setStyleSheet("font-weight: 600; color: #1f2937; padding: 2px 6px;");
-    m_summaryMetricsLabel->setText("NP 0 W   IF 0.00   TSS 0   VI 0.00   EF 0.00");
-    mainLayout->addWidget(m_summaryMetricsLabel);
-
     m_welcomeWidget = new WelcomeWidget(this);
     mainLayout->addWidget(m_welcomeWidget, 1);
     m_welcomeWidget->setVisible(false);
@@ -2376,24 +2371,21 @@ void MainWindow::updateStatsLabel()
     if (m_useEstimatedFtpButton)
         m_useEstimatedFtpButton->setEnabled(m_currentAthleteId > 0 && estimatedFtpRounded > 0);
 
-    if (m_summaryMetricsLabel)
-    {
-        const QString ftpSummary = estimatedFtpRounded > 0
-            ? QString("FTP %1 W   Est %2 W   Delta %+3")
-                  .arg(ftpWatts)
-                  .arg(estimatedFtpRounded)
-                  .arg(ftpDelta)
-            : QString("FTP %1 W   Est -   Delta -").arg(ftpWatts);
+    const QString ftpSummary = estimatedFtpRounded > 0
+        ? QString("FTP %1  Est %2  \u0394%+3")
+              .arg(ftpWatts)
+              .arg(estimatedFtpRounded)
+              .arg(ftpDelta)
+        : QString();
 
-        m_summaryMetricsLabel->setText(
-            QString("NP %1 W   IF %2   TSS %3   VI %4   EF %5   %6")
-                .arg(m_controller->normalizedPower(), 0, 'f', 0)
-                .arg(m_controller->intensityFactor(), 0, 'f', 2)
-                .arg(m_controller->trainingStressScore(), 0, 'f', 0)
-                .arg(m_controller->variabilityIndex(), 0, 'f', 2)
-                .arg(m_controller->efficiencyFactor(), 0, 'f', 2)
-                .arg(ftpSummary));
-    }
+    const QString rideText = QString("NP %1 W   IF %2   TSS %3   VI %4   EF %5%6")
+        .arg(m_controller->normalizedPower(), 0, 'f', 0)
+        .arg(m_controller->intensityFactor(), 0, 'f', 2)
+        .arg(m_controller->trainingStressScore(), 0, 'f', 0)
+        .arg(m_controller->variabilityIndex(), 0, 'f', 2)
+        .arg(m_controller->efficiencyFactor(), 0, 'f', 2)
+        .arg(ftpSummary.isEmpty() ? QString() : QString("   ") + ftpSummary);
+    m_athleteHeader->setRideMetrics(rideText);
 }
 
 void MainWindow::updateCharts()

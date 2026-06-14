@@ -167,7 +167,6 @@ private:
 
     // -- Stats panel --------------------------------------------------------
     AthleteHeaderWidget* m_athleteHeader = nullptr;
-    QLabel* m_summaryMetricsLabel = nullptr;
 
     // -- Tab widget ---------------------------------------------------------
     QTabWidget* m_tabWidget = nullptr;
