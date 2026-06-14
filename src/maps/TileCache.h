@@ -4,6 +4,7 @@
 #include <QNetworkAccessManager>
 #include <QObject>
 #include <QPixmap>
+#include <QQueue>
 #include <QSet>
 #include <QString>
 #include <QStringList>
@@ -61,6 +62,10 @@ private slots:
     void onReplyFinished(QNetworkReply* reply);
 
 private:
+    struct TileRequest { int z, x, y; };
+
+    static constexpr int kMaxConcurrentDownloads = 6;
+
     QString key(int z, int x, int y) const;
     QString diskTilePathForRoot(const QString& root, int z, int x, int y) const;
     QString diskTilePath(int z, int x, int y) const;
@@ -68,9 +73,13 @@ private:
     static QString styleDisplayName(MapStyle style);
     static TileProvider providerForStyle(MapStyle style);
 
+    void dispatchNextDownloads();
+
     QNetworkAccessManager      m_nam;
     QCache<QString, QPixmap>   m_cache;
     QSet<QString>              m_pending;
+    QQueue<TileRequest>        m_downloadQueue;
+    int                        m_activeDownloads = 0;
     QString                    m_diskCacheRoot;
     QStringList                m_diskFallbackRoots;
     MapStyle                   m_mapStyle = MapStyle::Light;

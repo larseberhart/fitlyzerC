@@ -168,6 +168,10 @@ void TileCache::clearMemoryCache()
 {
     m_cache.clear();
     m_pending.clear();
+    m_downloadQueue.clear();
+    // m_activeDownloads is not reset here: in-flight replies will still arrive
+    // and decrement it correctly. dispatchNextDownloads() will be a no-op since
+    // the queue is now empty.
 }
 
 void TileCache::setMapStyle(MapStyle style)
@@ -235,25 +239,8 @@ QPixmap TileCache::tile(int z, int x, int y)
     if (!m_pending.contains(k))
     {
         m_pending.insert(k);
-
-        QString urlStr = m_provider.urlTemplate;
-        urlStr.replace("{z}", QString::number(z));
-        urlStr.replace("{x}", QString::number(x));
-        urlStr.replace("{y}", QString::number(y));
-        const QUrl url(urlStr);
-
-        QNetworkRequest req(url);
-        req.setHeader(QNetworkRequest::UserAgentHeader,
-                      "FitlyzerC/1.0");
-        req.setAttribute(
-            QNetworkRequest::RedirectPolicyAttribute,
-            QNetworkRequest::NoLessSafeRedirectPolicy);
-
-        auto* reply = m_nam.get(req);
-        reply->setProperty("z", z);
-        reply->setProperty("x", x);
-        reply->setProperty("y", y);
-        reply->setProperty("style", styleKey(m_mapStyle));
+        m_downloadQueue.enqueue({z, x, y});
+        dispatchNextDownloads();
     }
 
     return {};   // empty until the download completes
@@ -328,9 +315,37 @@ QPixmap TileCache::tileBlocking(int z, int x, int y, bool allowNetwork)
     return px;
 }
 
+void TileCache::dispatchNextDownloads()
+{
+    while (m_activeDownloads < kMaxConcurrentDownloads && !m_downloadQueue.isEmpty())
+    {
+        const TileRequest req = m_downloadQueue.dequeue();
+
+        QString urlStr = m_provider.urlTemplate;
+        urlStr.replace("{z}", QString::number(req.z));
+        urlStr.replace("{x}", QString::number(req.x));
+        urlStr.replace("{y}", QString::number(req.y));
+
+        QNetworkRequest netReq{QUrl(urlStr)};
+        netReq.setHeader(QNetworkRequest::UserAgentHeader, "FitlyzerC/1.0");
+        netReq.setAttribute(
+            QNetworkRequest::RedirectPolicyAttribute,
+            QNetworkRequest::NoLessSafeRedirectPolicy);
+
+        auto* reply = m_nam.get(netReq);
+        reply->setProperty("z", req.z);
+        reply->setProperty("x", req.x);
+        reply->setProperty("y", req.y);
+        reply->setProperty("style", styleKey(m_mapStyle));
+
+        ++m_activeDownloads;
+    }
+}
+
 void TileCache::onReplyFinished(QNetworkReply* reply)
 {
     reply->deleteLater();
+    --m_activeDownloads;
 
     const int z = reply->property("z").toInt();
     const int x = reply->property("x").toInt();
@@ -338,6 +353,9 @@ void TileCache::onReplyFinished(QNetworkReply* reply)
     const QString style = reply->property("style").toString();
     const QString k = key(z, x, y);
     m_pending.remove(k);
+
+    // Always redispatch so queued tiles are sent as slots free up.
+    dispatchNextDownloads();
 
     if (style != styleKey(m_mapStyle))
         return;
