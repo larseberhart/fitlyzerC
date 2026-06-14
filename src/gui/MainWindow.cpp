@@ -48,6 +48,7 @@
 #include <QWidget>
 
 #include "ActivityBrowser.h"
+#include "AboutDialog.h"
 #include "AthleteHeaderWidget.h"
 #include "AthleteDialog.h"
 #include "AthleteListDialog.h"
@@ -323,7 +324,8 @@ void MainWindow::buildUI()
         viewMenu->addAction("Reset Zoom", QKeySequence("Ctrl+0"), this, &MainWindow::resetAllZoom);
         viewMenu->addAction("Increase Chart Height", this, &MainWindow::increaseChartHeight);
         viewMenu->addAction("Decrease Chart Height", this, &MainWindow::decreaseChartHeight);
-        menuBar()->addMenu("&Help");
+        auto* helpMenu = menuBar()->addMenu("&Help");
+        helpMenu->addAction("&About", this, &MainWindow::showAbout);
 
     }
 
@@ -3092,4 +3094,10 @@ void MainWindow::editCurrentActivityProperties()
     }
 
     statusBar()->showMessage("Activity properties updated.", 2500);
+}
+
+void MainWindow::showAbout()
+{
+    AboutDialog dlg(this);
+    dlg.exec();
 }

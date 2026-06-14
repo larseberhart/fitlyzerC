@@ -62,6 +62,7 @@ private slots:
     void openRecentDatabase();
     void onAthleteSelectionChanged(int index);
     void createVideo();
+    void showAbout();
 
 private:
     void buildUI();
