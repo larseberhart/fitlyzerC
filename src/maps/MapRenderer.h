@@ -36,6 +36,7 @@ public:
     MapStyle mapStyle() const { return m_tileCache.mapStyle(); }
     void setAutoRouteContrast(bool enabled);
     bool autoRouteContrast() const { return m_autoRouteContrast; }
+    void setTileCacheSize(int maxTiles);
 
 signals:
     void segmentSelectionChanged(double startSeconds, double endSeconds);

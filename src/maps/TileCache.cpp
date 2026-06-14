@@ -174,6 +174,11 @@ void TileCache::clearMemoryCache()
     // the queue is now empty.
 }
 
+void TileCache::setMemoryCacheSize(int maxTiles)
+{
+    m_cache.setMaxCost(std::max(1, maxTiles));
+}
+
 void TileCache::setMapStyle(MapStyle style)
 {
     if (m_mapStyle == style)

@@ -6,6 +6,7 @@
 #include <QPainterPath>
 #include <QWheelEvent>
 
+#include "core/settings/AppSettings.h"
 #include "core/zones/ColorProvider.h"
 #include "maps/MapFitMath.h"
 
@@ -71,6 +72,9 @@ MapRenderer::MapRenderer(QWidget* parent)
     : QWidget(parent)
 {
     setMinimumHeight(300);
+
+    // Apply persisted tile cache size.
+    m_tileCache.setMemoryCacheSize(AppSettings::instance().tileCacheSize());
 
     // Coalesce tile-download repaints: many tiles arriving at once
     // produce one repaint 50 ms after the last arrival, not one per tile.
@@ -271,6 +275,11 @@ void MapRenderer::setAutoRouteContrast(bool enabled)
         return;
     m_autoRouteContrast = enabled;
     update();
+}
+
+void MapRenderer::setTileCacheSize(int maxTiles)
+{
+    m_tileCache.setMemoryCacheSize(maxTiles);
 }
 
 QColor MapRenderer::adjustRouteColorForStyle(const QColor& color) const

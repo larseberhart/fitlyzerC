@@ -2177,6 +2177,21 @@ void MainWindow::openSettingsDialog()
     form->addRow("Date Format:", dateFormatCombo);
     layout->addWidget(generalGroup);
 
+    // Maps group
+    auto* mapsGroup = new QGroupBox("Maps", &dialog);
+    auto* mapsForm = new QFormLayout(mapsGroup);
+    auto* tileCacheCombo = new QComboBox(mapsGroup);
+    tileCacheCombo->addItem("128 tiles (~32 MB)",  128);
+    tileCacheCombo->addItem("256 tiles (~64 MB)",  256);
+    tileCacheCombo->addItem("512 tiles (~128 MB)", 512);
+    tileCacheCombo->addItem("1024 tiles (~256 MB)", 1024);
+    tileCacheCombo->addItem("2048 tiles (~512 MB)", 2048);
+    const int currentCacheSize = AppSettings::instance().tileCacheSize();
+    const int cacheSizeIndex = tileCacheCombo->findData(currentCacheSize);
+    tileCacheCombo->setCurrentIndex(cacheSizeIndex >= 0 ? cacheSizeIndex : 2);
+    mapsForm->addRow("Tile Memory Cache:", tileCacheCombo);
+    layout->addWidget(mapsGroup);
+
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
     layout->addWidget(buttons);
 
@@ -2191,6 +2206,17 @@ void MainWindow::openSettingsDialog()
         return;
 
     AppSettings::instance().setDateFormat(selectedFormat);
+
+    const int selectedCacheSize = tileCacheCombo->currentData().toInt();
+    if (selectedCacheSize != currentCacheSize)
+    {
+        AppSettings::instance().setTileCacheSize(selectedCacheSize);
+        if (m_mapRenderer)
+            m_mapRenderer->setTileCacheSize(selectedCacheSize);
+    }
+
+    if (selectedFormat == currentFormat)
+        return;
 
     if (m_activityBrowser)
         m_activityBrowser->refresh(m_currentAthleteId);

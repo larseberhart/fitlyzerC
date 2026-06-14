@@ -42,3 +42,26 @@ DateFormat AppSettings::sanitizeDateFormat(int rawValue)
             return DateFormat::DD_MM_YYYY;
     }
 }
+
+int AppSettings::tileCacheSize() const
+{
+    QSettings settings("Fitlyzer", "FitlyzerC");
+    const int stored = settings.value(tileCacheSizeKey(), 512).toInt();
+    // Clamp to known-good values in case of corruption.
+    const int valid[] = {128, 256, 512, 1024, 2048};
+    for (int v : valid)
+        if (stored == v)
+            return v;
+    return 512;
+}
+
+void AppSettings::setTileCacheSize(int tiles)
+{
+    QSettings settings("Fitlyzer", "FitlyzerC");
+    settings.setValue(tileCacheSizeKey(), tiles);
+}
+
+QString AppSettings::tileCacheSizeKey()
+{
+    return QStringLiteral("maps/tileCacheSize");
+}

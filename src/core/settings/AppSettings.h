@@ -20,9 +20,13 @@ public:
     DateFormat dateFormat() const;
     void setDateFormat(DateFormat format);
 
+    int tileCacheSize() const;   // number of tiles to keep in RAM (128-2048)
+    void setTileCacheSize(int tiles);
+
 private:
     AppSettings() = default;
 
     static QString dateFormatKey();
     static DateFormat sanitizeDateFormat(int rawValue);
+    static QString tileCacheSizeKey();
 };

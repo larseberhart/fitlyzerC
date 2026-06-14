@@ -48,6 +48,7 @@ public:
     QPixmap tileBlocking(int z, int x, int y, bool allowNetwork = true);
     bool isTileCachedOnDisk(int z, int x, int y) const;
     void clearMemoryCache();
+    void setMemoryCacheSize(int maxTiles);  // live resize; drops excess entries
     void setMapStyle(MapStyle style);
     MapStyle mapStyle() const { return m_mapStyle; }
     QString mapStyleName() const;
