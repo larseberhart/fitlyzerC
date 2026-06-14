@@ -115,8 +115,6 @@ FitlyzerC is under active development.
 
 Recent milestones include:
 
-### v0.2.x
-
 - Linux AppImage packaging
 - Reworked map tile system
 - Additional map styles
