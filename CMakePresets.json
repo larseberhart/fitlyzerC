@@ -13,11 +13,12 @@
     },
 
     {
-      "name": "macos",
+      "name": "macos-debug",
       "displayName": "macOS Debug",
       "description": "Configure a regular macOS debug build",
       "inherits": "base",
       "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_C_COMPILER": "/opt/homebrew/opt/llvm/bin/clang",
         "CMAKE_CXX_COMPILER": "/opt/homebrew/opt/llvm/bin/clang++",
         "CMAKE_PREFIX_PATH": "/opt/homebrew/opt/qt",
@@ -30,7 +31,7 @@
       "name": "macos-release",
       "displayName": "macOS Release",
       "description": "Configure a regular macOS release build",
-      "inherits": "macos",
+      "inherits": "macos-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
@@ -43,37 +44,68 @@
     },
 
     {
-      "name": "linux",
+      "name": "linux-debug",
+      "displayName": "Linux Debug",
+      "description": "Configure a regular Linux debug build",
       "inherits": "base",
       "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
         "FITLYZERC_BUNDLE_FFMPEG": "ON",
         "FITLYZERC_FFMPEG_SOURCE_DIR": "${sourceDir}/third_party/ffmpeg",
-        "FITLYZERC_FFMPEG_BINARY_PATH": "${sourceDir}/resources/ffmpeg/linux/ffmpeg"
+        "FITLYZERC_FFMPEG_BINARY_PATH": "${sourceDir}/resources/ffmpeg/linux/ffmpeg",
+        "FITLYZERC_ENABLE_APPIMAGE_PACKAGE": "OFF"
+      }
+    },
+    {
+      "name": "linux-release",
+      "displayName": "Linux Release",
+      "description": "Configure a regular Linux release build",
+      "inherits": "linux-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "FITLYZERC_ENABLE_APPIMAGE_PACKAGE": "OFF"
       }
     },
     {
       "name": "linux-appimage",
       "displayName": "Linux AppImage",
       "description": "Configure a Linux release build intended for AppImage packaging",
-      "inherits": "linux",
+      "inherits": "linux-release",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
         "FITLYZERC_ENABLE_APPIMAGE_PACKAGE": "ON"
       }
     },
 
     {
-      "name": "windows",
+      "name": "windows-debug",
+      "displayName": "Windows Debug",
+      "description": "Configure a regular Windows debug build",
       "inherits": "base",
       "generator": "Visual Studio 18 2026",
       "architecture": "x64",
       "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
         "FITLYZERC_BUNDLE_FFMPEG": "ON",
         "FITLYZERC_FFMPEG_SOURCE_DIR": "",
         "FITLYZERC_FFMPEG_BINARY_PATH": "${sourceDir}/resources/ffmpeg/windows/ffmpeg.exe"
       }
+    },
+    {
+      "name": "windows-release",
+      "displayName": "Windows Release",
+      "description": "Configure a regular Windows release build",
+      "inherits": "windows-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "windows-nsis",
+      "displayName": "Windows NSIS",
+      "description": "Configure a Windows release build intended for NSIS packaging",
+      "inherits": "windows-release"
     },
     {
       "name": "windows-mingw",
@@ -92,9 +124,14 @@
 
   "buildPresets": [
     {
-      "name": "macos",
-      "displayName": "macOS Build",
-      "configurePreset": "macos"
+      "name": "macos-debug",
+      "displayName": "macOS Debug",
+      "configurePreset": "macos-debug"
+    },
+    {
+      "name": "macos-release",
+      "displayName": "macOS Release",
+      "configurePreset": "macos-release"
     },
     {
       "name": "macos-dmg",
@@ -105,8 +142,14 @@
       ]
     },
     {
-      "name": "linux",
-      "configurePreset": "linux"
+      "name": "linux-debug",
+      "displayName": "Linux Debug",
+      "configurePreset": "linux-debug"
+    },
+    {
+      "name": "linux-release",
+      "displayName": "Linux Release",
+      "configurePreset": "linux-release"
     },
     {
       "name": "linux-appimage",
@@ -117,13 +160,22 @@
       ]
     },
     {
-      "name": "windows",
-      "configurePreset": "windows"
+      "name": "windows-debug",
+      "displayName": "Windows Debug",
+      "configurePreset": "windows-debug",
+      "configuration": "Debug"
     },
     {
-      "name": "windows-package",
-      "displayName": "Windows NSIS Package",
-      "configurePreset": "windows",
+      "name": "windows-release",
+      "displayName": "Windows Release",
+      "configurePreset": "windows-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "windows-nsis",
+      "displayName": "Windows NSIS",
+      "configurePreset": "windows-nsis",
+      "configuration": "Release",
       "targets": [
         "PACKAGE"
       ]

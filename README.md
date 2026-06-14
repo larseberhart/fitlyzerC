@@ -210,7 +210,7 @@ cmake --preset macos-release
 ### Build
 
 ```bash
-cmake --build --preset macos
+cmake --build --preset macos-release
 ```
 
 ### Create DMG
@@ -233,19 +233,19 @@ Install:
 ### Configure
 
 ```cmd
-cmake --preset windows
+cmake --preset windows-release
 ```
 
 ### Build
 
 ```cmd
-cmake --build --preset windows
+cmake --build --preset windows-release
 ```
 
 ### Create Installer
 
 ```cmd
-cmake --build --preset windows-package
+cmake --build --preset windows-nsis
 ```
 
 ---
@@ -267,13 +267,13 @@ sudo pacman -S \
 ### Configure
 
 ```bash
-cmake --preset linux
+cmake --preset linux-release
 ```
 
 ### Build
 
 ```bash
-cmake --build --preset linux
+cmake --build --preset linux-release
 ```
 
 ### AppImage

@@ -9,10 +9,47 @@ project(
 include(FetchContent)
 include(ExternalProject)
 include(CTest)
+include(CheckIPOSupported)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+option(
+    FITLYZERC_ENABLE_RELEASE_IPO
+    "Enable interprocedural optimization (LTO) for Release and RelWithDebInfo"
+    ON
+)
+
+# Build profile tuning:
+# - Debug: prioritize fast compile + clear debugging
+# - Release/RelWithDebInfo: prioritize runtime execution speed
+if(MSVC)
+    add_compile_options(
+        "$<$<CONFIG:Debug>:/Od>"
+        "$<$<CONFIG:Debug>:/Zi>"
+        "$<$<CONFIG:Release>:/O2>"
+        "$<$<CONFIG:RelWithDebInfo>:/O2>"
+    )
+else()
+    add_compile_options(
+        "$<$<CONFIG:Debug>:-O0>"
+        "$<$<CONFIG:Debug>:-g>"
+        "$<$<CONFIG:Release>:-O3>"
+        "$<$<CONFIG:RelWithDebInfo>:-O2>"
+        "$<$<CONFIG:RelWithDebInfo>:-g>"
+    )
+endif()
+
+if(FITLYZERC_ENABLE_RELEASE_IPO)
+    check_ipo_supported(RESULT FITLYZERC_IPO_SUPPORTED OUTPUT FITLYZERC_IPO_ERROR)
+    if(FITLYZERC_IPO_SUPPORTED)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
+    else()
+        message(WARNING "Release IPO/LTO is not supported by this toolchain: ${FITLYZERC_IPO_ERROR}")
+    endif()
+endif()
 
 
 if(WIN32 AND NOT Qt6_DIR AND NOT CMAKE_PREFIX_PATH)
