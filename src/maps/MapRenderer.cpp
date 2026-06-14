@@ -82,6 +82,76 @@ MapRenderer::MapRenderer(QWidget* parent)
             this, [this](int, int, int) { m_tileRepaintTimer.start(); });
 }
 
+// Precompute per-segment base colors (excluding map-style adjustment which changes
+// per-repaint). Called once on setRideData() and whenever the color mode changes.
+void MapRenderer::rebuildSegmentColors()
+{
+    if (m_gpsRecords.size() < 2 || m_routeColorMode == RouteColorMode::None)
+    {
+        m_segmentColors.clear();
+        return;
+    }
+
+    m_segmentColors.resize(m_gpsRecords.size() - 1);
+
+    for (size_t i = 0; i + 1 < m_gpsRecords.size(); ++i)
+    {
+        const RideRecord& cur  = *m_gpsRecords[i];
+        const RideRecord& next = *m_gpsRecords[i + 1];
+
+        double value = 0.0;
+        bool hasValue = false;
+
+        switch (m_routeColorMode)
+        {
+            case RouteColorMode::None: break;
+            case RouteColorMode::Power:
+                if      (cur.hasPower)  { value = cur.power;  hasValue = true; }
+                else if (next.hasPower) { value = next.power; hasValue = true; }
+                break;
+            case RouteColorMode::HeartRate:
+                if      (cur.hasHeartRate)  { value = cur.heartRate;  hasValue = true; }
+                else if (next.hasHeartRate) { value = next.heartRate; hasValue = true; }
+                break;
+            case RouteColorMode::Cadence:
+                if      (cur.hasCadence)  { value = cur.cadence;  hasValue = true; }
+                else if (next.hasCadence) { value = next.cadence; hasValue = true; }
+                break;
+            case RouteColorMode::Speed:
+                if      (cur.hasSpeed)  { value = cur.speed;  hasValue = true; }
+                else if (next.hasSpeed) { value = next.speed; hasValue = true; }
+                break;
+            case RouteColorMode::Altitude:
+                if      (cur.hasAltitude)  { value = cur.altitude;  hasValue = true; }
+                else if (next.hasAltitude) { value = next.altitude; hasValue = true; }
+                break;
+            case RouteColorMode::Gradient:
+                if (cur.hasGps && next.hasGps && cur.hasAltitude && next.hasAltitude)
+                {
+                    const double lat1 = cur.latitude  * kPi / 180.0;
+                    const double lat2 = next.latitude * kPi / 180.0;
+                    const double dLat = lat2 - lat1;
+                    const double dLon = (next.longitude - cur.longitude) * kPi / 180.0;
+                    const double a = std::sin(dLat / 2.0) * std::sin(dLat / 2.0)
+                                   + std::cos(lat1) * std::cos(lat2)
+                                   * std::sin(dLon / 2.0) * std::sin(dLon / 2.0);
+                    const double dist = 2.0 * 6371000.0
+                        * std::atan2(std::sqrt(a), std::sqrt(std::max(0.0, 1.0 - a)));
+                    const double elev = next.altitude - cur.altitude;
+                    if (dist > 0.1) { value = (elev / dist) * 100.0; hasValue = true; }
+                }
+                break;
+        }
+
+        m_segmentColors[i] = hasValue
+            ? (m_routeColorMode == RouteColorMode::Gradient
+                ? gradientColorForSlope(value)
+                : ColorProvider::colorForMetric(
+                    routeModeToMetric(m_routeColorMode), value, m_colorContext))
+            : QColor(); // invalid = no data
+    }
+}
+
 void MapRenderer::rebuildGpsCache()
 {
     m_gpsRecords.clear();
@@ -152,6 +222,7 @@ void MapRenderer::setRideData(const RideData& rideData,
 
     rebuildGpsCache();
     m_hasGps = !m_gpsRecords.empty();
+    rebuildSegmentColors();
 
     if (m_hasGps)
         fitToTrack();
@@ -180,6 +251,7 @@ void MapRenderer::setRouteColorMode(RouteColorMode mode, const ColorContext& col
 {
     m_routeColorMode = mode;
     m_colorContext = colorContext;
+    rebuildSegmentColors();
     update();
 }
 
@@ -417,51 +489,6 @@ void MapRenderer::paintEvent(QPaintEvent*)
     // Use precomputed GPS record list — no per-frame allocation.
     const auto& gpsRecords = m_gpsRecords;
 
-    auto gpsValueForMode = [this](const RideRecord& record, const RideRecord* next, double& outValue, bool& outHasValue)
-    {
-        outHasValue = false;
-        outValue = 0.0;
-        switch (m_routeColorMode)
-        {
-            case RouteColorMode::None:
-                return;
-            case RouteColorMode::Power:
-                if (record.hasPower) { outValue = record.power; outHasValue = true; }
-                return;
-            case RouteColorMode::HeartRate:
-                if (record.hasHeartRate) { outValue = record.heartRate; outHasValue = true; }
-                return;
-            case RouteColorMode::Cadence:
-                if (record.hasCadence) { outValue = record.cadence; outHasValue = true; }
-                return;
-            case RouteColorMode::Speed:
-                if (record.hasSpeed) { outValue = record.speed; outHasValue = true; }
-                return;
-            case RouteColorMode::Altitude:
-                if (record.hasAltitude) { outValue = record.altitude; outHasValue = true; }
-                return;
-            case RouteColorMode::Gradient:
-                if (next && record.hasGps && next->hasGps)
-                {
-                    const double lat1 = record.latitude * kPi / 180.0;
-                    const double lat2 = next->latitude * kPi / 180.0;
-                    const double dLat = lat2 - lat1;
-                    const double dLon = (next->longitude - record.longitude) * kPi / 180.0;
-                    const double a = std::sin(dLat / 2.0) * std::sin(dLat / 2.0)
-                                   + std::cos(lat1) * std::cos(lat2)
-                                   * std::sin(dLon / 2.0) * std::sin(dLon / 2.0);
-                    const double distance = 2.0 * 6371000.0 * std::atan2(std::sqrt(a), std::sqrt(std::max(0.0, 1.0 - a)));
-                    const double elevation = next->altitude - record.altitude;
-                    if (distance > 0.1)
-                    {
-                        outValue = (elevation / distance) * 100.0;
-                        outHasValue = true;
-                    }
-                }
-                return;
-        }
-    };
-
     auto segmentVisible = [this](double startSec, double endSec)
     {
         if (m_visibleStartSeconds < 0.0 || m_visibleEndSeconds < 0.0)
@@ -530,16 +557,10 @@ void MapRenderer::paintEvent(QPaintEvent*)
             const QPointF prevPoint = tileToScreen(latLonToTile(prev.latitude, prev.longitude, m_zoom));
             const QPointF currPoint = tileToScreen(latLonToTile(curr.latitude, curr.longitude, m_zoom));
 
-            double value = 0.0;
-            bool hasValue = false;
-            gpsValueForMode(prev, &curr, value, hasValue);
-            if (!hasValue)
-                gpsValueForMode(curr, nullptr, value, hasValue);
-
-            const QColor color = hasValue
-                ? (m_routeColorMode == RouteColorMode::Gradient
-                    ? adjustRouteColorForStyle(gradientColorForSlope(value))
-                    : adjustRouteColorForStyle(ColorProvider::colorForMetric(routeModeToMetric(m_routeColorMode), value, m_colorContext)))
+            // Look up precomputed base color; apply style adjustment per-paint.
+            const QColor& baseColor = m_segmentColors[index - 1];
+            const QColor color = baseColor.isValid()
+                ? adjustRouteColorForStyle(baseColor)
                 : QColor("#cbd5e1");
 
             if (!segmentVisible(prev.elapsedSeconds, curr.elapsedSeconds))

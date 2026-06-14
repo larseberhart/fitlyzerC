@@ -70,12 +70,16 @@ private:
     QColor adjustRouteColorForStyle(const QColor& color) const;
     const RideRecord* nearestGpsRecord(const QPointF& screenPos) const;
     void rebuildGpsCache();
+    void rebuildSegmentColors();
     const RideRecord* gpsRecordAtTime(double elapsedSeconds) const;
 
     TileCache m_tileCache;
     RideData  m_rideData;
     // Pre-filtered, time-ordered GPS-only records. Rebuilt once in setRideData().
     std::vector<const RideRecord*> m_gpsRecords;
+    // Per-segment base colors (before map-style adjustment). One per GPS segment.
+    // Invalid QColor means no data for that segment.
+    std::vector<QColor> m_segmentColors;
     const RideRecord* m_firstGpsRecord = nullptr;
     const RideRecord* m_lastGpsRecord  = nullptr;
     bool      m_hasGps = false;
