@@ -8,9 +8,9 @@ get_filename_component(FITLYZER_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLU
 
 if(NOT DEFINED FITLYZER_PRESET OR FITLYZER_PRESET STREQUAL "")
     if(WIN32)
-        set(FITLYZER_PRESET "windows")
+        set(FITLYZER_PRESET "windows-nsis")
     elseif(APPLE)
-        set(FITLYZER_PRESET "macos")
+        set(FITLYZER_PRESET "macos-dmg")
     else()
         set(FITLYZER_PRESET "linux-appimage")
     endif()
@@ -39,7 +39,8 @@ if(NOT FITLYZER_CONFIGURE_RESULT EQUAL 0)
 endif()
 
 set(FITLYZER_BUILD_COMMAND "${CMAKE_COMMAND}" --build "${FITLYZER_BUILD_DIR}")
-if(WIN32 AND FITLYZER_PRESET STREQUAL "windows")
+if(WIN32 AND (FITLYZER_PRESET STREQUAL "windows-release"
+              OR FITLYZER_PRESET STREQUAL "windows-nsis"))
     list(APPEND FITLYZER_BUILD_COMMAND --config Release)
 endif()
 
@@ -61,7 +62,8 @@ set(FITLYZER_CPACK_COMMAND
     --config "${FITLYZER_CPACK_CONFIG}"
 )
 
-if(WIN32 AND FITLYZER_PRESET STREQUAL "windows")
+if(WIN32 AND (FITLYZER_PRESET STREQUAL "windows-release"
+              OR FITLYZER_PRESET STREQUAL "windows-nsis"))
     list(APPEND FITLYZER_CPACK_COMMAND -C Release)
 endif()
 
