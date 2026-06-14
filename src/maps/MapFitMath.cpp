@@ -5,7 +5,7 @@
 
 namespace
 {
-constexpr double kPi = M_PI;
+constexpr double kPi = 3.14159265358979323846;
 constexpr int kTilePx = 256;
 constexpr double kMinLatSpan = 0.001;
 constexpr double kMinLonSpan = 0.001;

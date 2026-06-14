@@ -40,7 +40,7 @@ static ColorMetric routeModeToMetric(RouteColorMode mode)
     return ColorMetric::None;
 }
 
-static constexpr double kPi     = M_PI;
+static constexpr double kPi     = 3.14159265358979323846;
 static constexpr int    kTilePx = 256;
 
 QPointF MapRenderer::latLonToTile(double lat, double lon, int zoom)
@@ -364,10 +364,10 @@ void MapRenderer::paintEvent(QPaintEvent*)
             case RouteColorMode::Gradient:
                 if (next && record.hasGps && next->hasGps)
                 {
-                    const double lat1 = record.latitude * M_PI / 180.0;
-                    const double lat2 = next->latitude * M_PI / 180.0;
+                    const double lat1 = record.latitude * kPi / 180.0;
+                    const double lat2 = next->latitude * kPi / 180.0;
                     const double dLat = lat2 - lat1;
-                    const double dLon = (next->longitude - record.longitude) * M_PI / 180.0;
+                    const double dLon = (next->longitude - record.longitude) * kPi / 180.0;
                     const double a = std::sin(dLat / 2.0) * std::sin(dLat / 2.0)
                                    + std::cos(lat1) * std::cos(lat2)
                                    * std::sin(dLon / 2.0) * std::sin(dLon / 2.0);
