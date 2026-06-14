@@ -2,11 +2,12 @@ cmake_minimum_required(VERSION 3.21)
 
 project(
     FitlyzerC
-    VERSION 0.2.0
+    VERSION 0.3.0
     LANGUAGES CXX
 )
 
 include(FetchContent)
+include(ExternalProject)
 include(CTest)
 
 set(CMAKE_CXX_STANDARD 23)
@@ -56,6 +57,26 @@ set(
     ""
     CACHE STRING
     "Path to bundled FFmpeg executable (absolute or relative to app directory)"
+)
+
+option(
+    FITLYZERC_BUNDLE_FFMPEG
+    "Bundle FFmpeg with FitlyzerC releases"
+    ON
+)
+
+set(
+    FITLYZERC_FFMPEG_SOURCE_DIR
+    "${CMAKE_SOURCE_DIR}/third_party/ffmpeg"
+    CACHE PATH
+    "Path to FFmpeg source tree (expects a configure script)"
+)
+
+set(
+    FITLYZERC_FFMPEG_BINARY_PATH
+    ""
+    CACHE FILEPATH
+    "Path to a prebuilt FFmpeg executable to bundle if source build is unavailable"
 )
 
 set(
@@ -182,6 +203,7 @@ if(APPLE)
     set_source_files_properties(
         ${MACOS_ICON}
         PROPERTIES
+        MACOSX_PACKAGE_LOCATION "Resources"
     )
 
     set_target_properties(
@@ -203,7 +225,129 @@ target_link_libraries(FitlyzerC PRIVATE
     FitSDK
 )
 
-if(FITLYZER_FFMPEG_PATH)
+set(FITLYZERC_BUNDLED_FFMPEG_BINARY "")
+set(FITLYZERC_RUNTIME_FFMPEG_PATH "")
+
+if(FITLYZERC_BUNDLE_FFMPEG)
+    set(_ffmpeg_suffix "")
+    if(WIN32)
+        set(_ffmpeg_suffix ".exe")
+    endif()
+
+    set(_ffmpeg_source_dir "${FITLYZERC_FFMPEG_SOURCE_DIR}")
+    if(_ffmpeg_source_dir AND NOT IS_ABSOLUTE "${_ffmpeg_source_dir}")
+        get_filename_component(_ffmpeg_source_dir "${_ffmpeg_source_dir}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
+    endif()
+
+    if(_ffmpeg_source_dir AND EXISTS "${_ffmpeg_source_dir}/configure")
+        find_program(FITLYZERC_BASH_EXECUTABLE NAMES bash)
+        find_program(FITLYZERC_MAKE_EXECUTABLE NAMES make gmake mingw32-make)
+
+        if(FITLYZERC_BASH_EXECUTABLE AND FITLYZERC_MAKE_EXECUTABLE)
+            set(FITLYZERC_FFMPEG_INSTALL_DIR "${CMAKE_BINARY_DIR}/ffmpeg/install")
+            set(FITLYZERC_FFMPEG_BUILD_DIR "${CMAKE_BINARY_DIR}/ffmpeg/build")
+
+            set(_ffmpeg_configure
+                "${FITLYZERC_BASH_EXECUTABLE}" "${_ffmpeg_source_dir}/configure"
+                "--prefix=${FITLYZERC_FFMPEG_INSTALL_DIR}"
+                "--disable-shared"
+                "--enable-static"
+                "--disable-debug"
+                "--disable-doc"
+                "--enable-ffmpeg"
+                "--disable-ffplay"
+                "--disable-ffprobe"
+            )
+
+            ExternalProject_Add(FitlyzerFFmpeg
+                SOURCE_DIR "${_ffmpeg_source_dir}"
+                BINARY_DIR "${FITLYZERC_FFMPEG_BUILD_DIR}"
+                CONFIGURE_COMMAND ${_ffmpeg_configure}
+                BUILD_COMMAND "${FITLYZERC_MAKE_EXECUTABLE}" -j
+                INSTALL_COMMAND "${FITLYZERC_MAKE_EXECUTABLE}" install
+                BUILD_BYPRODUCTS "${FITLYZERC_FFMPEG_INSTALL_DIR}/bin/ffmpeg${_ffmpeg_suffix}"
+                LOG_CONFIGURE ON
+                LOG_BUILD ON
+                LOG_INSTALL ON
+            )
+
+            add_dependencies(FitlyzerC FitlyzerFFmpeg)
+            set(FITLYZERC_BUNDLED_FFMPEG_BINARY "${FITLYZERC_FFMPEG_INSTALL_DIR}/bin/ffmpeg${_ffmpeg_suffix}")
+            message(STATUS "FFmpeg will be built from source: ${_ffmpeg_source_dir}")
+        else()
+            message(WARNING "FFmpeg source was found but build tools are missing (bash/make). Falling back to prebuilt FFmpeg lookup.")
+        endif()
+    endif()
+
+    if(NOT FITLYZERC_BUNDLED_FFMPEG_BINARY)
+        set(_ffmpeg_prebuilt "${FITLYZERC_FFMPEG_BINARY_PATH}")
+        if(NOT _ffmpeg_prebuilt)
+            if(WIN32)
+                set(_ffmpeg_prebuilt "${CMAKE_SOURCE_DIR}/resources/ffmpeg/windows/ffmpeg.exe")
+            elseif(APPLE)
+                set(_ffmpeg_prebuilt "${CMAKE_SOURCE_DIR}/resources/ffmpeg/macos/ffmpeg")
+            else()
+                set(_ffmpeg_prebuilt "${CMAKE_SOURCE_DIR}/resources/ffmpeg/linux/ffmpeg")
+            endif()
+        endif()
+
+        if(_ffmpeg_prebuilt AND NOT IS_ABSOLUTE "${_ffmpeg_prebuilt}")
+            get_filename_component(_ffmpeg_prebuilt "${_ffmpeg_prebuilt}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
+        endif()
+
+        if(EXISTS "${_ffmpeg_prebuilt}")
+            set(FITLYZERC_BUNDLED_FFMPEG_BINARY "${_ffmpeg_prebuilt}")
+            message(STATUS "Using prebuilt bundled FFmpeg: ${FITLYZERC_BUNDLED_FFMPEG_BINARY}")
+        else()
+            message(WARNING "No bundled FFmpeg source or binary found. FitlyzerC will fall back to system FFmpeg.")
+        endif()
+    endif()
+
+    if(FITLYZERC_BUNDLED_FFMPEG_BINARY)
+        if(WIN32)
+            set(FITLYZERC_RUNTIME_FFMPEG_PATH "ffmpeg.exe")
+            set(FITLYZERC_RUNTIME_FFMPEG_DEST "$<TARGET_FILE_DIR:FitlyzerC>/ffmpeg.exe")
+            set(FITLYZERC_INSTALL_FFMPEG_DEST ".")
+        elseif(APPLE)
+            set(FITLYZERC_RUNTIME_FFMPEG_PATH "ffmpeg")
+            set(FITLYZERC_RUNTIME_FFMPEG_DEST "$<TARGET_BUNDLE_DIR:FitlyzerC>/Contents/MacOS/ffmpeg")
+            set(FITLYZERC_INSTALL_FFMPEG_DEST "FitlyzerC.app/Contents/MacOS")
+        else()
+            set(FITLYZERC_RUNTIME_FFMPEG_PATH "ffmpeg")
+            set(FITLYZERC_RUNTIME_FFMPEG_DEST "$<TARGET_FILE_DIR:FitlyzerC>/ffmpeg")
+            set(FITLYZERC_INSTALL_FFMPEG_DEST ".")
+        endif()
+
+        add_custom_command(TARGET FitlyzerC POST_BUILD
+            COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+                "${FITLYZERC_BUNDLED_FFMPEG_BINARY}"
+                "${FITLYZERC_RUNTIME_FFMPEG_DEST}"
+            COMMENT "Copying bundled FFmpeg next to FitlyzerC"
+            VERBATIM
+        )
+
+        if(NOT WIN32)
+            add_custom_command(TARGET FitlyzerC POST_BUILD
+                COMMAND "${CMAKE_COMMAND}" -E chmod +x "${FITLYZERC_RUNTIME_FFMPEG_DEST}"
+                COMMENT "Ensuring bundled FFmpeg is executable"
+                VERBATIM
+            )
+        endif()
+
+        install(FILES
+            "${FITLYZERC_BUNDLED_FFMPEG_BINARY}"
+            DESTINATION "${FITLYZERC_INSTALL_FFMPEG_DEST}"
+            PERMISSIONS
+                OWNER_READ OWNER_WRITE OWNER_EXECUTE
+                GROUP_READ GROUP_EXECUTE
+                WORLD_READ WORLD_EXECUTE
+        )
+    endif()
+endif()
+
+if(FITLYZERC_RUNTIME_FFMPEG_PATH)
+    target_compile_definitions(FitlyzerC PRIVATE FITLYZER_FFMPEG_PATH="${FITLYZERC_RUNTIME_FFMPEG_PATH}")
+elseif(FITLYZER_FFMPEG_PATH)
     target_compile_definitions(FitlyzerC PRIVATE FITLYZER_FFMPEG_PATH="${FITLYZER_FFMPEG_PATH}")
 endif()
 

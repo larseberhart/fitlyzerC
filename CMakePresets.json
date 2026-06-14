@@ -20,7 +20,10 @@
       "cacheVariables": {
         "CMAKE_C_COMPILER": "/opt/homebrew/opt/llvm/bin/clang",
         "CMAKE_CXX_COMPILER": "/opt/homebrew/opt/llvm/bin/clang++",
-        "CMAKE_PREFIX_PATH": "/opt/homebrew/opt/qt"
+        "CMAKE_PREFIX_PATH": "/opt/homebrew/opt/qt",
+        "FITLYZERC_BUNDLE_FFMPEG": "ON",
+        "FITLYZERC_FFMPEG_SOURCE_DIR": "${sourceDir}/third_party/ffmpeg",
+        "FITLYZERC_FFMPEG_BINARY_PATH": "${sourceDir}/resources/ffmpeg/macos/ffmpeg"
       }
     },
     {
@@ -44,7 +47,10 @@
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_C_COMPILER": "clang",
-        "CMAKE_CXX_COMPILER": "clang++"
+        "CMAKE_CXX_COMPILER": "clang++",
+        "FITLYZERC_BUNDLE_FFMPEG": "ON",
+        "FITLYZERC_FFMPEG_SOURCE_DIR": "${sourceDir}/third_party/ffmpeg",
+        "FITLYZERC_FFMPEG_BINARY_PATH": "${sourceDir}/resources/ffmpeg/linux/ffmpeg"
       }
     },
     {
@@ -62,7 +68,12 @@
       "name": "windows",
       "inherits": "base",
       "generator": "Visual Studio 18 2026",
-      "architecture": "x64"
+      "architecture": "x64",
+      "cacheVariables": {
+        "FITLYZERC_BUNDLE_FFMPEG": "ON",
+        "FITLYZERC_FFMPEG_SOURCE_DIR": "",
+        "FITLYZERC_FFMPEG_BINARY_PATH": "${sourceDir}/resources/ffmpeg/windows/ffmpeg.exe"
+      }
     },
     {
       "name": "windows-mingw",
@@ -71,7 +82,10 @@
       "cacheVariables": {
         "CMAKE_C_COMPILER": "C:/Qt/Tools/mingw1310_64/bin/gcc.exe",
         "CMAKE_CXX_COMPILER": "C:/Qt/Tools/mingw1310_64/bin/g++.exe",
-        "CMAKE_PREFIX_PATH": "C:/Qt/6.11.1/mingw_64"
+        "CMAKE_PREFIX_PATH": "C:/Qt/6.11.1/mingw_64",
+        "FITLYZERC_BUNDLE_FFMPEG": "ON",
+        "FITLYZERC_FFMPEG_SOURCE_DIR": "${sourceDir}/third_party/ffmpeg",
+        "FITLYZERC_FFMPEG_BINARY_PATH": "${sourceDir}/resources/ffmpeg/windows/ffmpeg.exe"
       }
     }
   ],

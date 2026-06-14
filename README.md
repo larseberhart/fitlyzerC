@@ -1,339 +1,260 @@
-# FitlyzerC — Garmin FIT Activity Analyzer
+# FitlyzerC
 
 <p align="center">
-<img src="images/logo.png" alt="My Image" width="400">
+<img src="images/logo.png" width="400" alt="FitlyzerC Logo">
 </p>
 
-> [!WARNING]
-> **FitlyzerC is currently in pre-release / beta status.**
->
-> Breaking changes may occur between releases. In particular, database schemas, file formats, and internal data structures may change without backward compatibility. Updating to a newer version may require recreating your database or re-importing data.
->
+<p align="center">
+<b>Modern Garmin FIT analysis for cyclists, runners, triathletes, coaches, and data enthusiasts.</b>
+</p>
 
 ---
+
+> [!WARNING]
+> **FitlyzerC is pre-release software.**
+>
+> Database schemas, internal data structures, and project formats may change between releases. Upgrading may require recreating databases or re-importing activities. Backward compatibility is not guaranteed yet.
 
 ## Download
 
-Pre-built installers are available on the [Releases](../../releases) page.
+Prebuilt binaries are available from the [Releases](../../releases) page.
 
-| Platform | Format |
-|----------|--------|
-| macOS | DMG disk image |
-| Windows | NSIS installer (.exe) |
-| Linux (x64) | AppImage |
-
----
-
-
-
-## Overview
-
-FitlyzerC is a cross-platform desktop application for analyzing Garmin FIT activity files. It is written in modern C++23 and uses Qt 6 for its user interface, charting, networking, and database functionality.
-
-The application is designed for endurance athletes, coaches, and performance analysts who need a native desktop tool for inspecting training sessions, intervals, power data, heart rate data, and GPS tracks.
+| Platform | Package |
+|----------|---------|
+| Windows | NSIS Installer |
+| macOS | DMG |
+| Linux | AppImage |
 
 ---
 
-## Key Features
+## What is FitlyzerC?
+
+FitlyzerC is a native desktop application for analyzing Garmin FIT activity files.
+
+Unlike cloud-based training platforms, FitlyzerC focuses on local-first analysis, high-performance visualization, and complete ownership of your training data. The application is written in modern C++23 and Qt 6 and runs on Windows, macOS, and Linux.
+
+The project is designed primarily for cycling and currently focuses on detailed ride analysis, interval inspection, power-based training metrics, GPS visualization, and athlete management.
+
+---
+
+## Features
 
 ### Activity Analysis
-- Import Garmin FIT files
-- Decode FIT records using the Garmin FIT SDK
-- Analyze power, heart rate, cadence, speed, elevation, and GPS data
-- Interactive charts with zooming and panning
-- Interval inspection and workout review
-- Track visualization on maps
+
+- Import Garmin FIT activities
+- Decode FIT files using the Garmin FIT SDK
+- Power, heart rate, cadence, speed, elevation and GPS analysis
+- Automatic interval detection
+- Power curve generation
+- Power histograms
+- Training load calculations
+- Fitness tracking metrics
+- Workout review tools
+- Ride notes
+
+### Interactive Charts
+
+- Zoomable and pannable charts
+- Synchronized chart navigation
+- Power analysis
+- Fitness trend visualization
+- Ride timeline inspection
+- Smoothed data visualization
+
+### Mapping
+
+- Interactive route display
+- Multiple map styles
+- GPS track visualization
+- Segment selection directly on the map
+- Draggable selection markers
+- Route coloring by:
+  - Power
+  - Heart Rate
+  - Cadence
+  - Speed
+  - Altitude
+  - Gradient
 
 ### Athlete Management
-- Athlete profiles
+
+- Multiple athlete profiles
+- Athlete-specific FTP settings
 - Training history
-- Performance tracking
-- FTP-based analysis
+- Calendar-based activity browsing
+- Planned workouts
 
-### Visualization
-- High-performance Qt Charts rendering
-- Multiple synchronized charts
-- Zoom and selection tools
-- Activity overlays
-- Map display and route inspection
+### Video Export
 
-### Cross-Platform
-- macOS
+- Animated ride playback
+- Map-based activity visualization
+- Chart synchronization
+- Power zone overlays
+- MP4 export through FFmpeg
+- Custom export settings
+
+### Cross Platform
+
 - Windows
-- Linux 
+- macOS
+- Linux
+
+---
+
+## Screenshots
 
 <p align="center">
-<img src="images/main.png" alt="Main Window">
+<img src="images/main.png" alt="FitlyzerC Main Window">
 </p>
 
 ---
 
-## Technical Details
+## Current Development Status
 
-### Language
-- C++23
+FitlyzerC is under active development.
 
-### Build System
-- CMake 3.21+
+Recent milestones include:
 
-### GUI Framework
-- Qt 6
+### v0.2.x
 
-### Qt Modules Used
-- Qt Widgets
-- Qt Charts
-- Qt SQL
-- Qt Network
+- Linux AppImage packaging
+- Reworked map tile system
+- Additional map styles
+- Improved route rendering
+- Movable interval markers
+- Segment selection on maps
+- Video export support
+- FFmpeg integration
+- Multiple video rendering improvements
 
-### External Dependencies
+### Planned Areas
 
-#### Garmin FIT SDK
-The application automatically downloads the Garmin FIT C++ SDK during configuration using CMake FetchContent when enabled.
-
-SDK Version:
-- 21.205.0
-
-Repository:
-https://github.com/garmin/fit-cpp-sdk
+- Additional training metrics
+- Reporting features
+- More export formats
+- Better workout planning
+- UI/UX refinements
+- Performance improvements
 
 ---
 
-## Project Architecture
+## Technology Stack
+
+| Component | Technology |
+|------------|------------|
+| Language | C++23 |
+| GUI | Qt 6 |
+| Charts | Qt Charts |
+| Database | SQLite |
+| Networking | Qt Network |
+| Build System | CMake |
+| Packaging | CPack |
+| FIT Parsing | Garmin FIT SDK |
+
+---
+
+## Project Structure
 
 ```text
-FitlyzerC
-├── src/
-│   ├── platform/
-│   │   ├── Platform_linux.cpp
-│   │   ├── Platform_macos.cpp
-│   │   └── Platform_windows.cpp
-│   ├── charts/
-│   ├── database/
-│   ├── fit/
-│   ├── map/
-│   └── ui/
-├── resources/
-│   ├── icons/
-│   └── fonts/
-├── CMakeLists.txt
-└── resources.qrc
+src/
+├── analysis/      Training metrics, power curves, interval detection
+├── charts/        Interactive chart widgets
+├── core/          Zone calculations and shared logic
+├── database/      SQLite repositories and schema management
+├── fit/           Garmin FIT decoding
+├── gui/           User interface
+├── maps/          Tile engine and route rendering
+├── model/         Serialization helpers
+├── platform/      OS-specific functionality
+├── video/         Video export pipeline
+└── reports/       Reporting infrastructure
 ```
-
-The application contains platform-specific implementations for Windows, macOS, and Linux while sharing the majority of its codebase.
 
 ---
 
-# Build Requirements
-
-## Common Requirements
+## Build Requirements
 
 ### Required Software
 
 | Component | Version |
-|-----------|----------|
+|------------|----------|
 | CMake | 3.21+ |
-| C++ Compiler | C++23 capable |
 | Qt | 6.x |
+| Compiler | C++23 capable |
+| Git | Current |
 | Ninja | Recommended |
-| Git | Latest |
+| FFmpeg (for bundled releases) | Source tree in `third_party/ffmpeg` or prebuilt binary in `resources/ffmpeg/<platform>/` |
 
 ---
 
-# macOS Build
+# Building
 
-## Install Dependencies
+## macOS
 
-Using Homebrew:
+### Dependencies
 
 ```bash
-brew update
-
-brew install cmake
-brew install ninja
-brew install qt
+brew install cmake ninja qt
 ```
-
-Add Qt to the environment:
 
 ```bash
 export PATH="/opt/homebrew/opt/qt/bin:$PATH"
 ```
 
-Verify installation:
+### Configure
 
 ```bash
-cmake --version
-qmake --version
+cmake --preset macos-release
 ```
 
-## Configure
+### Build
 
 ```bash
-git clone <repository>
-cd FitlyzerC
-
-cmake \
-  -S . \
-  -B build/macos \
-  -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release
+cmake --build --preset macos
 ```
 
-## Build
-
-```bash
-cmake --build build/macos
-```
-
-## Build + Package DMG (Automatic)
-
-Use the preset below to build Release and generate a DMG in one command:
+### Create DMG
 
 ```bash
 cmake --build --preset macos-dmg
 ```
 
-In VS Code with CMake Tools, select the `macos-dmg` configure preset first, then select the `macos-dmg` build preset. The plain `macos` preset is a normal app build and does not create a DMG.
-
-This runs the custom `dmg` target (backed by CPack DragNDrop) and produces:
-
-```text
-FitlyzerC-<version>.dmg
-```
-
-Executable:
-
-```text
-build/macos/FitlyzerC
-```
-
 ---
 
-# Windows Build
-
-## Install Dependencies
+## Windows
 
 Install:
 
-1. Visual Studio 2022
-   - Desktop development with C++
-2. CMake
-3. Ninja
-4. Qt 6 (MSVC version)
+- Visual Studio 2026
+- Qt 6 (MSVC)
+- CMake
+- Ninja
 
-Recommended Qt installation:
-
-```text
-C:\Qt\
-```
-
-The project automatically attempts to detect Qt installations located under:
-
-```text
-C:\Qt\<version>\msvc*\lib\cmake\Qt6
-```
-
-## Configure
-
-Developer Command Prompt:
+### Configure
 
 ```cmd
-cmake ^
-  -S . ^
-  -B build\windows ^
-  -G Ninja ^
-  -DCMAKE_BUILD_TYPE=Release
+cmake --preset windows
 ```
 
-## Build
+### Build
 
 ```cmd
-cmake --build build\windows
+cmake --build --preset windows
 ```
 
-## Build + Package NSIS Installer
-
-Use the dedicated packaging preset to build Release and generate the NSIS installer in one command:
+### Create Installer
 
 ```cmd
 cmake --build --preset windows-package
 ```
 
-In VS Code with CMake Tools, select the `windows` configure preset first, then select the `windows-package` build preset. The plain `windows` build preset only builds the app binary and does not create the installer.
-
-This runs the CPack `PACKAGE` target and produces:
-
-```text
-FitlyzerC-<version>-Setup.exe
-```
-
-### Deployment
-
-The build system automatically runs:
-
-```text
-windeployqt
-```
-
-when available, copying required Qt DLLs and plugins next to the executable.
-
-Executable:
-
-```text
-build\windows\FitlyzerC.exe
-```
-
 ---
 
-# Packaging (One Command)
+## Linux
 
-Use the packaging driver script to configure, build, and run CPack for the current platform:
-
-```bash
-cmake -P scripts/package.cmake
-```
-
-Default preset mapping:
-
-- macOS -> `macos`
-- Windows -> `windows`
-- Linux -> `linux`
-
-You can override the preset when needed (for example MinGW on Windows):
+### Arch Linux
 
 ```bash
-cmake -DFITLYZER_PRESET=windows-mingw -P scripts/package.cmake
-```
-
-Expected package outputs:
-
-- Windows: `FitlyzerC-<version>-Setup.exe`
-- macOS: `FitlyzerC-<version>.dmg`
-
----
-
-# Linux Build
-
-## Common Linux Requirements
-
-The following tools are required on all Linux distributions:
-
-- C++ compiler with C++23 support (GCC 13+ or Clang 17+ recommended)
-- CMake 3.21+
-- Ninja
-- Qt 6 Base
-- Qt 6 Charts
-- Git
-
----
-
-## Arch Linux
-
-### Install Dependencies
-
-```bash
-sudo pacman -Syu
-
 sudo pacman -S \
     base-devel \
     cmake \
@@ -346,179 +267,65 @@ sudo pacman -S \
 ### Configure
 
 ```bash
-cmake \
-  -S . \
-  -B build/linux \
-  -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release
+cmake --preset linux
 ```
 
 ### Build
 
 ```bash
-cmake --build build/linux
+cmake --build --preset linux
 ```
 
-Executable:
+### AppImage
 
-```text
-build/linux/FitlyzerC
+Install:
+
+```bash
+sudo pacman -S patchelf
+yay -S appimagetool-bin
 ```
-
-### Build + Package AppImage
-
-The dedicated preset enables the AppImage packaging path automatically.
-
-Install the packaging tools used by CPack:
-
-- appimagetool
-- patchelf
-
-Configure using the packaging preset:
 
 ```bash
 cmake --preset linux-appimage
-```
-
-Then build the dedicated packaging preset:
-
-```bash
 cmake --build --preset linux-appimage
 ```
 
-In VS Code with CMake Tools, select the `linux-appimage` configure preset first, then select the `linux-appimage` build preset. The plain `linux` preset is a normal app build and does not create an AppImage.
+---
 
-This runs the custom `appimage` target and produces:
+## One-Command Packaging
 
-```text
-FitlyzerC-<version>.AppImage
+```bash
+cmake -P scripts/package.cmake
 ```
+
+Supported outputs:
+
+| Platform | Output |
+|----------|---------|
+| Windows | Setup.exe |
+| macOS | DMG |
+| Linux | AppImage |
 
 ---
 
-## Debian 12 / Ubuntu 24.04+
+## Garmin FIT SDK
 
-### Install Dependencies
+By default, CMake automatically downloads the Garmin FIT SDK.
 
-```bash
-sudo apt update
+Repository:
 
-sudo apt install -y \
-    build-essential \
-    cmake \
-    ninja-build \
-    qt6-base-dev \
-    libqt6charts6-dev \
-    git
-```
-
-### Configure
-
-```bash
-cmake \
-  -S . \
-  -B build/linux \
-  -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release
-```
-
-### Build
-
-```bash
-cmake --build build/linux
-```
-
-Executable:
-
-```text
-build/linux/FitlyzerC
-```
-
----
-
-## Fedora
-
-### Install Dependencies
-
-```bash
-sudo dnf update
-
-sudo dnf install -y \
-    gcc-c++ \
-    cmake \
-    ninja-build \
-    qt6-qtbase-devel \
-    qt6-qtcharts-devel \
-    git
-```
-
-### Configure
-
-```bash
-cmake \
-  -S . \
-  -B build/linux \
-  -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release
-```
-
-### Build
-
-```bash
-cmake --build build/linux
-```
-
-Executable:
-
-```text
-build/linux/FitlyzerC
-```
-
----
-
-## Running
-
-After building:
-
-```bash
-./build/linux/FitlyzerC
-```
-
-or from the build directory:
-
-```bash
-cd build/linux
-./FitlyzerC
-```
-
----
-
-# Garmin FIT SDK
-
-The build system supports two modes.
-
-## Automatic Download (Default)
-
-No action required.
-
-During configuration, CMake downloads:
-
-```text
 https://github.com/garmin/fit-cpp-sdk
-```
 
-and builds the SDK automatically.
-
-## Manual SDK Location
+To use a local SDK copy:
 
 ```bash
 cmake \
+  -DGARMIN_FIT_SDK_DIR=/path/to/sdk \
   -S . \
-  -B build \
-  -DGARMIN_FIT_SDK_DIR=/path/to/fit-sdk
+  -B build
 ```
 
-The path may point to:
+Supported locations:
 
 ```text
 fit-sdk/
@@ -528,120 +335,71 @@ fit-sdk/cpp-sdk/src/
 
 ---
 
-# Running the Application
+## FFmpeg Bundling
 
-After building:
+Release builds are configured to bundle FFmpeg with the app so end users do not need a system FFmpeg installation.
+
+Bundling priority:
+
+1. Build from FFmpeg source in `third_party/ffmpeg`
+2. Use prebuilt executable in `resources/ffmpeg/<platform>/`
+3. Fallback to system `ffmpeg` if neither is available
+
+Default prebuilt lookup paths:
+
+```text
+resources/ffmpeg/macos/ffmpeg
+resources/ffmpeg/linux/ffmpeg
+resources/ffmpeg/windows/ffmpeg.exe
+```
+
+Useful CMake options:
 
 ```bash
-./FitlyzerC
+-DFITLYZERC_BUNDLE_FFMPEG=ON
+-DFITLYZERC_FFMPEG_SOURCE_DIR=third_party/ffmpeg
+-DFITLYZERC_FFMPEG_BINARY_PATH=/absolute/path/to/ffmpeg
 ```
 
-or on Windows:
+Disable bundling (not recommended for release artifacts):
 
-```cmd
-FitlyzerC.exe
+```bash
+cmake -DFITLYZERC_BUNDLE_FFMPEG=OFF --preset <your-preset>
 ```
+
+---
+
+## Running
 
 Typical workflow:
 
-1. Start FitlyzerC.
-2. Create or select an athlete.
-3. Import FIT files.
-4. Inspect charts and maps.
-5. Analyze intervals and training sessions.
-6. Review performance metrics.
+1. Create an athlete
+2. Import FIT activities
+3. Browse activities in the calendar
+4. Inspect charts and maps
+5. Select intervals
+6. Analyze performance metrics
+7. Export video visualizations
 
 ---
 
-# Release Builds
+## Contributing
 
-## macOS
+Issues, bug reports, feature requests and pull requests are welcome.
 
-Typical release workflow:
+If you encounter a problem, include:
 
-```bash
-cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release
-cmake --build build/release
-```
-
-Package using:
-
-```bash
-macdeployqt
-```
-
-Optionally create:
-
-```text
-FitlyzerC.app
-FitlyzerC.dmg
-```
-
-## Windows
-
-```cmd
-cmake --build build\windows --config Release
-```
-
-Deploy using:
-
-```cmd
-windeployqt
-```
-
-Create installer using:
-- NSIS
-- Inno Setup
-- WiX
-
-## Linux
-
-Package as:
-- AppImage
-- Flatpak
-- Native packages
+- Operating system
+- Application version
+- FIT file characteristics
+- Steps to reproduce
 
 ---
 
-# Troubleshooting
+## License
 
-## Qt Not Found
+Informal license:
 
-Specify Qt explicitly:
-
-```bash
-cmake \
-  -DCMAKE_PREFIX_PATH=/path/to/Qt \
-  -S . \
-  -B build
-```
-
-## Garmin SDK Errors
-
-Ensure either:
-
-```text
-FITLYZERC_AUTO_DOWNLOAD_FITSDK=ON
-```
-
-or:
-
-```text
-GARMIN_FIT_SDK_DIR=<valid path>
-```
-
-is configured.
-
-## Clean Build
-
-```bash
-rm -rf build
-```
-
-Then reconfigure and rebuild.
-
----
-
-# License
-
-Do whatever you want with it, just point to my repository and attibute. Except dopers, they can't use it. 
+> Do whatever you want with it, provide attribution and link back to the repository.
+>
+> Except dopers. They cannot use it.
