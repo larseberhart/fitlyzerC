@@ -1,14 +1,20 @@
-# FitlyzerC
+# FitlyzerC — Garmin FIT Activity Analyzer
 
 <p align="center">
 <img src="images/logo.png" alt="My Image" width="400">
 </p>
 
-## Engineering Roadmap
+## Download
 
-Implementation roadmap (phased, architecture-aware):
+Pre-built installers are available on the [Releases](../../releases) page.
 
-- [docs/engineering-roadmap.md](docs/engineering-roadmap.md)
+| Platform | Format |
+|----------|--------|
+| macOS | DMG disk image |
+| Windows | NSIS installer (.exe) |
+| Linux (x64) | AppImage |
+
+---
 
 ## Overview
 
@@ -347,6 +353,35 @@ Executable:
 
 ```text
 build/linux/FitlyzerC
+```
+
+### Build + Package AppImage
+
+The dedicated preset enables the AppImage packaging path automatically.
+
+Install the packaging tools used by CPack:
+
+- appimagetool
+- patchelf
+
+Configure using the packaging preset:
+
+```bash
+cmake --preset linux-appimage
+```
+
+Then build the dedicated packaging preset:
+
+```bash
+cmake --build --preset linux-appimage
+```
+
+In VS Code with CMake Tools, select the `linux-appimage` configure preset first, then select the `linux-appimage` build preset. The plain `linux` preset is a normal app build and does not create an AppImage.
+
+This runs the custom `appimage` target and produces:
+
+```text
+FitlyzerC-<version>.AppImage
 ```
 
 ---
