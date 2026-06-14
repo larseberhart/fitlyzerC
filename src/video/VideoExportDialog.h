@@ -38,6 +38,8 @@ private slots:
 
 private:
     VideoExportSettings collectSettings() const;
+    void setAllOverlayChecks(bool enabled);
+    void updateVideoLengthLabel();
 
     VideoExportSettings m_defaults;
 
@@ -45,13 +47,12 @@ private:
     QComboBox* m_resolutionCombo = nullptr;
     QSpinBox* m_fpsSpin = nullptr;
     QDoubleSpinBox* m_speedSpin = nullptr;
+    QLabel* m_videoLengthLabel = nullptr;
 
     QRadioButton* m_selectedSegmentRadio = nullptr;
     QRadioButton* m_entireActivityRadio = nullptr;
 
     QComboBox* m_mapStyleCombo = nullptr;
-    QRadioButton* m_autoZoomRadio = nullptr;
-    QRadioButton* m_fixedZoomRadio = nullptr;
     QSpinBox* m_fixedZoomSpin = nullptr;
 
     QComboBox* m_routeColorCombo = nullptr;
@@ -63,6 +64,9 @@ private:
     QCheckBox* m_altitudeCheck = nullptr;
     QCheckBox* m_timeCheck = nullptr;
     QCheckBox* m_athleteCheck = nullptr;
+    QCheckBox* m_telemetryPanelCheck = nullptr;
+    QCheckBox* m_legendCheck = nullptr;
+    QCheckBox* m_chartsCheck = nullptr;
 
     QLabel* m_stageLabel = nullptr;
     QLabel* m_frameLabel = nullptr;

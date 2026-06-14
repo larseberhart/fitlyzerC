@@ -126,6 +126,44 @@ QString fmtDuration(double seconds)
     return QString("%1:%2").arg(m, 2, 10, QChar('0')).arg(s, 2, 10, QChar('0'));
 }
 
+QString formatLegendValue(double value, ColorMetric metric)
+{
+    switch (metric)
+    {
+        case ColorMetric::Speed:
+            return QString::number(value, 'f', 1);
+        case ColorMetric::Power:
+        case ColorMetric::HeartRate:
+        case ColorMetric::Cadence:
+        case ColorMetric::Altitude:
+            return QString::number(static_cast<int>(std::round(value)));
+        case ColorMetric::Gradient:
+        case ColorMetric::None:
+            return QString::number(value, 'f', 1);
+    }
+
+    return QString::number(value, 'f', 1);
+}
+
+QString zoneLegendText(const Zone& zone, ColorMetric metric)
+{
+    const QString unit = colorMetricUnit(metric);
+    const bool hasUnit = !unit.isEmpty();
+    const QString valueSuffix = hasUnit ? QString(" %1").arg(unit) : QString();
+    const double hugeThreshold = std::numeric_limits<double>::max() * 0.5;
+    const bool openEnded = !std::isfinite(zone.maxValue) || zone.maxValue >= hugeThreshold;
+
+    if (openEnded)
+        return QString("%1 > %2%3").arg(zone.name, formatLegendValue(zone.minValue, metric), valueSuffix);
+    if (zone.minValue <= 0.0)
+        return QString("%1 < %2%3").arg(zone.name, formatLegendValue(zone.maxValue, metric), valueSuffix);
+    return QString("%1 %2-%3%4")
+        .arg(zone.name,
+             formatLegendValue(zone.minValue, metric),
+             formatLegendValue(zone.maxValue, metric),
+             valueSuffix);
+}
+
 QColor routeColor(const RideRecord& rec,
                   ColorMetric metric,
                   const ColorContext& context,
@@ -186,12 +224,6 @@ void VideoRenderJob::run()
 
     const int fps = std::max(1, m_settings.fps);
     const double playbackSpeed = std::max(1.0, m_settings.playbackSpeed);
-    const double sourceDuration = endSec - startSec;
-    const double outputDuration = sourceDuration / playbackSpeed;
-    const int totalFrames = std::max(1, static_cast<int>(std::ceil(outputDuration * fps)));
-
-    emit stageChanged("Preparing data...");
-    emit progressChanged(0, totalFrames);
 
     std::vector<const RideRecord*> gpsRecords;
     gpsRecords.reserve(m_settings.rideData.records.size());
@@ -220,8 +252,66 @@ void VideoRenderJob::run()
         return;
     }
 
-    const int mapHeight = static_cast<int>(std::round(m_settings.height * 0.72));
-    const int chartHeight = std::max(120, m_settings.height - mapHeight);
+    // If the selected segment begins before the first GPS fix, start rendering at
+    // the first GPS timestamp so the route animation starts immediately.
+    startSec = std::max(startSec, gpsRecords.front()->elapsedSeconds);
+    if (endSec <= startSec)
+    {
+        emit finished(false, "Selected segment has no duration after GPS alignment.", false);
+        return;
+    }
+
+    const double sourceDuration = endSec - startSec;
+    const double outputDuration = sourceDuration / playbackSpeed;
+    const int totalFrames = std::max(1, static_cast<int>(std::ceil(outputDuration * fps)));
+
+    emit stageChanged("Preparing data...");
+    emit progressChanged(0, totalFrames);
+
+    const bool showAnyMetricChart = m_settings.overlayCharts &&
+        (m_settings.overlayPower ||
+         m_settings.overlayHeartRate ||
+         m_settings.overlayCadence ||
+         m_settings.overlaySpeed ||
+         m_settings.overlayAltitude);
+    const int mapHeight = showAnyMetricChart
+        ? static_cast<int>(std::round(m_settings.height * 0.72))
+        : m_settings.height;
+    const int chartHeight = showAnyMetricChart
+        ? std::max(120, m_settings.height - mapHeight)
+        : 0;
+    const double uiScale = std::clamp(static_cast<double>(m_settings.height) / 720.0, 0.85, 2.6);
+
+    const int telemetryMargin = static_cast<int>(std::round(18.0 * uiScale));
+    const int telemetryWidth = static_cast<int>(std::round(320.0 * uiScale));
+    const int telemetryHeight = static_cast<int>(std::round(180.0 * uiScale));
+    const int telemetryLeftPadding = static_cast<int>(std::round(12.0 * uiScale));
+    const int telemetryTopBaseline = static_cast<int>(std::round(26.0 * uiScale));
+    const int telemetryLineStep = static_cast<int>(std::round(20.0 * uiScale));
+    const int telemetryFontPx = static_cast<int>(std::round(12.0 * uiScale));
+
+    const int athleteWidth = static_cast<int>(std::round(344.0 * uiScale));
+    const int athleteHeight = static_cast<int>(std::round(42.0 * uiScale));
+    const int athleteInset = static_cast<int>(std::round(12.0 * uiScale));
+    const int athleteFontPx = static_cast<int>(std::round(13.0 * uiScale));
+
+    const int chartSidePadding = static_cast<int>(std::round(12.0 * uiScale));
+    const int chartTopPadding = static_cast<int>(std::round(4.0 * uiScale));
+    const int chartBottomPadding = static_cast<int>(std::round(8.0 * uiScale));
+    const int chartLabelFontPx = static_cast<int>(std::round(9.0 * uiScale));
+    const int chartLabelBaseline = static_cast<int>(std::round(14.0 * uiScale));
+
+    const int legendInset = static_cast<int>(std::round(8.0 * uiScale));
+    const int legendGap = static_cast<int>(std::round(8.0 * uiScale));
+    const int legendSwatchSize = static_cast<int>(std::round(12.0 * uiScale));
+    const int legendTitleFontPx = static_cast<int>(std::round(9.0 * uiScale));
+    const int legendLabelFontPx = static_cast<int>(std::round(8.5 * uiScale));
+
+    const std::vector<Zone> routeLegendZones = ZoneCalculator::zonesForMetric(m_settings.routeColorMetric,
+                                                                               m_settings.colorContext);
+    const bool showRouteLegend = m_settings.overlayRouteLegend &&
+        m_settings.routeColorMetric != ColorMetric::None &&
+        !routeLegendZones.empty();
 
     TileCache tileCache;
     tileCache.setMapStyle(m_settings.mapStyle);
@@ -450,63 +540,180 @@ void VideoRenderJob::run()
         p.setBrush(QColor("#ef4444"));
         p.drawEllipse(currentPos, 7.0, 7.0);
 
-        QRect telemetryRect(18, 16, 320, 180);
-        p.setPen(Qt::NoPen);
-        p.setBrush(QColor(15, 23, 42, 165));
-        p.drawRoundedRect(telemetryRect, 8.0, 8.0);
-
-        p.setPen(QColor("#e2e8f0"));
-        p.setFont(QFont("Helvetica", 12, QFont::DemiBold));
-        int y = telemetryRect.top() + 26;
-        auto drawLine = [&](const QString& line)
+        if (showRouteLegend)
         {
-            p.drawText(telemetryRect.left() + 12, y, line);
-            y += 20;
-        };
+            const bool hasAthleteBox = m_settings.overlayAthleteName;
+            const int reservedLeft = telemetryMargin + telemetryWidth + telemetryMargin;
+            const int reservedRight = hasAthleteBox
+                ? (athleteWidth + telemetryMargin + telemetryMargin)
+                : telemetryMargin;
 
-        if (m_settings.overlayTime)
-            drawLine(QString("Time  %1").arg(fmtDuration(sourceSeconds - startSec)));
-        if (m_settings.overlayPower && now.hasPower)
-            drawLine(QString("Power %1 W").arg(static_cast<int>(std::round(now.power))));
-        if (m_settings.overlayHeartRate && now.hasHeartRate)
-            drawLine(QString("HR    %1 bpm").arg(static_cast<int>(std::round(now.heartRate))));
-        if (m_settings.overlayCadence && now.hasCadence)
-            drawLine(QString("Cad   %1 rpm").arg(static_cast<int>(std::round(now.cadence))));
-        if (m_settings.overlaySpeed && now.hasSpeed)
-            drawLine(QString("Speed %1 km/h").arg(now.speed, 0, 'f', 1));
-        if (m_settings.overlayAltitude && now.hasAltitude)
-            drawLine(QString("Alt   %1 m").arg(now.altitude, 0, 'f', 0));
+            int legendLeft = reservedLeft;
+            int legendRight = m_settings.width - reservedRight;
+            int legendY = telemetryMargin;
+
+            if (legendRight - legendLeft < static_cast<int>(std::round(260.0 * uiScale)))
+            {
+                legendLeft = telemetryMargin;
+                legendRight = m_settings.width - telemetryMargin;
+                legendY = telemetryMargin + std::max(telemetryHeight, hasAthleteBox ? athleteHeight : 0) + legendGap;
+            }
+
+            const QString legendTitle = QString("Track Color: %1").arg(colorMetricDisplayName(m_settings.routeColorMetric));
+            p.setFont(QFont("Helvetica", legendTitleFontPx, QFont::DemiBold));
+            const QFontMetrics titleFm = p.fontMetrics();
+
+            p.setFont(QFont("Helvetica", legendLabelFontPx, QFont::Normal));
+            const QFontMetrics labelFm = p.fontMetrics();
+
+            const int legendWidth = std::max(120, legendRight - legendLeft);
+            const int contentWidth = std::max(80, legendWidth - (2 * legendInset));
+            const int rowHeight = std::max(legendSwatchSize + 2, labelFm.height() + 2);
+
+            struct LegendLayoutItem
+            {
+                const Zone* zone = nullptr;
+                QString label;
+                int row = 0;
+                int x = 0;
+                int textWidth = 0;
+            };
+
+            std::vector<LegendLayoutItem> layoutItems;
+            layoutItems.reserve(routeLegendZones.size());
+            int currentRow = 0;
+            int currentX = 0;
+            for (const Zone& zone : routeLegendZones)
+            {
+                const QString label = zoneLegendText(zone, m_settings.routeColorMetric);
+                const int textW = labelFm.horizontalAdvance(label);
+                const int itemW = legendSwatchSize + legendGap + textW + legendInset;
+
+                if (currentX > 0 && currentX + itemW > contentWidth)
+                {
+                    ++currentRow;
+                    currentX = 0;
+                }
+
+                layoutItems.push_back({ &zone, label, currentRow, currentX, textW });
+                currentX += itemW;
+            }
+
+            const int rows = std::max(1, currentRow + 1);
+            const int titleHeight = titleFm.height();
+            const int legendHeight = (2 * legendInset) + titleHeight + legendGap + (rows * rowHeight);
+
+            QRect legendRect(legendLeft,
+                             legendY,
+                             legendWidth,
+                             legendHeight);
+
+            p.setPen(Qt::NoPen);
+            p.setBrush(QColor(15, 23, 42, 170));
+            p.drawRoundedRect(legendRect, 8.0, 8.0);
+
+            p.setPen(QColor("#cbd5e1"));
+            p.setFont(QFont("Helvetica", legendTitleFontPx, QFont::DemiBold));
+            const QRect titleRect(legendRect.left() + legendInset,
+                                  legendRect.top() + legendInset,
+                                  legendRect.width() - (2 * legendInset),
+                                  titleHeight);
+            p.drawText(titleRect, Qt::AlignVCenter | Qt::AlignLeft, legendTitle);
+
+            p.setFont(QFont("Helvetica", legendLabelFontPx, QFont::Normal));
+            for (const LegendLayoutItem& item : layoutItems)
+            {
+                const int rowTop = titleRect.bottom() + legendGap + (item.row * rowHeight);
+                QRect swatchRect(legendRect.left() + legendInset + item.x,
+                                 rowTop + (rowHeight - legendSwatchSize) / 2,
+                                 legendSwatchSize,
+                                 legendSwatchSize);
+                p.setPen(QPen(QColor(255, 255, 255, 90), 1.0));
+                p.setBrush(item.zone->color);
+                p.drawRoundedRect(swatchRect, 2.0, 2.0);
+
+                p.setPen(QColor("#f1f5f9"));
+                p.drawText(QRect(swatchRect.right() + legendGap,
+                                 rowTop,
+                                 item.textWidth,
+                                 rowHeight),
+                           Qt::AlignVCenter | Qt::AlignLeft,
+                           item.label);
+            }
+        }
+
+        const bool hasTelemetryValue = m_settings.overlayTime ||
+            (m_settings.overlayPower && now.hasPower) ||
+            (m_settings.overlayHeartRate && now.hasHeartRate) ||
+            (m_settings.overlayCadence && now.hasCadence) ||
+            (m_settings.overlaySpeed && now.hasSpeed) ||
+            (m_settings.overlayAltitude && now.hasAltitude);
+
+        if (m_settings.overlayTelemetryPanel && hasTelemetryValue)
+        {
+            QRect telemetryRect(telemetryMargin, telemetryMargin, telemetryWidth, telemetryHeight);
+            p.setPen(Qt::NoPen);
+            p.setBrush(QColor(15, 23, 42, 165));
+            p.drawRoundedRect(telemetryRect, 8.0, 8.0);
+
+            p.setPen(QColor("#e2e8f0"));
+            p.setFont(QFont("Helvetica", telemetryFontPx, QFont::DemiBold));
+            int y = telemetryRect.top() + telemetryTopBaseline;
+            auto drawLine = [&](const QString& line)
+            {
+                p.drawText(telemetryRect.left() + telemetryLeftPadding, y, line);
+                y += telemetryLineStep;
+            };
+
+            if (m_settings.overlayTime)
+                drawLine(QString("Time  %1").arg(fmtDuration(sourceSeconds - startSec)));
+            if (m_settings.overlayPower && now.hasPower)
+                drawLine(QString("Power %1 W").arg(static_cast<int>(std::round(now.power))));
+            if (m_settings.overlayHeartRate && now.hasHeartRate)
+                drawLine(QString("HR    %1 bpm").arg(static_cast<int>(std::round(now.heartRate))));
+            if (m_settings.overlayCadence && now.hasCadence)
+                drawLine(QString("Cad   %1 rpm").arg(static_cast<int>(std::round(now.cadence))));
+            if (m_settings.overlaySpeed && now.hasSpeed)
+                drawLine(QString("Speed %1 km/h").arg(now.speed, 0, 'f', 1));
+            if (m_settings.overlayAltitude && now.hasAltitude)
+                drawLine(QString("Alt   %1 m").arg(now.altitude, 0, 'f', 0));
+        }
 
         if (m_settings.overlayAthleteName)
         {
             p.setPen(Qt::NoPen);
             p.setBrush(QColor(15, 23, 42, 150));
-            QRect athleteRect(m_settings.width - 360, 16, 344, 42);
+            QRect athleteRect(m_settings.width - athleteWidth - telemetryMargin,
+                              telemetryMargin,
+                              athleteWidth,
+                              athleteHeight);
             p.drawRoundedRect(athleteRect, 8.0, 8.0);
             p.setPen(QColor("#f8fafc"));
-            p.setFont(QFont("Helvetica", 13, QFont::Bold));
-            p.drawText(athleteRect.adjusted(12, 0, -12, 0), Qt::AlignVCenter | Qt::AlignRight, m_settings.athleteName);
+            p.setFont(QFont("Helvetica", athleteFontPx, QFont::Bold));
+            p.drawText(athleteRect.adjusted(athleteInset, 0, -athleteInset, 0), Qt::AlignVCenter | Qt::AlignRight, m_settings.athleteName);
         }
 
-        const QRect chartRect(0, mapHeight, m_settings.width, chartHeight);
-        p.fillRect(chartRect, QColor("#020617"));
-
-        auto drawMetricChart = [&](int row,
-                                   const QString& label,
-                                   auto hasMetric,
-                                   auto metricValue,
-                                   const QColor& color)
+        if (showAnyMetricChart)
         {
-            const int rows = 5;
-            const int rowHeight = chartRect.height() / rows;
-            const QRect rowRect(chartRect.left() + 12,
-                                chartRect.top() + row * rowHeight + 4,
-                                chartRect.width() - 24,
-                                rowHeight - 8);
+            const QRect chartRect(0, mapHeight, m_settings.width, chartHeight);
+            p.fillRect(chartRect, QColor("#020617"));
+
+            auto drawMetricChart = [&](int row,
+                                       int rows,
+                                       const QString& label,
+                                       auto hasMetric,
+                                       auto metricValue,
+                                       const QColor& color)
+            {
+                const int rowHeight = chartRect.height() / std::max(1, rows);
+            const QRect rowRect(chartRect.left() + chartSidePadding,
+                                chartRect.top() + row * rowHeight + chartTopPadding,
+                                chartRect.width() - (2 * chartSidePadding),
+                                rowHeight - chartBottomPadding);
 
             p.setPen(QColor("#94a3b8"));
-            p.setFont(QFont("Helvetica", 9, QFont::DemiBold));
-            p.drawText(rowRect.adjusted(0, 0, 0, -rowRect.height() + 14), label);
+            p.setFont(QFont("Helvetica", chartLabelFontPx, QFont::DemiBold));
+            p.drawText(rowRect.adjusted(0, 0, 0, -rowRect.height() + chartLabelBaseline), label);
 
             const double windowStart = sourceSeconds - kChartWindowBackSeconds;
             const double windowEnd = sourceSeconds + kChartWindowForwardSeconds;
@@ -559,13 +766,66 @@ void VideoRenderJob::run()
             const double cursorX = rowRect.left() + ((sourceSeconds - windowStart) / std::max(0.001, windowEnd - windowStart)) * rowRect.width();
             p.setPen(QPen(QColor("#e2e8f0"), 1.0, Qt::DashLine));
             p.drawLine(QPointF(cursorX, rowRect.top()), QPointF(cursorX, rowRect.bottom()));
-        };
+                        };
 
-        drawMetricChart(0, "Power", [](const RideRecord& r) { return r.hasPower; }, [](const RideRecord& r) { return r.power; }, QColor("#ef4444"));
-        drawMetricChart(1, "Heart Rate", [](const RideRecord& r) { return r.hasHeartRate; }, [](const RideRecord& r) { return r.heartRate; }, QColor("#f97316"));
-        drawMetricChart(2, "Cadence", [](const RideRecord& r) { return r.hasCadence; }, [](const RideRecord& r) { return r.cadence; }, QColor("#22c55e"));
-        drawMetricChart(3, "Speed", [](const RideRecord& r) { return r.hasSpeed; }, [](const RideRecord& r) { return r.speed; }, QColor("#38bdf8"));
-        drawMetricChart(4, "Altitude", [](const RideRecord& r) { return r.hasAltitude; }, [](const RideRecord& r) { return r.altitude; }, QColor("#c084fc"));
+                        struct ChartSpec
+                        {
+                                bool enabled;
+                                QString label;
+                                std::function<bool(const RideRecord&)> hasMetric;
+                                std::function<double(const RideRecord&)> metricValue;
+                                QColor color;
+                        };
+
+                        const std::vector<ChartSpec> chartSpecs = {
+                                { m_settings.overlayPower,
+                                    "Power",
+                                    [](const RideRecord& r) { return r.hasPower; },
+                                    [](const RideRecord& r) { return r.power; },
+                                    QColor("#ef4444") },
+                                { m_settings.overlayHeartRate,
+                                    "Heart Rate",
+                                    [](const RideRecord& r) { return r.hasHeartRate; },
+                                    [](const RideRecord& r) { return r.heartRate; },
+                                    QColor("#f97316") },
+                                { m_settings.overlayCadence,
+                                    "Cadence",
+                                    [](const RideRecord& r) { return r.hasCadence; },
+                                    [](const RideRecord& r) { return r.cadence; },
+                                    QColor("#22c55e") },
+                                { m_settings.overlaySpeed,
+                                    "Speed",
+                                    [](const RideRecord& r) { return r.hasSpeed; },
+                                    [](const RideRecord& r) { return r.speed; },
+                                    QColor("#38bdf8") },
+                                { m_settings.overlayAltitude,
+                                    "Altitude",
+                                    [](const RideRecord& r) { return r.hasAltitude; },
+                                    [](const RideRecord& r) { return r.altitude; },
+                                    QColor("#c084fc") }
+                        };
+
+                        int enabledCount = 0;
+                        for (const ChartSpec& spec : chartSpecs)
+                        {
+                                if (spec.enabled)
+                                        ++enabledCount;
+                        }
+
+                        int row = 0;
+                        for (const ChartSpec& spec : chartSpecs)
+                        {
+                                if (!spec.enabled)
+                                        continue;
+                                drawMetricChart(row,
+                                                                enabledCount,
+                                                                spec.label,
+                                                                spec.hasMetric,
+                                                                spec.metricValue,
+                                                                spec.color);
+                                ++row;
+                        }
+                }
 
         p.end();
 
