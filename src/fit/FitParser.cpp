@@ -1,12 +1,61 @@
 #include "FitParser.h"
 #include "FitRecordListener.h"
 
+#include <QDateTime>
+#include <QTimeZone>
+
 #include <fstream>
 #include <cmath>
 #include <numbers>
 
 #include <fit_decode.hpp>
+#include <fit_file_id_mesg_listener.hpp>
 #include <fit_mesg_broadcaster.hpp>
+#include <fit_session_mesg_listener.hpp>
+
+namespace
+{
+QString fitTimestampToIsoUtc(FIT_DATE_TIME timestamp)
+{
+    if (timestamp == FIT_DATE_TIME_INVALID)
+        return {};
+
+    // FIT epoch: 1989-12-31T00:00:00Z.
+    static constexpr qint64 kFitEpochToUnixOffset = 631065600;
+    const qint64 unixSeconds = kFitEpochToUnixOffset + static_cast<qint64>(timestamp);
+    return QDateTime::fromSecsSinceEpoch(unixSeconds, QTimeZone::UTC).toString(Qt::ISODate);
+}
+
+class FitSessionListener final : public fit::SessionMesgListener
+{
+public:
+    void OnMesg(fit::SessionMesg& mesg) override
+    {
+        if (mesg.IsStartTimeValid())
+            m_startTime = mesg.GetStartTime();
+    }
+
+    FIT_DATE_TIME startTime() const { return m_startTime; }
+
+private:
+    FIT_DATE_TIME m_startTime = FIT_DATE_TIME_INVALID;
+};
+
+class FitFileIdListener final : public fit::FileIdMesgListener
+{
+public:
+    void OnMesg(fit::FileIdMesg& mesg) override
+    {
+        if (mesg.IsTimeCreatedValid())
+            m_timeCreated = mesg.GetTimeCreated();
+    }
+
+    FIT_DATE_TIME timeCreated() const { return m_timeCreated; }
+
+private:
+    FIT_DATE_TIME m_timeCreated = FIT_DATE_TIME_INVALID;
+};
+}
 
 // Remove GPS points that imply speed > 150 km/h (equirectangular approximation)
 static void filterGpsOutliers(RideData& rideData)
@@ -60,7 +109,11 @@ RideData FitParser::load(const QString& fileName)
     fit::MesgBroadcaster broadcaster;
 
     FitRecordListener listener(rideData);
+    FitSessionListener sessionListener;
+    FitFileIdListener fileIdListener;
     broadcaster.AddListener((fit::RecordMesgListener&)listener);
+    broadcaster.AddListener((fit::SessionMesgListener&)sessionListener);
+    broadcaster.AddListener((fit::FileIdMesgListener&)fileIdListener);
 
     if (!decode.CheckIntegrity(fitFile))
         throw std::runtime_error(
@@ -78,6 +131,26 @@ RideData FitParser::load(const QString& fileName)
             "The file may be a device configuration or course file, not an activity.");
 
     filterGpsOutliers(rideData);
+
+    const FIT_DATE_TIME sessionStart = sessionListener.startTime();
+    const FIT_DATE_TIME firstRecordTime = listener.firstTimestamp();
+    const FIT_DATE_TIME lastRecordTime = listener.lastTimestamp();
+    const FIT_DATE_TIME fileTime = fileIdListener.timeCreated();
+
+    FIT_DATE_TIME chosenStart = sessionStart;
+    if (chosenStart == FIT_DATE_TIME_INVALID)
+        chosenStart = firstRecordTime;
+    if (chosenStart == FIT_DATE_TIME_INVALID)
+        chosenStart = fileTime;
+
+    rideData.activityStartTimeUtc = fitTimestampToIsoUtc(chosenStart);
+    rideData.activityEndTimeUtc = fitTimestampToIsoUtc(lastRecordTime != FIT_DATE_TIME_INVALID ? lastRecordTime : chosenStart);
+    rideData.fileTimestampUtc = fitTimestampToIsoUtc(fileTime);
+
+    if (rideData.activityStartTimeUtc.isEmpty())
+        rideData.activityStartTimeUtc = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+    if (rideData.activityEndTimeUtc.isEmpty())
+        rideData.activityEndTimeUtc = rideData.activityStartTimeUtc;
 
     return rideData;
 }

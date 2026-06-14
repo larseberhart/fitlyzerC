@@ -72,6 +72,8 @@ void FitRecordListener::OnMesg(
         if (m_firstTimestamp == FIT_DATE_TIME_INVALID)
             m_firstTimestamp = ts;
 
+        m_lastTimestamp = ts;
+
         record.elapsedSeconds =
             static_cast<double>(ts - m_firstTimestamp);
     }

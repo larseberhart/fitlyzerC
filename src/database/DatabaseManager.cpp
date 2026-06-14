@@ -35,6 +35,63 @@ static bool columnExists(QSqlDatabase& db, const QString& tableName, const QStri
     return false;
 }
 
+static bool ensureActivityTimeColumns(QSqlDatabase& db, QString* errorOut)
+{
+    if (!columnExists(db, "activities", "activity_start_time"))
+    {
+        QSqlQuery q(db);
+        if (!q.exec("ALTER TABLE activities ADD COLUMN activity_start_time TEXT"))
+        {
+            if (errorOut)
+                *errorOut = q.lastError().text();
+            return false;
+        }
+    }
+
+    if (!columnExists(db, "activities", "import_time"))
+    {
+        QSqlQuery q(db);
+        if (!q.exec("ALTER TABLE activities ADD COLUMN import_time TEXT"))
+        {
+            if (errorOut)
+                *errorOut = q.lastError().text();
+            return false;
+        }
+    }
+
+    const bool hasLegacyStart = columnExists(db, "activities", "start_time");
+    const bool hasLegacyImported = columnExists(db, "activities", "imported_at");
+
+    QString startExpr = QStringLiteral("activity_start_time = COALESCE(activity_start_time");
+    if (hasLegacyStart)
+        startExpr += QStringLiteral(", start_time");
+    if (hasLegacyImported)
+        startExpr += QStringLiteral(", imported_at");
+    startExpr += QStringLiteral(", datetime('now'))");
+
+    QString importExpr = QStringLiteral("import_time = COALESCE(import_time");
+    if (hasLegacyImported)
+        importExpr += QStringLiteral(", imported_at");
+    importExpr += QStringLiteral(", datetime('now'))");
+
+    {
+        QSqlQuery q(db);
+        if (!q.exec(QString("UPDATE activities SET %1, %2").arg(startExpr, importExpr)))
+        {
+            if (errorOut)
+                *errorOut = q.lastError().text();
+            return false;
+        }
+    }
+
+    {
+        QSqlQuery q(db);
+        q.exec("CREATE INDEX IF NOT EXISTS idx_activities_activity_start_time ON activities(activity_start_time DESC)");
+    }
+
+    return true;
+}
+
 bool DatabaseManager::applySchema(QString* errorOut)
 {
     QSqlQuery q(m_db);
@@ -50,6 +107,9 @@ bool DatabaseManager::applySchema(QString* errorOut)
             return false;
         }
     }
+
+    if (!ensureActivityTimeColumns(m_db, errorOut))
+        return false;
 
     // Write schema version
     q.prepare("INSERT OR REPLACE INTO schema_info(version, created_at) VALUES(:v, :ts)");
@@ -114,6 +174,12 @@ bool DatabaseManager::upgradeSchema(int fromVersion, QString* errorOut)
                 return false;
             }
         }
+    }
+
+    if (fromVersion < 4)
+    {
+        if (!ensureActivityTimeColumns(m_db, errorOut))
+            return false;
     }
 
     return applySchema(errorOut);

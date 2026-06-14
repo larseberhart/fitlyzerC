@@ -3026,8 +3026,20 @@ void MainWindow::updateIntervals()
         auto db = m_dbManager.database();
         ActivityRepository repo(db);
         const Activity activity = repo.getActivity(m_controller->currentActivityId());
+
+        const QDateTime activityDateUtc = QDateTime::fromString(activity.startTime, Qt::ISODate);
+        const QDateTime importDateUtc = QDateTime::fromString(activity.importedAt, Qt::ISODate);
+        const QString activityDateText = activityDateUtc.isValid()
+            ? DateFormatter::formatDateTime(activityDateUtc.toLocalTime())
+            : QStringLiteral("-");
+        const QString importDateText = importDateUtc.isValid()
+            ? DateFormatter::formatDateTime(importDateUtc.toLocalTime())
+            : QStringLiteral("-");
+
         m_activityNotesView->setPlainText(
-            QString("Notes:\n%1\n\nWeather: %2\nTemperature: %3 C\nRPE: %4\nFatigue: %5\nSleep: %6 h\nBike: %7\nEquipment: %8")
+            QString("Activity Date: %1\nImported: %2\n\nNotes:\n%3\n\nWeather: %4\nTemperature: %5 C\nRPE: %6\nFatigue: %7\nSleep: %8 h\nBike: %9\nEquipment: %10")
+                .arg(activityDateText)
+                .arg(importDateText)
                 .arg(activity.notes)
                 .arg(activity.weather)
                 .arg(activity.temperature, 0, 'f', 1)

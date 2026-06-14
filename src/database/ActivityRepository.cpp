@@ -49,11 +49,11 @@ static Activity activityFromQuery(QSqlQuery& q)
 }
 
 static const char* kSelectCols =
-    "id, athlete_id, fit_hash, file_name, sport, start_time, end_time,"
+    "id, athlete_id, fit_hash, file_name, sport, activity_start_time, end_time,"
     " duration_sec, distance_m, avg_power, max_power, normalized_power,"
     " avg_hr, max_hr, avg_cadence, avg_speed, elevation_gain,"
     " notes, weather_notes, temperature, weather, wind, rpe, fatigue, sleep,"
-    " weight, bike, equipment, imported_at";
+    " weight, bike, equipment, import_time";
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -62,17 +62,17 @@ int ActivityRepository::insertActivity(const Activity& a)
     QSqlQuery q(m_db);
     q.prepare(
         "INSERT INTO activities("
-        "  athlete_id, fit_hash, file_name, sport, start_time, end_time,"
+        "  athlete_id, fit_hash, file_name, sport, activity_start_time, end_time,"
         "  duration_sec, distance_m, avg_power, max_power, normalized_power,"
         "  avg_hr, max_hr, avg_cadence, avg_speed, elevation_gain,"
         "  notes, weather_notes, temperature, weather, wind, rpe, fatigue, sleep,"
-        "  weight, bike, equipment, imported_at"
+        "  weight, bike, equipment, import_time"
         ") VALUES("
         "  :aid, :fh, :fn, :sport, :st, :et,"
         "  :dur, :dist, :ap, :mp, :np,"
         "  :ah, :mh, :ac, :as_, :eg,"
         "  :notes, :wn, :temp, :weather, :wind, :rpe, :fatigue, :sleep,"
-        "  :weight, :bike, :equipment, :ts"
+        "  :weight, :bike, :equipment, :import_time"
         ")");
 
     q.bindValue(":aid",   a.athleteId);
@@ -102,9 +102,9 @@ int ActivityRepository::insertActivity(const Activity& a)
     q.bindValue(":weight", a.weightKg > 0.0 ? QVariant(a.weightKg) : QVariant());
     q.bindValue(":bike", a.bike.isEmpty() ? QVariant() : QVariant(a.bike));
     q.bindValue(":equipment", a.equipment.isEmpty() ? QVariant() : QVariant(a.equipment));
-    q.bindValue(":ts",    a.importedAt.isEmpty()
-                          ? QDateTime::currentDateTimeUtc().toString(Qt::ISODate)
-                          : a.importedAt);
+    q.bindValue(":import_time", a.importedAt.isEmpty()
+                                   ? QDateTime::currentDateTimeUtc().toString(Qt::ISODate)
+                                   : a.importedAt);
 
     if (!q.exec()) return -1;
     return q.lastInsertId().toInt();
@@ -127,12 +127,12 @@ QList<Activity> ActivityRepository::listActivities(int athleteId)
     if (athleteId > 0)
     {
         q.prepare(QString("SELECT %1 FROM activities WHERE athlete_id=:aid"
-                          " ORDER BY imported_at DESC").arg(kSelectCols));
+                          " ORDER BY activity_start_time DESC").arg(kSelectCols));
         q.bindValue(":aid", athleteId);
     }
     else
     {
-        q.prepare(QString("SELECT %1 FROM activities ORDER BY imported_at DESC")
+        q.prepare(QString("SELECT %1 FROM activities ORDER BY activity_start_time DESC")
                   .arg(kSelectCols));
     }
     q.exec();

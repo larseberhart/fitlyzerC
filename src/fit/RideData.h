@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QString>
 #include <vector>
 
 struct RideRecord
@@ -27,4 +28,7 @@ class RideData
 {
 public:
     std::vector<RideRecord> records;
+    QString activityStartTimeUtc;
+    QString activityEndTimeUtc;
+    QString fileTimestampUtc;
 };

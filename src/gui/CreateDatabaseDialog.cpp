@@ -40,6 +40,7 @@ CreateDatabaseDialog::CreateDatabaseDialog(const QString& defaultDirectory, QWid
     mainLayout->addLayout(form);
 
     m_createAthleteCheck = new QCheckBox("Create default athlete", this);
+    m_createAthleteCheck->setChecked(true);
     mainLayout->addWidget(m_createAthleteCheck);
 
     auto* athleteForm = new QFormLayout;

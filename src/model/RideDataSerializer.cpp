@@ -45,7 +45,8 @@ int RideDataSerializer::saveRideToDatabase(
     act.fitHash         = fitHash;
     act.fileName        = QFileInfo(filePath).fileName();
     act.sport           = "Cycling";
-    act.startTime       = now;    // real start time requires FIT metadata
+    act.startTime       = rideData.activityStartTimeUtc.isEmpty() ? now : rideData.activityStartTimeUtc;
+    act.endTime         = rideData.activityEndTimeUtc.isEmpty() ? act.startTime : rideData.activityEndTimeUtc;
     act.durationSec     = stats.durationSeconds;
     act.distanceM       = stats.totalDistanceKm * 1000.0;
     act.avgPower        = stats.averagePower;
