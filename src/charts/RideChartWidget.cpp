@@ -252,6 +252,12 @@ void RideChartWidget::setIntervals(const std::vector<Interval>& intervals)
         rebuildChart();
 }
 
+void RideChartWidget::setClimbs(const std::vector<Climb>& climbs)
+{
+    m_climbs = climbs;
+    rebuildChart();
+}
+
 std::vector<double> RideChartWidget::computeSmoothedPowerSeries(int seconds) const
 {
     return computeSmoothedSeries(Metric::Power, seconds);
@@ -466,6 +472,35 @@ void RideChartWidget::addIntervalBackgroundBands(double minY, double maxY)
         auto* area = new QAreaSeries(upper, lower);
         QColor fill = base;
         fill.setAlpha(isWork ? 18 : 10);
+        area->setColor(fill);
+        area->setPen(Qt::NoPen);
+
+        chart()->addSeries(area);
+        area->attachAxis(m_axisX);
+        area->attachAxis(m_axisY);
+        m_backgroundSeries.push_back(area);
+    }
+}
+
+void RideChartWidget::addClimbBackgroundBands(double minY, double maxY)
+{
+    if (m_climbs.empty())
+        return;
+
+    for (const Climb& climb : m_climbs)
+    {
+        auto* upper = new QLineSeries;
+        auto* lower = new QLineSeries;
+        const double x0 = climb.startSeconds / 60.0;
+        const double x1 = climb.endSeconds / 60.0;
+        upper->append(x0, maxY);
+        upper->append(x1, maxY);
+        lower->append(x0, minY);
+        lower->append(x1, minY);
+
+        auto* area = new QAreaSeries(upper, lower);
+        QColor fill("#16a34a");
+        fill.setAlpha(20);
         area->setColor(fill);
         area->setPen(Qt::NoPen);
 
@@ -739,6 +774,7 @@ void RideChartWidget::rebuildChart(bool preserveXRange)
 
         addZoneBackgroundBands(m_dataMinY, m_dataMaxY, maxX);
         addIntervalBackgroundBands(m_dataMinY, m_dataMaxY);
+        addClimbBackgroundBands(m_dataMinY, m_dataMaxY);
 
         if (m_metric == Metric::Power)
         {

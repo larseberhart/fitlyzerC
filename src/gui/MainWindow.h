@@ -2,6 +2,7 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDoubleSpinBox>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QLabel>
@@ -92,6 +93,10 @@ private:
     void updatePowerCurve();
     void updateFitnessChart();
     void updateIntervals();
+    void updateClimbingTab();
+    void detectClimbsAndRefresh();
+    void updateClimbRowStyles();
+    void onClimbSelectionChanged();
     void onIntervalSelectionChanged();
     void onIntervalRowDoubleClicked(QTableWidgetItem* item);
     void navigateToInterval(double startSeconds, double endSeconds, bool exactZoom);
@@ -183,6 +188,7 @@ private:
     static constexpr int kAnalysisTabPDC        = 3;
     static constexpr int kAnalysisTabCalendar   = 4;
     static constexpr int kAnalysisTabFitness    = 5;
+    static constexpr int kAnalysisTabClimbing   = 6;
 
     // Charts tab
     QScrollArea*     m_chartScroll      = nullptr;
@@ -195,6 +201,13 @@ private:
     RideChartWidget* m_cadenceChart     = nullptr;
     RideChartWidget* m_speedChart       = nullptr;
     RideChartWidget* m_altitudeChart    = nullptr;
+
+    // Climbing tab charts
+    RideChartWidget* m_climbAltitudeChart = nullptr;
+    RideChartWidget* m_climbPowerChart = nullptr;
+    RideChartWidget* m_climbHrChart = nullptr;
+    RideChartWidget* m_climbCadenceChart = nullptr;
+    RideChartWidget* m_climbSpeedChart = nullptr;
 
     // Chart controls
     QPushButton* m_fitChartsButton            = nullptr;
@@ -229,6 +242,18 @@ private:
     QTextEdit* m_activityNotesView = nullptr;
     QCheckBox* m_followIntervalSelectionCheck = nullptr;
     QLabel* m_intervalSummaryLabel = nullptr;
+
+    // Climbing tab
+    QTableWidget* m_climbsTable = nullptr;
+    QLabel* m_climbSummaryLabel = nullptr;
+    QDoubleSpinBox* m_climbMinLengthSpin = nullptr;
+    QDoubleSpinBox* m_climbMinGainSpin = nullptr;
+    QDoubleSpinBox* m_climbMinGradientSpin = nullptr;
+    QDoubleSpinBox* m_climbStartGradientSpin = nullptr;
+    QDoubleSpinBox* m_climbDipMetersSpin = nullptr;
+    QDoubleSpinBox* m_climbDipDistanceSpin = nullptr;
+    QDoubleSpinBox* m_climbSmoothingSpin = nullptr;
+    std::vector<Climb> m_detectedClimbs;
 
     // Integrated map panel
     MapRenderer* m_mapRenderer = nullptr;

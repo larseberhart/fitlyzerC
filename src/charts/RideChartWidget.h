@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "analysis/IntervalDetector.h"
+#include "analysis/ClimbMetrics.h"
 #include "charts/Metric.h"
 #include "core/zones/ZoneDefinition.h"
 #include "fit/RideData.h"
@@ -29,6 +30,7 @@ public:
     void setPowerSmoothingSeconds(int seconds);
     void setAutoSmoothingEnabled(bool enabled);
     void setIntervals(const std::vector<Interval>& intervals);
+    void setClimbs(const std::vector<Climb>& climbs);
     void clearChart();
 
     bool hasData() const { return m_hasData; }
@@ -65,6 +67,7 @@ private:
     void clearBackgroundSeries();
     void addZoneBackgroundBands(double minY, double maxY, double maxXMinutes);
     void addIntervalBackgroundBands(double minY, double maxY);
+    void addClimbBackgroundBands(double minY, double maxY);
     void updateXTicks(double minVal, double maxVal);
     void updateYAxis();   // recalculates nice range + tick count
 
@@ -79,6 +82,7 @@ private:
     QValueAxis*     m_axisY         = nullptr;
     RideData        m_rideData;
     std::vector<Interval> m_intervals;
+    std::vector<Climb> m_climbs;
     ColorMetric     m_colorMetric   = ColorMetric::None;
     ColorContext    m_colorContext;
     std::unordered_map<int, std::vector<double>> m_powerSmoothingCache;

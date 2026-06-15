@@ -11,6 +11,7 @@
 #include <QDate>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QDoubleSpinBox>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QDir>
@@ -61,6 +62,7 @@
 #include "charts/PowerCurveWidget.h"
 #include "charts/PowerHistogramWidget.h"
 #include "charts/RideChartWidget.h"
+#include "analysis/ClimbDetector.h"
 #include "core/settings/AppSettings.h"
 #include "core/settings/DateFormatter.h"
 #include "core/zones/ZoneCalculator.h"
@@ -128,6 +130,8 @@ enum ChartPresetId
 
 static constexpr int kIntervalStartRole = Qt::UserRole + 1;
 static constexpr int kIntervalEndRole = Qt::UserRole + 2;
+static constexpr int kClimbStartRole = Qt::UserRole + 3;
+static constexpr int kClimbEndRole = Qt::UserRole + 4;
 
 static QString rangeLabelForZone(const Zone& zone, ColorMetric metric)
 {
@@ -931,6 +935,135 @@ void MainWindow::buildUI()
     {
         m_fitnessChart = new FitnessChartWidget(this);
         m_analysisTabWidget->addTab(m_fitnessChart, "Fitness");
+    }
+
+    // == Tab 6: Climbing ==
+    {
+        auto* climbingTab = new QWidget(this);
+        auto* climbingVL = new QVBoxLayout(climbingTab);
+        climbingVL->setContentsMargins(0, 0, 0, 0);
+        climbingVL->setSpacing(6);
+
+        m_climbAltitudeChart = new RideChartWidget(Metric::Altitude, climbingTab);
+        m_climbPowerChart = new RideChartWidget(Metric::Power, climbingTab);
+        m_climbHrChart = new RideChartWidget(Metric::HeartRate, climbingTab);
+        m_climbCadenceChart = new RideChartWidget(Metric::Cadence, climbingTab);
+        m_climbSpeedChart = new RideChartWidget(Metric::Speed, climbingTab);
+
+        auto* climbCharts = new QWidget(climbingTab);
+        auto* climbChartsVL = new QVBoxLayout(climbCharts);
+        climbChartsVL->setContentsMargins(0, 0, 0, 0);
+        climbChartsVL->setSpacing(4);
+        climbChartsVL->addWidget(m_climbAltitudeChart);
+        climbChartsVL->addWidget(m_climbPowerChart);
+        climbChartsVL->addWidget(m_climbHrChart);
+        climbChartsVL->addWidget(m_climbCadenceChart);
+        climbChartsVL->addWidget(m_climbSpeedChart);
+
+        auto* paramsGroup = new QGroupBox("Detection Parameters", climbingTab);
+        auto* paramsForm = new QFormLayout(paramsGroup);
+        m_climbMinLengthSpin = new QDoubleSpinBox(paramsGroup);
+        m_climbMinLengthSpin->setRange(0.1, 20.0);
+        m_climbMinLengthSpin->setDecimals(2);
+        m_climbMinLengthSpin->setSingleStep(0.1);
+        m_climbMinLengthSpin->setValue(0.5);
+
+        m_climbMinGainSpin = new QDoubleSpinBox(paramsGroup);
+        m_climbMinGainSpin->setRange(1.0, 2000.0);
+        m_climbMinGainSpin->setDecimals(0);
+        m_climbMinGainSpin->setSingleStep(5.0);
+        m_climbMinGainSpin->setValue(30.0);
+
+        m_climbMinGradientSpin = new QDoubleSpinBox(paramsGroup);
+        m_climbMinGradientSpin->setRange(0.5, 20.0);
+        m_climbMinGradientSpin->setDecimals(1);
+        m_climbMinGradientSpin->setSingleStep(0.5);
+        m_climbMinGradientSpin->setValue(3.0);
+
+        m_climbStartGradientSpin = new QDoubleSpinBox(paramsGroup);
+        m_climbStartGradientSpin->setRange(0.5, 20.0);
+        m_climbStartGradientSpin->setDecimals(1);
+        m_climbStartGradientSpin->setSingleStep(0.5);
+        m_climbStartGradientSpin->setValue(3.0);
+
+        m_climbDipMetersSpin = new QDoubleSpinBox(paramsGroup);
+        m_climbDipMetersSpin->setRange(0.0, 200.0);
+        m_climbDipMetersSpin->setDecimals(1);
+        m_climbDipMetersSpin->setSingleStep(1.0);
+        m_climbDipMetersSpin->setValue(10.0);
+
+        m_climbDipDistanceSpin = new QDoubleSpinBox(paramsGroup);
+        m_climbDipDistanceSpin->setRange(10.0, 2000.0);
+        m_climbDipDistanceSpin->setDecimals(0);
+        m_climbDipDistanceSpin->setSingleStep(10.0);
+        m_climbDipDistanceSpin->setValue(200.0);
+
+        m_climbSmoothingSpin = new QDoubleSpinBox(paramsGroup);
+        m_climbSmoothingSpin->setRange(1.0, 500.0);
+        m_climbSmoothingSpin->setDecimals(0);
+        m_climbSmoothingSpin->setSingleStep(5.0);
+        m_climbSmoothingSpin->setValue(50.0);
+
+        paramsForm->addRow("Min Length (km)", m_climbMinLengthSpin);
+        paramsForm->addRow("Min Gain (m)", m_climbMinGainSpin);
+        paramsForm->addRow("Min Avg Gradient (%)", m_climbMinGradientSpin);
+        paramsForm->addRow("Start Gradient (%)", m_climbStartGradientSpin);
+        paramsForm->addRow("Max Dip (m)", m_climbDipMetersSpin);
+        paramsForm->addRow("Max Dip Distance (m)", m_climbDipDistanceSpin);
+        paramsForm->addRow("Elevation Smoothing (m)", m_climbSmoothingSpin);
+
+        m_climbsTable = new QTableWidget(0, 14, climbingTab);
+        m_climbsTable->setHorizontalHeaderLabels(
+            { "Name", "Length (km)", "Gain (m)", "Avg Gradient %", "Max Gradient %",
+              "Duration", "Avg Power", "NP", "Avg HR", "Avg Cadence", "Avg Speed", "VAM", "Fade %", "Difficulty" });
+        m_climbsTable->horizontalHeader()->setStretchLastSection(true);
+        m_climbsTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+        m_climbsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+        m_climbsTable->setSelectionMode(QAbstractItemView::SingleSelection);
+        m_climbsTable->setAlternatingRowColors(true);
+
+        m_climbSummaryLabel = new QLabel("Climb summary: select a climb", climbingTab);
+        m_climbSummaryLabel->setStyleSheet("color: #334155;");
+
+        climbingVL->addWidget(climbCharts);
+        climbingVL->addWidget(paramsGroup);
+        climbingVL->addWidget(new QLabel("Recognized Climbs", climbingTab));
+        climbingVL->addWidget(m_climbsTable, 1);
+        climbingVL->addWidget(m_climbSummaryLabel);
+
+        auto wireDetectionChange = [this](QDoubleSpinBox* spin)
+        {
+            connect(spin, qOverload<double>(&QDoubleSpinBox::valueChanged),
+                    this, [this](double)
+            {
+                detectClimbsAndRefresh();
+            });
+        };
+
+        wireDetectionChange(m_climbMinLengthSpin);
+        wireDetectionChange(m_climbMinGainSpin);
+        wireDetectionChange(m_climbMinGradientSpin);
+        wireDetectionChange(m_climbStartGradientSpin);
+        wireDetectionChange(m_climbDipMetersSpin);
+        wireDetectionChange(m_climbDipDistanceSpin);
+        wireDetectionChange(m_climbSmoothingSpin);
+
+        connect(m_climbsTable, &QTableWidget::itemSelectionChanged,
+                this, &MainWindow::onClimbSelectionChanged);
+
+        const std::initializer_list<RideChartWidget*> climbChartsAll =
+            { m_climbAltitudeChart, m_climbPowerChart, m_climbHrChart, m_climbCadenceChart, m_climbSpeedChart };
+        for (auto* src : climbChartsAll)
+            for (auto* dst : climbChartsAll)
+                if (src != dst)
+                    connect(src, &RideChartWidget::xRangeChanged, dst, &RideChartWidget::setXRange);
+
+        for (auto* src : climbChartsAll)
+            for (auto* dst : climbChartsAll)
+                if (src != dst)
+                    connect(src, &RideChartWidget::crosshairMoved, dst, &RideChartWidget::setCrosshair);
+
+        m_analysisTabWidget->addTab(climbingTab, "Climbing");
     }
 
     analysisLayout->addWidget(m_analysisTabWidget, 1);
@@ -2322,6 +2455,8 @@ void MainWindow::onWorkoutLoaded()
         updateFitnessChart();
     }
 
+    updateClimbingTab();
+
     if (m_mapRenderer)
         m_mapRenderer->setRideData(m_controller->rideData(), currentColorMetric(), buildColorContext());
 
@@ -2385,18 +2520,40 @@ void MainWindow::updateCharts()
 {
     const ColorMetric colorMetric = currentColorMetric();
     const ColorContext colorContext = buildColorContext();
+    const std::vector<Climb>& climbsForView =
+        m_climbMinLengthSpin ? m_detectedClimbs : m_controller->climbs();
 
     setUpdatesEnabled(false);
     applyChartSmoothing();
     if (m_powerChart)
     {
         m_powerChart->setIntervals(m_controller->intervals());
+        m_powerChart->setClimbs(climbsForView);
     }
+    if (m_hrChart) m_hrChart->setClimbs(climbsForView);
+    if (m_cadenceChart) m_cadenceChart->setClimbs(climbsForView);
+    if (m_speedChart) m_speedChart->setClimbs(climbsForView);
+    if (m_altitudeChart) m_altitudeChart->setClimbs(climbsForView);
     m_powerChart->setRideData(m_controller->rideData(), colorMetric, colorContext);
     m_hrChart->setRideData(m_controller->rideData(), colorMetric, colorContext);
     m_cadenceChart->setRideData(m_controller->rideData(), colorMetric, colorContext);
     m_speedChart->setRideData(m_controller->rideData(), colorMetric, colorContext);
     m_altitudeChart->setRideData(m_controller->rideData(), colorMetric, colorContext);
+
+    if (m_climbPowerChart)
+    {
+        m_climbPowerChart->setClimbs(climbsForView);
+        m_climbHrChart->setClimbs(climbsForView);
+        m_climbCadenceChart->setClimbs(climbsForView);
+        m_climbSpeedChart->setClimbs(climbsForView);
+        m_climbAltitudeChart->setClimbs(climbsForView);
+
+        m_climbPowerChart->setRideData(m_controller->rideData(), colorMetric, colorContext);
+        m_climbHrChart->setRideData(m_controller->rideData(), colorMetric, colorContext);
+        m_climbCadenceChart->setRideData(m_controller->rideData(), colorMetric, colorContext);
+        m_climbSpeedChart->setRideData(m_controller->rideData(), colorMetric, colorContext);
+        m_climbAltitudeChart->setRideData(m_controller->rideData(), colorMetric, colorContext);
+    }
     setUpdatesEnabled(true);
 }
 
@@ -2467,7 +2624,8 @@ void MainWindow::applyChartPreset(int presetId)
 void MainWindow::applyChartSmoothing()
 {
     const std::initializer_list<RideChartWidget*> all =
-        { m_powerChart, m_hrChart, m_cadenceChart, m_speedChart, m_altitudeChart };
+                { m_powerChart, m_hrChart, m_cadenceChart, m_speedChart, m_altitudeChart,
+                    m_climbPowerChart, m_climbHrChart, m_climbCadenceChart, m_climbSpeedChart, m_climbAltitudeChart };
 
     const int smoothingSeconds = m_powerSmoothingCombo ? m_powerSmoothingCombo->currentData().toInt() : 0;
     const bool autoSmoothing = m_autoSmoothingCheck ? m_autoSmoothingCheck->isChecked() : false;
@@ -3060,6 +3218,174 @@ void MainWindow::updateIntervals()
                 .arg(activity.bike)
                 .arg(activity.equipment));
     }
+}
+
+void MainWindow::updateClimbingTab()
+{
+    detectClimbsAndRefresh();
+}
+
+void MainWindow::detectClimbsAndRefresh()
+{
+    if (!m_climbsTable)
+        return;
+
+    const auto& ride = m_controller->rideData();
+    if (ride.records.empty())
+    {
+        m_detectedClimbs.clear();
+        m_climbsTable->setRowCount(0);
+        if (m_climbSummaryLabel)
+            m_climbSummaryLabel->setText("Climb summary: select a climb");
+        return;
+    }
+
+    ClimbDetector::Config cfg;
+    cfg.minLengthKm = m_climbMinLengthSpin ? m_climbMinLengthSpin->value() : 0.5;
+    cfg.minElevationGainM = m_climbMinGainSpin ? m_climbMinGainSpin->value() : 30.0;
+    cfg.minAverageGradient = m_climbMinGradientSpin ? m_climbMinGradientSpin->value() : 3.0;
+    cfg.startGradient = m_climbStartGradientSpin ? m_climbStartGradientSpin->value() : 3.0;
+    cfg.maxDipMeters = m_climbDipMetersSpin ? m_climbDipMetersSpin->value() : 10.0;
+    cfg.maxDipDistanceMeters = m_climbDipDistanceSpin ? m_climbDipDistanceSpin->value() : 200.0;
+    cfg.elevationSmoothingMeters = m_climbSmoothingSpin ? m_climbSmoothingSpin->value() : 50.0;
+
+    m_detectedClimbs = ClimbDetector::detect(ride, cfg);
+
+    const auto applyClimbOverlays = [this](RideChartWidget* chart)
+    {
+        if (chart)
+            chart->setClimbs(m_detectedClimbs);
+    };
+
+    applyClimbOverlays(m_powerChart);
+    applyClimbOverlays(m_hrChart);
+    applyClimbOverlays(m_cadenceChart);
+    applyClimbOverlays(m_speedChart);
+    applyClimbOverlays(m_altitudeChart);
+    applyClimbOverlays(m_climbPowerChart);
+    applyClimbOverlays(m_climbHrChart);
+    applyClimbOverlays(m_climbCadenceChart);
+    applyClimbOverlays(m_climbSpeedChart);
+    applyClimbOverlays(m_climbAltitudeChart);
+
+    const int previousRow = m_climbsTable->currentRow();
+    QSignalBlocker blocker(m_climbsTable);
+    m_climbsTable->setRowCount(static_cast<int>(m_detectedClimbs.size()));
+
+    auto mkItem = [](const QString& text)
+    {
+        auto* item = new QTableWidgetItem(text);
+        item->setTextAlignment(Qt::AlignCenter);
+        return item;
+    };
+
+    for (int row = 0; row < static_cast<int>(m_detectedClimbs.size()); ++row)
+    {
+        const Climb& climb = m_detectedClimbs[static_cast<size_t>(row)];
+        auto* nameItem = new QTableWidgetItem(climb.name.isEmpty() ? QString("Climb %1").arg(row + 1) : climb.name);
+        nameItem->setData(kClimbStartRole, climb.startSeconds);
+        nameItem->setData(kClimbEndRole, climb.endSeconds);
+        nameItem->setBackground(QBrush(QColor(34, 197, 94, 45)));
+        m_climbsTable->setItem(row, 0, nameItem);
+        m_climbsTable->setItem(row, 1, mkItem(QString::number(climb.lengthKm, 'f', 2)));
+        m_climbsTable->setItem(row, 2, mkItem(QString::number(climb.elevationGainM, 'f', 0)));
+        m_climbsTable->setItem(row, 3, mkItem(QString::number(climb.averageGradient, 'f', 1)));
+        m_climbsTable->setItem(row, 4, mkItem(QString::number(climb.maximumGradient, 'f', 1)));
+        m_climbsTable->setItem(row, 5, mkItem(fmtDur(climb.durationSeconds)));
+        m_climbsTable->setItem(row, 6, mkItem(climb.averagePower > 0.0 ? QString::number(climb.averagePower, 'f', 0) : "—"));
+        m_climbsTable->setItem(row, 7, mkItem(climb.normalizedPower > 0.0 ? QString::number(climb.normalizedPower, 'f', 0) : "—"));
+        m_climbsTable->setItem(row, 8, mkItem(climb.averageHeartRate > 0.0 ? QString::number(climb.averageHeartRate, 'f', 0) : "—"));
+        m_climbsTable->setItem(row, 9, mkItem(climb.averageCadence > 0.0 ? QString::number(climb.averageCadence, 'f', 0) : "—"));
+        m_climbsTable->setItem(row, 10, mkItem(climb.averageSpeed > 0.0 ? QString::number(climb.averageSpeed, 'f', 1) : "—"));
+        m_climbsTable->setItem(row, 11, mkItem(climb.vam > 0.0 ? QString::number(climb.vam, 'f', 0) : "—"));
+        m_climbsTable->setItem(row, 12, mkItem(climb.powerFadePct != 0.0 ? QString::number(climb.powerFadePct, 'f', 1) : "0.0"));
+        m_climbsTable->setItem(row, 13, mkItem(QString::number(climb.difficultyScore, 'f', 0)));
+    }
+
+    m_climbsTable->resizeColumnsToContents();
+
+    if (m_climbsTable->rowCount() > 0)
+    {
+        const int target = std::clamp(previousRow >= 0 ? previousRow : 0, 0, m_climbsTable->rowCount() - 1);
+        m_climbsTable->setCurrentCell(target, 0);
+    }
+
+    blocker.unblock();
+    updateClimbRowStyles();
+    onClimbSelectionChanged();
+}
+
+void MainWindow::updateClimbRowStyles()
+{
+    if (!m_climbsTable)
+        return;
+
+    const int selectedRow = m_climbsTable->currentRow();
+    for (int row = 0; row < m_climbsTable->rowCount(); ++row)
+    {
+        for (int col = 0; col < m_climbsTable->columnCount(); ++col)
+        {
+            auto* item = m_climbsTable->item(row, col);
+            if (!item)
+                continue;
+
+            QFont font = item->font();
+            font.setBold(row == selectedRow);
+            item->setFont(font);
+        }
+    }
+}
+
+void MainWindow::onClimbSelectionChanged()
+{
+    if (!m_climbsTable)
+        return;
+
+    const int row = m_climbsTable->currentRow();
+    if (row < 0 || row >= static_cast<int>(m_detectedClimbs.size()))
+    {
+        updateClimbRowStyles();
+        if (m_climbSummaryLabel)
+            m_climbSummaryLabel->setText("Climb summary: select a climb");
+        return;
+    }
+
+    const Climb& climb = m_detectedClimbs[static_cast<size_t>(row)];
+    const double padding = std::max(5.0, climb.durationSeconds * 0.08);
+    const double startSeconds = std::max(0.0, climb.startSeconds - padding);
+    const double endSeconds = climb.endSeconds + padding;
+
+    const std::initializer_list<RideChartWidget*> all =
+        { m_powerChart, m_hrChart, m_cadenceChart, m_speedChart, m_altitudeChart,
+          m_climbPowerChart, m_climbHrChart, m_climbCadenceChart, m_climbSpeedChart, m_climbAltitudeChart };
+    for (auto* chart : all)
+    {
+        if (!chart)
+            continue;
+        chart->setXRange(startSeconds / 60.0, endSeconds / 60.0);
+        chart->setCrosshair(climb.startSeconds / 60.0);
+    }
+
+    if (m_mapRenderer)
+    {
+        m_mapRenderer->setVisibleTimeRange(climb.startSeconds, climb.endSeconds);
+        m_mapRenderer->fitToVisibleRange();
+    }
+
+    if (m_climbSummaryLabel)
+    {
+        m_climbSummaryLabel->setText(
+            QString("%1 | %2 | Gain %3 m | Avg %4%% | VAM %5 m/h | Fade %6%% | HR drift %7%%")
+                .arg(climb.name)
+                .arg(fmtDur(climb.durationSeconds))
+                .arg(climb.elevationGainM, 0, 'f', 0)
+                .arg(climb.averageGradient, 0, 'f', 1)
+                .arg(climb.vam, 0, 'f', 0)
+                .arg(climb.powerFadePct, 0, 'f', 1)
+                .arg(climb.hrDriftPct, 0, 'f', 1));
+    }
+
+    updateClimbRowStyles();
 }
 
 void MainWindow::editCurrentActivityProperties()
