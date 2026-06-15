@@ -106,7 +106,8 @@ bool WorkoutController::loadFile(const QString& path, QString& errorOut)
 int WorkoutController::importFile(const QString& path, QString& errorOut,
                                    bool allowTimeOverlap,
                                    bool runAnalysis,
-                                   const QString& importSource)
+                                   const QString& importSource,
+                                   DuplicateActivityInfo* duplicateInfo)
 {
     if (!m_dbManager || !m_dbManager->isOpen())
     {
@@ -152,16 +153,18 @@ int WorkoutController::importFile(const QString& path, QString& errorOut,
         q.bindValue(":st",  ride.activityStartTimeUtc);
         if (q.exec() && q.next())
         {
-            const QString existStart    = q.value(1).toString();
-            const double  existDuration = q.value(3).toDouble();
-            const double  newDuration   = ride.records.empty() ? 0.0 : ride.records.back().elapsedSeconds;
+            if (duplicateInfo)
+            {
+                duplicateInfo->existingActivityId = q.value(0).toInt();
+                duplicateInfo->existingStartUtc = q.value(1).toString();
+                duplicateInfo->existingDurationSeconds = q.value(3).toDouble();
+                duplicateInfo->newStartUtc = ride.activityStartTimeUtc;
+                duplicateInfo->newDurationSeconds =
+                    ride.records.empty() ? 0.0 : ride.records.back().elapsedSeconds;
+            }
 
-            // Build info string for the dialog shown in MainWindow
-            errorOut = QString("time_overlap:%1:%2:%3:%4")
-                           .arg(existStart)
-                           .arg(static_cast<int>(existDuration))
-                           .arg(ride.activityStartTimeUtc)
-                           .arg(static_cast<int>(newDuration));
+            // Keep a concise sentinel for call sites that only branch on overlap.
+            errorOut = QString("time_overlap");
             return -1;
         }
     }

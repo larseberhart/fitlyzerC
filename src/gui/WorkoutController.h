@@ -23,6 +23,15 @@
 
 class DatabaseManager;
 
+struct DuplicateActivityInfo
+{
+    int existingActivityId = -1;
+    QString existingStartUtc;
+    double existingDurationSeconds = 0.0;
+    QString newStartUtc;
+    double newDurationSeconds = 0.0;
+};
+
 class WorkoutController : public QObject
 {
     Q_OBJECT
@@ -40,7 +49,8 @@ public:
     int  importFile(const QString& path, QString& errorOut,
                     bool allowTimeOverlap = false,
                     bool runAnalysis = true,
-                    const QString& importSource = QString());
+                    const QString& importSource = QString(),
+                    DuplicateActivityInfo* duplicateInfo = nullptr);
     bool loadActivity(int activityId, QString& errorOut);
 
     /// Re-read climbs from the database (after undo/redo or external edit).

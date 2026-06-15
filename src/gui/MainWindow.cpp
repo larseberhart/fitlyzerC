@@ -2301,34 +2301,30 @@ void MainWindow::importFilesInternal(const QStringList& filePaths,
     for (const QString& filePath : filePaths)
     {
         QString err;
-        int activityId = m_controller->importFile(filePath, err);
+        DuplicateActivityInfo duplicateInfo;
+        int activityId = m_controller->importFile(filePath, err, false, true, QString(), &duplicateInfo);
         if (activityId > 0)
         {
             ++imported;
             continue;
         }
 
-        // Check for time-overlap warning (importFile returns -1 with err = "time_overlap:...")
-        if (err.startsWith("time_overlap:"))
+        if (err == "time_overlap")
         {
-            // Parse overlap info: time_overlap:existStart:existDuration:newStart:newDuration
-            const QStringList parts = err.split(':');
-            // parts[0]="time_overlap", [1]=existStart date, [2]=existStart time, [3]=existDuration,
-            //   [4]=newStart date, [5]=newStart time, [6]=newDuration
-            // (ISO dates may have ':' in time portion, so reconstruct)
-            // Simple: extract known field positions
-            // Format was set as: "time_overlap:%1:%2:%3:%4" with ISO date strings and ints
-            // ISO strings look like 2026-06-15T09:02:33Z — they contain ':'
-            // We need to be smarter. Let's use a different separator.
-            // Actually the format uses %1 %2 %3 %4 with ints for durations; the issue is colons in ISO times.
-            // Since we can't parse reliably here, just show a simple dialog.
+            const QString existingStartText = duplicateInfo.existingStartUtc.isEmpty()
+                ? QStringLiteral("Unknown")
+                : DateFormatter::formatDateTime(
+                    QDateTime::fromString(duplicateInfo.existingStartUtc, Qt::ISODate).toLocalTime());
+
             const int res = QMessageBox::warning(
                 this,
                 "Potential Duplicate Activity",
                 QString("A potential duplicate was detected for:\n%1\n\n"
-                        "An activity with the same start time already exists in the database.\n\n"
+                        "An activity with the same start time already exists in the database.\n"
+                        "Existing start: %2\n\n"
                         "Import anyway?")
-                    .arg(QFileInfo(filePath).fileName()),
+                    .arg(QFileInfo(filePath).fileName())
+                    .arg(existingStartText),
                 QMessageBox::Cancel | QMessageBox::Yes,
                 QMessageBox::Cancel);
 
@@ -2347,7 +2343,7 @@ void MainWindow::importFilesInternal(const QStringList& filePaths,
         if (err.contains("duplicate", Qt::CaseInsensitive) ||
             err.contains("already", Qt::CaseInsensitive))
             ++duplicates;
-        else if (!err.startsWith("time_overlap:"))
+        else if (err != "time_overlap")
             ++failed;
         else
             ++duplicates; // user cancelled overlap import counts as skipped
