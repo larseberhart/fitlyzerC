@@ -557,7 +557,7 @@ if(FITLYZERC_BUNDLE_FFMPEG)
         if(WIN32)
             set(FITLYZERC_RUNTIME_FFMPEG_PATH "ffmpeg.exe")
             set(FITLYZERC_RUNTIME_FFMPEG_DEST "$<TARGET_FILE_DIR:FitlyzerC>/ffmpeg.exe")
-            set(FITLYZERC_INSTALL_FFMPEG_DEST ".")
+            set(FITLYZERC_INSTALL_FFMPEG_DEST "bin")
             get_filename_component(FITLYZERC_FFMPEG_RUNTIME_DIR "${FITLYZERC_BUNDLED_FFMPEG_BINARY}" DIRECTORY)
             file(GLOB FITLYZERC_FFMPEG_RUNTIME_DLLS CONFIGURE_DEPENDS
                 "${FITLYZERC_FFMPEG_RUNTIME_DIR}/*.dll"
@@ -569,7 +569,7 @@ if(FITLYZERC_BUNDLE_FFMPEG)
         else()
             set(FITLYZERC_RUNTIME_FFMPEG_PATH "ffmpeg")
             set(FITLYZERC_RUNTIME_FFMPEG_DEST "$<TARGET_FILE_DIR:FitlyzerC>/ffmpeg")
-            set(FITLYZERC_INSTALL_FFMPEG_DEST ".")
+            set(FITLYZERC_INSTALL_FFMPEG_DEST "bin")
         endif()
 
         add_custom_command(TARGET FitlyzerC POST_BUILD
@@ -785,7 +785,7 @@ if(UNIX AND NOT APPLE AND FITLYZERC_ENABLE_APPIMAGE_PACKAGE)
     install(FILES
         "${CMAKE_SOURCE_DIR}/resources/appicon.png"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps"
-        RENAME "appicon"
+        RENAME "appicon.png"
     )
 
     install(FILES
