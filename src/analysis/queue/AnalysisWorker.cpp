@@ -6,6 +6,19 @@
 #include <QThread>
 #include <QUuid>
 
+namespace
+{
+void applySqlitePragmas(QSqlDatabase& db)
+{
+    QSqlQuery q(db);
+    q.exec("PRAGMA journal_mode=WAL");
+    q.exec("PRAGMA synchronous=NORMAL");
+    q.exec("PRAGMA temp_store=MEMORY");
+    q.exec("PRAGMA foreign_keys=ON");
+    q.exec("PRAGMA cache_size=-20000");
+}
+}
+
 #include "analysis/ClimbDetector.h"
 #include "analysis/ClimbMetrics.h"
 #include "analysis/IntervalDetector.h"
@@ -50,6 +63,8 @@ void AnalysisWorker::processTask(int activityId)
         emit taskFailed(activityId, db.lastError().text());
         return;
     }
+
+    applySqlitePragmas(db);
 
     // ── Load ride data ──────────────────────────────────────────────────
     // We need a temporary DatabaseManager-like wrapper.  The simplest

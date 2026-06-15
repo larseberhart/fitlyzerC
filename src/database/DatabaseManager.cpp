@@ -15,12 +15,14 @@ DatabaseManager::~DatabaseManager()
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
-static void enableWAL(QSqlDatabase& db)
+static void applySqlitePragmas(QSqlDatabase& db)
 {
     QSqlQuery q(db);
     q.exec("PRAGMA journal_mode=WAL");
-    q.exec("PRAGMA foreign_keys=ON");
     q.exec("PRAGMA synchronous=NORMAL");
+    q.exec("PRAGMA temp_store=MEMORY");
+    q.exec("PRAGMA foreign_keys=ON");
+    q.exec("PRAGMA cache_size=-20000");
 }
 
 static bool columnExists(QSqlDatabase& db, const QString& tableName, const QString& columnName)
@@ -352,7 +354,7 @@ bool DatabaseManager::open(const QString& path, QString* errorOut)
         return false;
     }
 
-    enableWAL(m_db);
+    applySqlitePragmas(m_db);
 
     // Check schema version
     QSqlQuery q(m_db);
