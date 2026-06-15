@@ -1,4 +1,5 @@
 #include "IntervalRepository.h"
+#include "SqlQueryHelper.h"
 
 #include <QSqlDatabase>
 #include <QSqlQuery>
@@ -32,8 +33,8 @@ int IntervalRepository::insertInterval(const IntervalRecord& interval)
     q.bindValue(":avg_cadence",       interval.avgCadence);
     q.bindValue(":notes",             interval.notes);
     q.bindValue(":source",            interval.source);
-    q.bindValue(":locked",            interval.locked   ? 1 : 0);
-    q.bindValue(":deleted",           interval.deleted  ? 1 : 0);
+    SqlQueryHelper::bindBoolValue(q, ":locked",            interval.locked);
+    SqlQueryHelper::bindBoolValue(q, ":deleted",           interval.deleted);
     q.bindValue(":algorithm_version", interval.algorithmVersion);
     q.bindValue(":uuid",              interval.uuid.isEmpty() ? QVariant() : QVariant(interval.uuid));
 
@@ -71,8 +72,8 @@ bool IntervalRepository::updateInterval(const IntervalRecord& interval)
     q.bindValue(":avg_cadence",  interval.avgCadence);
     q.bindValue(":notes",        interval.notes);
     q.bindValue(":source",       interval.source);
-    q.bindValue(":locked",       interval.locked  ? 1 : 0);
-    q.bindValue(":deleted",      interval.deleted ? 1 : 0);
+    SqlQueryHelper::bindBoolValue(q, ":locked",       interval.locked);
+    SqlQueryHelper::bindBoolValue(q, ":deleted",      interval.deleted);
     q.bindValue(":id",           interval.id);
     return q.exec();
 }
@@ -144,7 +145,7 @@ QList<IntervalRecord> IntervalRepository::listIntervalsForActivity(int activityI
 bool IntervalRepository::hasLockedIntervals(int activityId)
 {
     QSqlQuery q(m_db);
-    q.prepare("SELECT 1 FROM intervals WHERE activity_id=:id AND locked=1 LIMIT 1");
+    q.prepare(SqlQueryHelper::selectExistsLocked("intervals"));
     q.bindValue(":id", activityId);
     return q.exec() && q.next();
 }

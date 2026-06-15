@@ -1,4 +1,5 @@
 #include "ClimbRepository.h"
+#include "SqlQueryHelper.h"
 
 #include <QSqlDatabase>
 #include <QSqlQuery>
@@ -88,8 +89,8 @@ int ClimbRepository::insertClimb(const ClimbRecord& climb)
     q.bindValue(":avg_cadence", climb.avgCadence);
     q.bindValue(":vam", climb.vam);
     q.bindValue(":source", climb.source);
-    q.bindValue(":locked", climb.locked ? 1 : 0);
-    q.bindValue(":deleted", climb.deleted ? 1 : 0);
+    SqlQueryHelper::bindBoolValue(q, ":locked", climb.locked);
+    SqlQueryHelper::bindBoolValue(q, ":deleted", climb.deleted);
     q.bindValue(":algorithm_version", climb.algorithmVersion);
     q.bindValue(":notes", climb.notes);
     q.bindValue(":favorite", climb.favorite ? 1 : 0);
@@ -137,8 +138,8 @@ bool ClimbRepository::updateClimb(const ClimbRecord& climb)
     q.bindValue(":avg_cadence", climb.avgCadence);
     q.bindValue(":vam", climb.vam);
     q.bindValue(":source", climb.source);
-    q.bindValue(":locked", climb.locked ? 1 : 0);
-    q.bindValue(":deleted", climb.deleted ? 1 : 0);
+    SqlQueryHelper::bindBoolValue(q, ":locked", climb.locked);
+    SqlQueryHelper::bindBoolValue(q, ":deleted", climb.deleted);
     q.bindValue(":notes", climb.notes);
     q.bindValue(":favorite", climb.favorite ? 1 : 0);
     q.bindValue(":rating", climb.rating);
@@ -211,7 +212,7 @@ QList<ClimbRecord> ClimbRepository::deletedClimbsForActivity(int activityId)
 bool ClimbRepository::hasClimbs(int activityId)
 {
     QSqlQuery q(m_db);
-    q.prepare("SELECT 1 FROM climbs WHERE activity_id=:id AND COALESCE(deleted,0)=0 LIMIT 1");
+    q.prepare(SqlQueryHelper::selectExistsNonDeleted("climbs"));
     q.bindValue(":id", activityId);
     return q.exec() && q.next();
 }
@@ -219,7 +220,7 @@ bool ClimbRepository::hasClimbs(int activityId)
 bool ClimbRepository::hasClimbsEver(int activityId)
 {
     QSqlQuery q(m_db);
-    q.prepare("SELECT 1 FROM climbs WHERE activity_id=:id LIMIT 1");
+    q.prepare(SqlQueryHelper::selectExistsEver("climbs"));
     q.bindValue(":id", activityId);
     return q.exec() && q.next();
 }
@@ -227,7 +228,7 @@ bool ClimbRepository::hasClimbsEver(int activityId)
 bool ClimbRepository::hasLockedClimbs(int activityId)
 {
     QSqlQuery q(m_db);
-    q.prepare("SELECT 1 FROM climbs WHERE activity_id=:id AND locked=1 AND COALESCE(deleted,0)=0 LIMIT 1");
+    q.prepare(SqlQueryHelper::selectExistsLocked("climbs"));
     q.bindValue(":id", activityId);
     return q.exec() && q.next();
 }
