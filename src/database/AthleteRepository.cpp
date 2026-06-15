@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file AthleteRepository.cpp
+ * @brief Athlete database persistence.
+ *
+ * Implements CRUD operations and queries for athlete
+ * records stored in the SQLite database.
+ *
+ * @author Lars EBERHART
+ */
+
 #include "AthleteRepository.h"
 
 #include <QDateTime>

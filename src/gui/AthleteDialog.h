@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file AthleteDialog.h
+ * @brief User interface component for AthleteDialog.
+ *
+ * Defines dialogs, widgets, controllers, and UI workflows used by the FitlyzerC desktop application.
+ *
+ * Responsibilities:
+ * - Provide interactive user interface behavior and presentation
+ *
+ * @author Lars EBERHART
+ */
+
 #pragma once
 
 #include <QDialog>
@@ -10,17 +24,29 @@ class QDoubleSpinBox;
 class QSpinBox;
 class QTableWidget;
 
-// Dialog for creating or editing a single athlete,
-// including FTP history and weight history sub-tables.
+/**
+ * @brief Dialog for creating or editing athlete profile.
+ *
+ * Allows entry of personal info, FTP history, and weight history.
+ */
 class AthleteDialog : public QDialog
 {
     Q_OBJECT
 public:
+    /**
+     * @brief Constructs athlete edit dialog.
+     * @param repo Athlete repository.
+     * @param athleteId Athlete ID to edit (-1 to create new).
+     * @param parent Parent widget.
+     */
     explicit AthleteDialog(AthleteRepository& repo,
-                           int athleteId = -1,   // -1 = create new
+                           int athleteId = -1,
                            QWidget* parent = nullptr);
 
-    // Returns the id of the saved athlete (valid after Accepted).
+    /**
+     * @brief Gets ID of saved athlete.
+     * @return Athlete ID (valid after Accepted).
+     */
     int savedAthleteId() const { return m_savedId; }
 
 private slots:

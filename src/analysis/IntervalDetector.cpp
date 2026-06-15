@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file IntervalDetector.cpp
+ * @brief Analysis component for IntervalDetector.
+ *
+ * Implements analysis logic used to compute cycling metrics, detect patterns, and derive activity insights.
+ *
+ * Responsibilities:
+ * - Provide analysis-specific functionality for activity processing
+ *
+ * @author Lars EBERHART
+ */
+
 #include "IntervalDetector.h"
 
 #include <algorithm>
@@ -204,4 +218,3 @@ std::vector<Interval> IntervalDetector::removeOverlappingAndDuplicates(
 
     return result;
 }
-

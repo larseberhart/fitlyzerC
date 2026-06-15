@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file NavigationSidebar.cpp
+ * @brief User interface component for NavigationSidebar.
+ *
+ * Defines dialogs, widgets, controllers, and UI workflows used by the FitlyzerC desktop application.
+ *
+ * Responsibilities:
+ * - Provide interactive user interface behavior and presentation
+ *
+ * @author Lars EBERHART
+ */
+
 #include "NavigationSidebar.h"
 
 #include <QListWidget>

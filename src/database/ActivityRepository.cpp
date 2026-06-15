@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file ActivityRepository.cpp
+ * @brief Activity database persistence.
+ *
+ * Implements CRUD operations and queries for activity
+ * records stored in the SQLite database.
+ *
+ * @author Lars EBERHART
+ */
+
 #include "ActivityRepository.h"
 
 #include <QDateTime>

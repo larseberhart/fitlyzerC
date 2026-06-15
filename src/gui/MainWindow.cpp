@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file MainWindow.cpp
+ * @brief User interface component for MainWindow.
+ *
+ * Defines dialogs, widgets, controllers, and UI workflows used by the FitlyzerC desktop application.
+ *
+ * Responsibilities:
+ * - Provide interactive user interface behavior and presentation
+ *
+ * @author Lars EBERHART
+ */
+
 #include "MainWindow.h"
 
 #include <QAction>
@@ -96,6 +110,11 @@
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
+/**
+ * @brief Formats duration in seconds to human-readable string.
+ * @param seconds Duration in seconds.
+ * @return Formatted string as "H:MM:SS" or "M:SS".
+ */
 static QString fmtDur(double seconds)
 {
     const int total = static_cast<int>(seconds);
@@ -109,6 +128,11 @@ static QString fmtDur(double seconds)
               .arg(m).arg(s, 2, 10, QChar('0'));
 }
 
+/**
+ * @brief Formats activity date for display with relative labels.
+ * @param isoDate ISO date string (YYYY-MM-DD).
+ * @return Display string ("Today", "Yesterday", or formatted date).
+ */
 static QString formatActivityDateLabel(const QString& isoDate)
 {
     const QDate date = QDate::fromString(isoDate, Qt::ISODate);
@@ -124,6 +148,11 @@ static QString formatActivityDateLabel(const QString& isoDate)
     return DateFormatter::formatDate(date);
 }
 
+/**
+ * @brief Extracts activity date for FTP context filtering.
+ * @param activity Activity record.
+ * @return Activity date from startTime or importedAt.
+ */
 static QDate activityDateForFtpContext(const Activity& activity)
 {
     const QString rawDate = !activity.startTime.isEmpty()
@@ -132,6 +161,11 @@ static QDate activityDateForFtpContext(const Activity& activity)
     return QDate::fromString(rawDate, Qt::ISODate);
 }
 
+/**
+ * @brief Extracts activity date for weight context filtering.
+ * @param activity Activity record.
+ * @return Activity date from startTime or importedAt.
+ */
 static QDate activityDateForWeightContext(const Activity& activity)
 {
     const QString rawDate = !activity.startTime.isEmpty()
@@ -140,21 +174,38 @@ static QDate activityDateForWeightContext(const Activity& activity)
     return QDate::fromString(rawDate, Qt::ISODate);
 }
 
+/// @brief Maximum number of recent databases to remember.
 static constexpr int kMaxRecentDatabases = 8;
 
+/**
+ * @brief Chart view preset identifiers.
+ */
 enum ChartPresetId
 {
-    ChartPresetCustom = 0,
-    ChartPresetPowerAnalysis,
-    ChartPresetHeartRateFocus,
-    ChartPresetRaceReview
+    ChartPresetCustom = 0,           ///< User-defined chart layout
+    ChartPresetPowerAnalysis,        ///< Power, heart rate, cadence view
+    ChartPresetHeartRateFocus,       ///< Heart rate focused view
+    ChartPresetRaceReview            ///< Review/race analysis view
 };
 
+/// @brief Model role for interval start time in minutes.
 static constexpr int kIntervalStartRole = Qt::UserRole + 1;
+
+/// @brief Model role for interval end time in minutes.
 static constexpr int kIntervalEndRole = Qt::UserRole + 2;
+
+/// @brief Model role for climb start time in minutes.
 static constexpr int kClimbStartRole = Qt::UserRole + 3;
+
+/// @brief Model role for climb end time in minutes.
 static constexpr int kClimbEndRole = Qt::UserRole + 4;
 
+/**
+ * @brief Formats a zone range label with units.
+ * @param zone Zone definition with bounds.
+ * @param metric Color metric for unit selection.
+ * @return Formatted string like "50 - 75 W" or "> 180 bpm".
+ */
 static QString rangeLabelForZone(const Zone& zone, ColorMetric metric)
 {
     const QString unit = colorMetricUnit(metric);
@@ -167,6 +218,11 @@ static QString rangeLabelForZone(const Zone& zone, ColorMetric metric)
     return QString("%1 - %2 %3").arg(minText, maxText, unit).trimmed();
 }
 
+/**
+ * @brief Sanitizes string for use in video file names.
+ * @param text Text to sanitize.
+ * @return Text with invalid filename characters replaced by hyphens.
+ */
 static QString sanitizeVideoFilePart(QString text)
 {
     static const QString invalid = QStringLiteral("\\/:*?\"<>|");
@@ -178,6 +234,13 @@ static QString sanitizeVideoFilePart(QString text)
     return text.trimmed();
 }
 
+/**
+ * @brief Wraps a content widget with a "no activity" state overlay.
+ * @param content Widget to show when activity is selected.
+ * @param outStack Output pointer to the stacked layout for state control.
+ * @param message Message to show when no activity is selected.
+ * @return Root widget with stacked layout (empty page as index 0, content as index 1).
+ */
 static QWidget* wrapWithNoActivityState(
     QWidget* content,
     QStackedLayout** outStack,
@@ -204,13 +267,25 @@ static QWidget* wrapWithNoActivityState(
     return root;
 }
 
+/**
+ * @brief Table item that sorts climb names alphabetically.
+ */
 class ClimbNameTableItem final : public QTableWidgetItem
 {
 public:
+    /**
+     * @brief Constructs a climb name table item.
+     * @param text Climb name text.
+     */
     explicit ClimbNameTableItem(const QString& text)
         : QTableWidgetItem(text)
     {}
 
+    /**
+     * @brief Compares items for sorting (alphabetical).
+     * @param other Item to compare with.
+     * @return True if this should sort before other.
+     */
     bool operator<(const QTableWidgetItem& other) const override
     {
         bool leftOk = false;
@@ -250,14 +325,27 @@ private:
     }
 };
 
+/**
+ * @brief Table item that sorts by numeric key, with text fallback.
+ */
 class ClimbSortKeyTableItem final : public QTableWidgetItem
 {
 public:
+    /**
+     * @brief Constructs a climb sort key table item.
+     * @param text Display text.
+     * @param sortKey Numeric sort key (NaN for text-based sorting).
+     */
     explicit ClimbSortKeyTableItem(const QString& text, double sortKey)
         : QTableWidgetItem(text)
         , m_sortKey(sortKey)
     {}
 
+    /**
+     * @brief Compares items for sorting (numeric key first, then alphabetical).
+     * @param other Item to compare with.
+     * @return True if this should sort before other.
+     */
     bool operator<(const QTableWidgetItem& other) const override
     {
         const auto* rhs = dynamic_cast<const ClimbSortKeyTableItem*>(&other);

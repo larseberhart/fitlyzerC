@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file EditActivityDialog.h
+ * @brief User interface component for EditActivityDialog.
+ *
+ * Defines dialogs, widgets, controllers, and UI workflows used by the FitlyzerC desktop application.
+ *
+ * Responsibilities:
+ * - Provide interactive user interface behavior and presentation
+ *
+ * @author Lars EBERHART
+ */
+
 #pragma once
 
 #include <QDialog>
@@ -9,13 +23,28 @@ class QLineEdit;
 class QTextEdit;
 class QSpinBox;
 
+/**
+ * @brief Dialog for editing activity metadata.
+ *
+ * Allows editing of weather, temperature, RPE, fatigue, sleep, weight,
+ * bike, equipment, and notes.
+ */
 class EditActivityDialog : public QDialog
 {
     Q_OBJECT
 
 public:
+    /**
+     * @brief Constructs activity edit dialog.
+     * @param activity Activity to edit.
+     * @param parent Parent widget.
+     */
     explicit EditActivityDialog(const Activity& activity, QWidget* parent = nullptr);
 
+    /**
+     * @brief Gets updated activity with edited values.
+     * @return Modified activity record.
+     */
     Activity updatedActivity() const;
 
 private:

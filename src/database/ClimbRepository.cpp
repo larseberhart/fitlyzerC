@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file ClimbRepository.cpp
+ * @brief Climb database persistence.
+ *
+ * Implements CRUD operations and queries for climb
+ * records stored in the SQLite database.
+ *
+ * @author Lars EBERHART
+ */
+
 #include "ClimbRepository.h"
 #include "SqlQueryHelper.h"
 

@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file EditNotesDialog.cpp
+ * @brief User interface component for EditNotesDialog.
+ *
+ * Defines dialogs, widgets, controllers, and UI workflows used by the FitlyzerC desktop application.
+ *
+ * Responsibilities:
+ * - Provide interactive user interface behavior and presentation
+ *
+ * @author Lars EBERHART
+ */
+
 #include "EditNotesDialog.h"
 
 #include <QDialogButtonBox>

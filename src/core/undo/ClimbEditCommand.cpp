@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file ClimbEditCommand.cpp
+ * @brief Undo/redo infrastructure for ClimbEditCommand.
+ *
+ * Defines undo command abstractions and managers used to support reversible edits in the application.
+ *
+ * Responsibilities:
+ * - Provide undo/redo command and management functionality
+ *
+ * @author Lars EBERHART
+ */
+
 #include "ClimbEditCommand.h"
 
 #include <QSqlDatabase>

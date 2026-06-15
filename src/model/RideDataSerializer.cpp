@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file RideDataSerializer.cpp
+ * @brief Data model support for RideDataSerializer.
+ *
+ * Defines model loading, serialization, and model-related helpers for ride and activity data handling.
+ *
+ * Responsibilities:
+ * - Provide model serialization or data-loading behavior
+ *
+ * @author Lars EBERHART
+ */
+
 #include "RideDataSerializer.h"
 #include "database/DatabaseManager.h"
 #include "model/RideDataLoader.h"

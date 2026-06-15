@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file ImportRepository.h
+ * @brief Database access component for ImportRepository.
+ *
+ * Implements database schema handling, repository operations, or SQL utility behavior for persistent storage.
+ *
+ * Responsibilities:
+ * - Provide database schema, query, or repository functionality
+ *
+ * @author Lars EBERHART
+ */
+
 #pragma once
 
 #include <QList>
@@ -5,22 +19,56 @@
 
 class QSqlDatabase;
 
+/**
+ * @brief Log entry for an activity import.
+ */
 struct ImportRecord
 {
+    /// @brief Unique import log entry ID.
     int     id           = -1;
+
+    /// @brief Name of imported file.
     QString fileName;
+
+    /// @brief ISO8601 import timestamp.
     QString importedAt;
-    QString status;       // "success", "duplicate", "error"
+
+    /// @brief Import status (success, duplicate, error).
+    QString status;
+
+    /// @brief ID of imported activity (or -1 if failed).
     int     activityId   = -1;
+
+    /// @brief Error message if import failed.
     QString errorMessage;
 };
 
+/**
+ * @brief Repository for import log persistence.
+ *
+ * Tracks all import attempts including successes, duplicates, and errors.
+ */
 class ImportRepository
 {
 public:
+    /**
+     * @brief Constructs repository with database connection.
+     * @param db Database connection.
+     */
     explicit ImportRepository(QSqlDatabase& db);
 
+    /**
+     * @brief Logs an import attempt.
+     * @param r Import record to log.
+     * @return ID of log entry, or -1 on error.
+     */
     int              logImport(const ImportRecord& r);
+
+    /**
+     * @brief Retrieves recent import log entries.
+     * @param limit Maximum number of entries to return (default 50).
+     * @return List of import records.
+     */
     QList<ImportRecord> getRecentImports(int limit = 50);
 
 private:

@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file VideoTileProvider.cpp
+ * @brief Video export and rendering component for VideoTileProvider.
+ *
+ * Implements video rendering, tile provision, and export settings used for activity video generation.
+ *
+ * Responsibilities:
+ * - Provide video rendering or export-related functionality
+ *
+ * @author Lars EBERHART
+ */
+
 #include "VideoTileProvider.h"
 
 #include <QDir>

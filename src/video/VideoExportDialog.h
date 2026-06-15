@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file VideoExportDialog.h
+ * @brief Video export and rendering component for VideoExportDialog.
+ *
+ * Implements video rendering, tile provision, and export settings used for activity video generation.
+ *
+ * Responsibilities:
+ * - Provide video rendering or export-related functionality
+ *
+ * @author Lars EBERHART
+ */
+
 #pragma once
 
 #include <QDialog>
@@ -19,11 +33,22 @@ class QThread;
 
 class VideoRenderJob;
 
+/**
+ * @brief Dialog for configuring and launching activity video export.
+ *
+ * Provides UI for selecting output file, video format, map style, data overlays,
+ * and other video generation settings, then launches rendering job.
+ */
 class VideoExportDialog : public QDialog
 {
     Q_OBJECT
 
 public:
+    /**
+     * @brief Constructs video export dialog.
+     * @param defaults Default export settings.
+     * @param parent Parent widget.
+     */
     explicit VideoExportDialog(const VideoExportSettings& defaults, QWidget* parent = nullptr);
     ~VideoExportDialog() override;
 

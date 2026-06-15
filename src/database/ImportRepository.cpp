@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file ImportRepository.cpp
+ * @brief Import log database persistence.
+ *
+ * Implements logging and querying of FIT file import
+ * attempts and results.
+ *
+ * @author Lars EBERHART
+ */
+
 #include "ImportRepository.h"
 
 #include <QDateTime>

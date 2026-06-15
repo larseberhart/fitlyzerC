@@ -1,12 +1,34 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file AnalysisVersions.h
+ * @brief Core support component for AnalysisVersions.
+ *
+ * Provides core constants, types, or shared definitions used throughout the FitlyzerC codebase.
+ *
+ * Responsibilities:
+ * - Provide shared core definitions for application modules
+ *
+ * @author Lars EBERHART
+ */
+
 #pragma once
 
-/// Algorithm version constants.  Increment each counter whenever the
-/// corresponding detection algorithm changes in a way that may produce
-/// different results from the same input data.  Stored in every climbs /
-/// intervals row so the UI can warn when stored data was produced by an
-/// outdated algorithm.
+/**
+ * @brief Algorithm version tracking for analysis results.
+ *
+ * Version constants are incremented when algorithms change
+ * to track data compatibility and warn on outdated results.
+ */
 namespace AnalysisVersions
 {
+    /**
+     * @brief Climb detection algorithm version.
+     */
     constexpr int ClimbDetection    = 1;
+
+    /**
+     * @brief Interval detection algorithm version.
+     */
     constexpr int IntervalDetection = 1;
 }

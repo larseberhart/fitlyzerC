@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file VideoExportDialog.cpp
+ * @brief Video export and rendering component for VideoExportDialog.
+ *
+ * Implements video rendering, tile provision, and export settings used for activity video generation.
+ *
+ * Responsibilities:
+ * - Provide video rendering or export-related functionality
+ *
+ * @author Lars EBERHART
+ */
+
 #include "VideoExportDialog.h"
 
 #include "core/settings/DateFormatter.h"

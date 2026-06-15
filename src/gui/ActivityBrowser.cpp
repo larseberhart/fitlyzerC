@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file ActivityBrowser.cpp
+ * @brief User interface component for ActivityBrowser.
+ *
+ * Defines dialogs, widgets, controllers, and UI workflows used by the FitlyzerC desktop application.
+ *
+ * Responsibilities:
+ * - Provide interactive user interface behavior and presentation
+ *
+ * @author Lars EBERHART
+ */
+
 #include "ActivityBrowser.h"
 #include "EditNotesDialog.h"
 #include "core/settings/DateFormatter.h"

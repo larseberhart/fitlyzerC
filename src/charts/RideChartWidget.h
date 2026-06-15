@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file RideChartWidget.h
+ * @brief Chart widget and visualization support for RideChartWidget.
+ *
+ * Provides chart rendering or chart-related data types used to visualize ride and fitness metrics in the UI.
+ *
+ * Responsibilities:
+ * - Provide chart visualization behavior or chart support types
+ *
+ * @author Lars EBERHART
+ */
+
 #pragma once
 
 #include <QtCharts/QChartView>
@@ -17,56 +31,175 @@ class QAreaSeries;
 class QValueAxis;
 class QCategoryAxis;
 
+/**
+ * @brief Interactive chart displaying ride data by selected metric.
+ *
+ * Shows power, heart rate, cadence, speed, or altitude over time with overlays
+ * for intervals, climbs, and zone visualization.
+ */
 class RideChartWidget : public QChartView
 {
     Q_OBJECT
 
 public:
+    /**
+     * @brief Constructs ride chart for specified metric.
+     * @param metric Metric to display (Power, HeartRate, etc.).
+     * @param parent Parent widget.
+     */
     explicit RideChartWidget(Metric metric, QWidget* parent = nullptr);
 
+    /**
+     * @brief Sets ride data to display.
+     * @param rideData Activity data.
+     * @param colorMetric Metric to use for zone coloring.
+     * @param colorContext Athlete context for coloring.
+     */
     void setRideData(const RideData& rideData,
                      ColorMetric colorMetric = ColorMetric::None,
                      const ColorContext& colorContext = {});
+
+    /**
+     * @brief Sets power smoothing window.
+     * @param seconds Smoothing window in seconds.
+     */
     void setPowerSmoothingSeconds(int seconds);
+
+    /**
+     * @brief Enables/disables automatic smoothing.
+     * @param enabled True to enable auto smoothing.
+     */
     void setAutoSmoothingEnabled(bool enabled);
+
+    /**
+     * @brief Sets interval overlays.
+     * @param intervals Work/recovery intervals.
+     */
     void setIntervals(const std::vector<Interval>& intervals);
+
+    /**
+     * @brief Sets climb overlays.
+     * @param climbs Detected climbs.
+     */
     void setClimbs(const std::vector<Climb>& climbs);
+
+    /**
+     * @brief Enables/disables metric overlay.
+     * @param metric Metric to overlay.
+     * @param enabled True to show overlay.
+     */
     void setMetricOverlay(ColorMetric metric, bool enabled);
+
+    /**
+     * @brief Highlights a specific climb.
+     * @param index Climb index (-1 to clear).
+     */
     void setSelectedClimbIndex(int index);
+
+    /**
+     * @brief Enables/disables climb editing mode.
+     * @param enabled True to enable editing.
+     */
     void setClimbEditingEnabled(bool enabled);
+
+    /**
+     * @brief Clears the chart.
+     */
     void clearChart();
 
+    /**
+     * @brief Checks if chart has data.
+     * @return True if data is displayed.
+     */
     bool hasData() const { return m_hasData; }
+
+    /**
+     * @brief Gets visible range start time.
+     * @return Start time in minutes.
+     */
     double visibleRangeStartMinutes() const;
+    /// @brief Gets end time of visible range in minutes from activity start.
     double visibleRangeEndMinutes() const;
 
 public slots:
+    /// @slot Sets visible x-axis range.
+    /// @param min Minimum time in minutes.
+    /// @param max Maximum time in minutes.
     void setXRange(double min, double max);
+
+    /// @slot Sets crosshair position.
+    /// @param xMinutes Time in minutes.
     void setCrosshair(double xMinutes);
+
+    /// @slot Resets zoom to full ride extent.
     void resetZoom();
-    void fitToData(); // alias for resetZoom — resets to full ride extent
+
+    /// @slot Alias for resetZoom().
+    void fitToData();
 
 signals:
+    /// @signal Emitted when visible x range changes.
+    /// @param min Minimum time in minutes.
+    /// @param max Maximum time in minutes.
     void xRangeChanged(double min, double max);
+
+    /// @signal Emitted when visible time range updates.
+    /// @param startMinutes Start time in minutes.
+    /// @param endMinutes End time in minutes.
     void visibleRangeChanged(double startMinutes, double endMinutes);
+
+    /// @signal Emitted when crosshair moves.
+    /// @param xMinutes Crosshair time in minutes.
     void crosshairMoved(double xMinutes);
+
+    /// @signal Emitted when user selects time interval.
+    /// @param startSeconds Start time in seconds from activity start.
+    /// @param endSeconds End time in seconds from activity start.
     void intervalSelectionRequested(double startSeconds, double endSeconds);
+
+    /// @signal Emitted when climb boundaries are edited.
+    /// @param oldStartSeconds Original start time in seconds.
+    /// @param oldEndSeconds Original end time in seconds.
+    /// @param newStartSeconds New start time in seconds.
+    /// @param newEndSeconds New end time in seconds.
     void climbBoundaryEdited(
         double oldStartSeconds,
         double oldEndSeconds,
         double newStartSeconds,
         double newEndSeconds);
+
+    /// @signal Emitted when user creates new climb.
+    /// @param startSeconds Start time in seconds.
+    /// @param endSeconds End time in seconds.
     void newClimbRequested(double startSeconds, double endSeconds);
+
+    /// @signal Emitted when climb is clicked.
+    /// @param climbIndex Index of clicked climb.
     void climbClicked(int climbIndex);
 
 protected:
+    /// @brief Handles wheel scroll for panning and zooming.
     void wheelEvent(QWheelEvent* event) override;
+
+    /// @brief Handles mouse press for chart interaction.
     void mousePressEvent(QMouseEvent* event) override;
+
+    /// @brief Handles mouse release for chart interaction.
     void mouseReleaseEvent(QMouseEvent* event) override;
+
+    /// @brief Handles double-click for interval creation.
     void mouseDoubleClickEvent(QMouseEvent* event) override;
+
+    /// @brief Handles mouse movement for crosshair and selection.
     void mouseMoveEvent(QMouseEvent* event) override;
+
+    /// @brief Handles mouse leaving widget.
     void leaveEvent(QEvent* event) override;
+
+    /// @brief Renders chart foreground elements.
     void drawForeground(QPainter* painter, const QRectF& rect) override;
+
+    /// @brief Handles widget resize events.
     void resizeEvent(QResizeEvent* event) override;
 
 private:

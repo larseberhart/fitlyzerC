@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file MapRenderer.h
+ * @brief Map rendering support for MapRenderer.
+ *
+ * Implements map math, tile caching, and rendering logic used for geographic visualization of activities.
+ *
+ * Responsibilities:
+ * - Provide map computation, tile handling, or rendering functionality
+ *
+ * @author Lars EBERHART
+ */
+
 #pragma once
 
 #include <QPointF>
@@ -9,6 +23,9 @@
 #include "fit/RideData.h"
 #include "maps/TileCache.h"
 
+/**
+ * @brief Route color visualization modes.
+ */
 enum class RouteColorMode
 {
     None,
@@ -20,41 +37,127 @@ enum class RouteColorMode
     Gradient
 };
 
+/**
+ * @brief Interactive map widget for displaying and editing activity routes.
+ *
+ * Renders map tiles with activity GPS trace, supports color-coding by metrics,
+ * time-range selection, and interacts with the main UI.
+ */
 class MapRenderer : public QWidget
 {
     Q_OBJECT
 public:
+    /**
+     * @brief Constructs the map renderer.
+     * @param parent Parent widget.
+     */
     explicit MapRenderer(QWidget* parent = nullptr);
 
-    void setRideData(const RideData& rideData,
-                     ColorMetric colorMetric = ColorMetric::None,
-                     const ColorContext& colorContext = {});
-    void setVisibleTimeRange(double startSeconds, double endSeconds);
-    void setCurrentTime(double seconds);
-    void setRouteColorMode(RouteColorMode mode, const ColorContext& colorContext = {});
-    void setMapStyle(MapStyle style);
-    MapStyle mapStyle() const { return m_tileCache.mapStyle(); }
-    void setAutoRouteContrast(bool enabled);
-    bool autoRouteContrast() const { return m_autoRouteContrast; }
-    void setTileCacheSize(int maxTiles);
+    /**
+ * @brief Sets activity data to display on map.
+ * @param rideData Activity data.
+ * @param colorMetric Metric to use for route coloring.
+ * @param colorContext Athlete context for coloring.
+ */
+void setRideData(const RideData& rideData,
+                 ColorMetric colorMetric = ColorMetric::None,
+                 const ColorContext& colorContext = {});
+
+/**
+ * @brief Sets visible time range for segmented display.
+ * @param startSeconds Start time in seconds from activity start.
+ * @param endSeconds End time in seconds from activity start.
+ */
+void setVisibleTimeRange(double startSeconds, double endSeconds);
+
+/**
+ * @brief Sets current time marker position.
+ * @param seconds Current time in seconds from activity start.
+ */
+void setCurrentTime(double seconds);
+
+/**
+ * @brief Sets route color visualization mode.
+ * @param mode Color mode (Power, HeartRate, etc.).
+ * @param colorContext Athlete context for coloring.
+ */
+void setRouteColorMode(RouteColorMode mode, const ColorContext& colorContext = {});
+
+/**
+ * @brief Sets map tile style.
+ * @param style Map style (Light, Dark, Satellite, etc.).
+ */
+void setMapStyle(MapStyle style);
+
+/**
+ * @brief Gets current map style.
+ * @return Current style.
+ */
+MapStyle mapStyle() const { return m_tileCache.mapStyle(); }
+
+/**
+ * @brief Sets automatic route contrast adjustment.
+ * @param enabled True to enable auto contrast.
+ */
+void setAutoRouteContrast(bool enabled);
+
+/**
+ * @brief Gets auto route contrast setting.
+ * @return True if auto contrast enabled.
+ */
+bool autoRouteContrast() const { return m_autoRouteContrast; }
+
+/**
+ * @brief Sets tile cache size limit.
+ * @param maxTiles Maximum tiles to cache in memory.
+ */
+void setTileCacheSize(int maxTiles);
 
 signals:
+    /// \signal Emitted when segment selection changes (during dragging).
+    /// \param startSeconds Current segment start time in seconds.
+    /// \param endSeconds Current segment end time in seconds.
     void segmentSelectionChanged(double startSeconds, double endSeconds);
+
+    /// \signal Emitted when segment selection completes.
+    /// \param startSeconds Final segment start time in seconds.
+    /// \param endSeconds Final segment end time in seconds.
     void segmentSelectionFinished(double startSeconds, double endSeconds);
 
 public slots:
+    /// \slot Fits map to entire track bounds.
     void fitToTrack();
+
+    /// \slot Fits map to visible time range bounds.
     void fitToVisibleRange();
+
+    /// \slot Zooms map in.
     void zoomIn();
+
+    /// \slot Zooms map out.
     void zoomOut();
+
+    /// \slot Sets highlighted current time marker.
+    /// \param elapsedSeconds Elapsed time in seconds from activity start.
     void setHighlightedElapsedSeconds(double elapsedSeconds);
 
 protected:
+    /// @brief Renders map tiles and route on update.
     void paintEvent(QPaintEvent* event) override;
+
+    /// @brief Handles scroll wheel for map zoom.
     void wheelEvent(QWheelEvent* event) override;
+
+    /// @brief Handles double-click for fit-to-track.
     void mouseDoubleClickEvent(QMouseEvent* event) override;
+
+    /// @brief Handles mouse press for segment selection start.
     void mousePressEvent(QMouseEvent* event) override;
+
+    /// @brief Handles mouse movement for segment selection.
     void mouseMoveEvent(QMouseEvent* event) override;
+
+    /// @brief Handles mouse release for segment selection end.
     void mouseReleaseEvent(QMouseEvent* event) override;
 
 private:

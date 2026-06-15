@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file DatabaseSchema.h
+ * @brief Database access component for DatabaseSchema.
+ *
+ * Implements database schema handling, repository operations, or SQL utility behavior for persistent storage.
+ *
+ * Responsibilities:
+ * - Provide database schema, query, or repository functionality
+ *
+ * @author Lars EBERHART
+ */
+
 #pragma once
 
 #include <array>
@@ -5,9 +19,17 @@
 
 namespace DatabaseSchema {
 
+/**
+ * @brief Current database schema version.
+ */
 static constexpr int kCurrentVersion = 8;
 
-// Each string is one DDL statement (no semicolons needed for exec()).
+/**
+ * @brief SQL DDL statements for database schema initialization.
+ *
+ * Each element is one CREATE TABLE or CREATE INDEX statement.
+ * Statements are executed in order to initialize an empty database.
+ */
 inline constexpr std::array kStatements = {
     std::string_view{
         "CREATE TABLE IF NOT EXISTS schema_info ("

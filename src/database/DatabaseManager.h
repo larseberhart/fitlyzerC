@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file DatabaseManager.h
+ * @brief Database access component for DatabaseManager.
+ *
+ * Implements database schema handling, repository operations, or SQL utility behavior for persistent storage.
+ *
+ * Responsibilities:
+ * - Provide database schema, query, or repository functionality
+ *
+ * @author Lars EBERHART
+ */
+
 #pragma once
 
 #include <QSqlDatabase>
@@ -8,26 +22,55 @@
 //   DatabaseManager db;
 //   if (!db.open("/path/to/file.fitlyzerdb", &errorMsg)) { ... }
 //   db.database(); // use for queries
+/**
+ * @brief Manages a single database connection and schema for FitlyzerC.
+ *
+ * Handles opening, creating, and closing SQLite database connections,
+ * applying schema initialization and upgrades as needed.
+ */
 class DatabaseManager
 {
 public:
     DatabaseManager();
     ~DatabaseManager();
 
-    // Open an existing database file. Returns false and sets errorOut on failure.
+    /**
+     * @brief Opens an existing database file.
+     * @param path Path to database file.
+     * @param errorOut Optional error message output.
+     * @return True if successfully opened, false otherwise.
+     */
     bool open(const QString& path, QString* errorOut = nullptr);
 
-    // Create a new database file at path (must not already exist).
-    // Returns false and sets errorOut on failure.
+    /**
+     * @brief Creates a new database file at the specified path.
+     * @param path Path for new database file.
+     * @param errorOut Optional error message output.
+     * @return True if successfully created, false otherwise.
+     */
     bool create(const QString& path, QString* errorOut = nullptr);
 
+    /**
+     * @brief Closes the database connection.
+     */
     void close();
 
+    /**
+     * @brief Checks if database connection is open.
+     * @return True if connected to a database.
+     */
     bool isOpen() const;
 
-    // The underlying connection (valid only when isOpen()).
+    /**
+     * @brief Gets the underlying SQL database connection.
+     * @return QSqlDatabase handle (valid only when isOpen() returns true).
+     */
     QSqlDatabase database() const;
 
+    /**
+     * @brief Gets the database file path.
+     * @return Path to the database file.
+     */
     QString path() const { return m_path; }
 
 private:

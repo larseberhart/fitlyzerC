@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file MapRenderer.cpp
+ * @brief Map rendering support for MapRenderer.
+ *
+ * Implements map math, tile caching, and rendering logic used for geographic visualization of activities.
+ *
+ * Responsibilities:
+ * - Provide map computation, tile handling, or rendering functionality
+ *
+ * @author Lars EBERHART
+ */
+
 #include "MapRenderer.h"
 
 #include <QLineF>
@@ -14,6 +28,11 @@
 #include <cmath>
 #include <limits>
 
+/**
+ * @brief Computes color for gradient visualization.
+ * @param percent Slope gradient percentage.
+ * @return Color from brown (downhill) to green (steep uphill).
+ */
 static QColor gradientColorForSlope(double percent)
 {
     if (percent <= -8.0) return QColor("#7c2d12");
@@ -25,6 +44,11 @@ static QColor gradientColorForSlope(double percent)
     return QColor("#15803d");
 }
 
+/**
+ * @brief Converts route color mode to color metric for data lookup.
+ * @param mode Route visualization mode.
+ * @return Corresponding color metric (None if gradient mode).
+ */
 static ColorMetric routeModeToMetric(RouteColorMode mode)
 {
     switch (mode)
@@ -42,11 +66,22 @@ static ColorMetric routeModeToMetric(RouteColorMode mode)
     return ColorMetric::None;
 }
 
+/// @brief Mathematical constant pi.
 static constexpr double kPi     = 3.14159265358979323846;
+
+/// @brief Tile size in pixels (Web Mercator standard).
 static constexpr int    kTilePx = 256;
+
+/// @brief Hit target size for climb/interval markers in pixels.
 static constexpr qreal  kMarkerHitSizePx = 24.0;
+
+/// @brief Display radius for climb/interval markers in pixels.
 static constexpr qreal  kMarkerRadiusPx = 6.5;
+
+/// @brief Maximum pixel distance for snapping to nearest record.
 static constexpr qreal  kNearestRecordMaxDistancePx = 40.0;
+
+/// @brief Margin from screen edge for panning triggers in pixels.
 static constexpr int    kEdgePanMargin = 60;
 
 QPointF MapRenderer::latLonToTile(double lat, double lon, int zoom)

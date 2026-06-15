@@ -1,26 +1,63 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file PowerCurve.h
+ * @brief Analysis component for PowerCurve.
+ *
+ * Implements analysis logic used to compute cycling metrics, detect patterns, and derive activity insights.
+ *
+ * Responsibilities:
+ * - Provide analysis-specific functionality for activity processing
+ *
+ * @author Lars EBERHART
+ */
+
 #pragma once
 
 #include <vector>
 
 #include "fit/RideData.h"
 
+/**
+ * @brief A single point on a power duration curve.
+ */
 struct PowerCurvePoint
 {
+    /// @brief Duration in seconds.
     double durationSeconds;
-    double bestPower;        // watts — best mean for the given duration
+
+    /// @brief Best mean power for duration in watts.
+    double bestPower;
 };
 
+/**
+ * @brief Computes power duration curve (PDC) for an activity.
+ *
+ * Analyzes best sustained power outputs across a range of durations.
+ */
 class PowerCurve
 {
 public:
-    // Standard test durations in seconds: 5 s → 2 h
+    /**
+     * @brief Returns standard test durations in seconds.
+     * @return Durations from 5 seconds to 2 hours.
+     */
     static std::vector<double> standardDurations();
 
-    // Best mean power over a sliding window of `durationSeconds`
+    /**
+     * @brief Calculates best mean power over a duration.
+     * @param rideData Activity data.
+     * @param durationSeconds Duration window in seconds.
+     * @return Best mean power in watts.
+     */
     static double bestMeanPower(
         const RideData& rideData, double durationSeconds);
 
-    // PDC for standard durations (omits durations longer than the ride)
+    /**
+     * @brief Computes power duration curve for standard durations.
+     * @param rideData Activity data.
+     * @return PDC points (omits durations longer than the ride).
+     */
     static std::vector<PowerCurvePoint> computeStandard(
         const RideData& rideData);
 };

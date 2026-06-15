@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file DatabaseConnectionGuard.cpp
+ * @brief Database access component for DatabaseConnectionGuard.
+ *
+ * Implements database schema handling, repository operations, or SQL utility behavior for persistent storage.
+ *
+ * Responsibilities:
+ * - Provide database schema, query, or repository functionality
+ *
+ * @author Lars EBERHART
+ */
+
 #include "DatabaseConnectionGuard.h"
 
 DatabaseConnectionGuard::DatabaseConnectionGuard(const QString& connectionName)

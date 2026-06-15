@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file RideDataSerializer.h
+ * @brief Data model support for RideDataSerializer.
+ *
+ * Defines model loading, serialization, and model-related helpers for ride and activity data handling.
+ *
+ * Responsibilities:
+ * - Provide model serialization or data-loading behavior
+ *
+ * @author Lars EBERHART
+ */
+
 #pragma once
 
 #include <QString>
@@ -9,12 +23,29 @@
 
 class DatabaseManager;
 
+/**
+ * @brief Persists ride data to database.
+ *
+ * Saves parsed rides with computed statistics, detects duplicates,
+ * and logs all import attempts.
+ */
 class RideDataSerializer
 {
 public:
-    // Save a parsed ride to the database.
-    // Returns the new activity id, or -1 on error.
-    // Logs every attempt (success, duplicate, error) to ImportRepository.
+    /**
+     * @brief Saves parsed ride to database.
+     * @param rideData Ride sample data.
+     * @param stats Computed statistics.
+     * @param athleteId Athlete ID.
+     * @param filePath Original file path.
+     * @param fitHash SHA-256 hash of FIT file.
+     * @param normalizedPower Computed normalized power.
+     * @param dbManager Database manager.
+     * @param activityRepo Activity repository.
+     * @param importRepo Import log repository.
+     * @param errorOut Optional error message output.
+     * @return New activity ID on success, -1 on error.
+     */
     static int saveRideToDatabase(
         const RideData&           rideData,
         const WorkoutStatistics&  stats,
@@ -27,6 +58,11 @@ public:
         ImportRepository&         importRepo,
         QString*                  errorOut = nullptr);
 
-    // Load a ride from the database back into a RideData object.
+    /**
+     * @brief Loads ride data from the database.
+     * @param activityId Activity ID to load.
+     * @param dbManager Database manager.
+     * @return RideData with samples from database.
+     */
     static RideData loadRideFromDatabase(int activityId, DatabaseManager& dbManager);
 };

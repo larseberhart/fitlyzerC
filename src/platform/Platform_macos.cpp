@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file Platform_macos.cpp
+ * @brief macOS-specific filesystem and OS integration.
+ *
+ * Provides platform-specific paths, file manager integration,
+ * and other macOS-specific functionality.
+ *
+ * @author Lars EBERHART
+ */
+
 #include "Platform.h"
 
 #include <QDesktopServices>

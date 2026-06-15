@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file ZoneCalculator.cpp
+ * @brief Training zone support for ZoneCalculator.
+ *
+ * Implements training-zone definitions, calculations, and related visual behavior for zone-based analysis.
+ *
+ * Responsibilities:
+ * - Provide zone definitions, calculations, or zone-related utilities
+ *
+ * @author Lars EBERHART
+ */
+
 #include "ZoneCalculator.h"
 
 #include <algorithm>

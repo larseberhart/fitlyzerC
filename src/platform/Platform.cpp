@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file Platform.cpp
+ * @brief Platform-specific filesystem and OS integration helpers.
+ *
+ * Provides application paths, database locations,
+ * backup locations, and file manager integration.
+ *
+ * @author Lars EBERHART
+ */
+
 #include "Platform.h"
 
 #include <QDir>

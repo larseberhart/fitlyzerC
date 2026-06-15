@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file SmoothingEngine.cpp
+ * @brief Analysis component for SmoothingEngine.
+ *
+ * Implements analysis logic used to compute cycling metrics, detect patterns, and derive activity insights.
+ *
+ * Responsibilities:
+ * - Provide analysis-specific functionality for activity processing
+ *
+ * @author Lars EBERHART
+ */
+
 #include "SmoothingEngine.h"
 
 #include <cmath>

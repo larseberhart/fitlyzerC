@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file FfmpegPath.cpp
+ * @brief Utility support component for FfmpegPath.
+ *
+ * Provides shared utility helpers used by multiple application subsystems.
+ *
+ * Responsibilities:
+ * - Provide reusable utility behavior for common tasks
+ *
+ * @author Lars EBERHART
+ */
+
 #include "FfmpegPath.h"
 
 #include <QCoreApplication>

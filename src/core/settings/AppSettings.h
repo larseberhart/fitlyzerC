@@ -1,9 +1,26 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file AppSettings.h
+ * @brief Application settings support for AppSettings.
+ *
+ * Defines settings and formatting helpers used to configure application behavior and presentation.
+ *
+ * Responsibilities:
+ * - Provide settings persistence or settings-related utilities
+ *
+ * @author Lars EBERHART
+ */
+
 #pragma once
 
 #include <QString>
 
 class QSettings;
 
+/**
+ * @brief Supported date display formats.
+ */
 enum class DateFormat
 {
     DD_MM_YYYY = 0,
@@ -12,15 +29,42 @@ enum class DateFormat
     MM_DD_YYYY
 };
 
+/**
+ * @brief Application-wide settings singleton.
+ *
+ * Manages persistent user preferences including date formatting and cache sizes.
+ */
 class AppSettings
 {
 public:
+    /**
+     * @brief Returns the global settings instance.
+     * @return Reference to the singleton AppSettings.
+     */
     static AppSettings& instance();
 
+    /**
+     * @brief Gets the current date format preference.
+     * @return Current DateFormat.
+     */
     DateFormat dateFormat() const;
+
+    /**
+     * @brief Sets the date format preference.
+     * @param format New DateFormat.
+     */
     void setDateFormat(DateFormat format);
 
-    int tileCacheSize() const;   // number of tiles to keep in RAM (128-2048)
+    /**
+     * @brief Gets the tile cache size.
+     * @return Number of tiles to keep in RAM (128-2048).
+     */
+    int tileCacheSize() const;
+
+    /**
+     * @brief Sets the tile cache size.
+     * @param tiles Number of tiles to cache (128-2048).
+     */
     void setTileCacheSize(int tiles);
 
 private:

@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-3
+
+/**
+ * @file MainWindow.h
+ * @brief User interface component for MainWindow.
+ *
+ * Defines dialogs, widgets, controllers, and UI workflows used by the FitlyzerC desktop application.
+ *
+ * Responsibilities:
+ * - Provide interactive user interface behavior and presentation
+ *
+ * @author Lars EBERHART
+ */
+
 #pragma once
 
 #include <QCheckBox>
@@ -44,17 +58,34 @@ class QPoint;
 class QTimer;
 class QChartView;
 
+/**
+ * @brief Main application window.
+ *
+ * Provides integrated UI for activity browsing, analysis, charting, mapping,
+ * and athlete/profile management.
+ */
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
 
 public:
+    /**
+     * @brief Constructs main window.
+     * @param parent Parent widget.
+     */
     explicit MainWindow(QWidget* parent = nullptr);
 
 protected:
+    /// @brief Handles application close event.
     void closeEvent(QCloseEvent* event) override;
+
+    /// @brief Filters events for custom handling.
     bool eventFilter(QObject* watched, QEvent* event) override;
+
+    /// @brief Handles drag-enter for file drop validation.
     void dragEnterEvent(QDragEnterEvent* event) override;
+
+    /// @brief Handles drop event for FIT file import.
     void dropEvent(QDropEvent* event) override;
 
 private slots:
