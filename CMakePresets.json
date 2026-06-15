@@ -23,7 +23,8 @@
         "CMAKE_CXX_COMPILER": "/opt/homebrew/opt/llvm/bin/clang++",
         "CMAKE_PREFIX_PATH": "/opt/homebrew/opt/qt",
         "FITLYZERC_BUNDLE_FFMPEG": "ON",
-        "FITLYZERC_FFMPEG_SOURCE_DIR": "${sourceDir}/third_party/ffmpeg",
+        "FITLYZERC_AUTO_DOWNLOAD_FFMPEG": "OFF",
+        "FITLYZERC_FFMPEG_SOURCE_DIR": "",
         "FITLYZERC_FFMPEG_BINARY_PATH": "${sourceDir}/resources/ffmpeg/macos/ffmpeg"
       }
     },

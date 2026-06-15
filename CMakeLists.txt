@@ -282,6 +282,10 @@ target_link_libraries(FitlyzerC PRIVATE
     FitSDK
 )
 
+if(APPLE)
+    find_program(CODESIGN_EXECUTABLE codesign HINTS "/usr/bin")
+endif()
+
 set(FITLYZERC_BUNDLED_FFMPEG_BINARY "")
 set(FITLYZERC_RUNTIME_FFMPEG_PATH "")
 
@@ -291,88 +295,95 @@ if(FITLYZERC_BUNDLE_FFMPEG)
         set(_ffmpeg_suffix ".exe")
     endif()
 
-    set(_ffmpeg_source_dir "${FITLYZERC_FFMPEG_SOURCE_DIR}")
-    if(_ffmpeg_source_dir AND NOT IS_ABSOLUTE "${_ffmpeg_source_dir}")
-        get_filename_component(_ffmpeg_source_dir "${_ffmpeg_source_dir}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
-    endif()
-
-    set(_ffmpeg_download_args)
-    if(_ffmpeg_source_dir AND EXISTS "${_ffmpeg_source_dir}/configure")
-        message(STATUS "FFmpeg source tree found: ${_ffmpeg_source_dir}")
-    elseif(FITLYZERC_AUTO_DOWNLOAD_FFMPEG)
-        set(_ffmpeg_source_dir "${CMAKE_BINARY_DIR}/_deps/ffmpeg-src")
-        set(_ffmpeg_download_args
-            GIT_REPOSITORY "${FITLYZERC_FFMPEG_GIT_REPOSITORY}"
-            GIT_TAG "${FITLYZERC_FFMPEG_GIT_TAG}"
-            GIT_SHALLOW TRUE
-        )
-        message(STATUS
-            "FFmpeg source tree not found; cloning ${FITLYZERC_FFMPEG_GIT_REPOSITORY} (${FITLYZERC_FFMPEG_GIT_TAG})"
-        )
-    endif()
-
-    if(_ffmpeg_source_dir)
-        find_program(FITLYZERC_BASH_EXECUTABLE NAMES bash)
-        find_program(FITLYZERC_MAKE_EXECUTABLE NAMES make gmake mingw32-make)
-
-        if(FITLYZERC_BASH_EXECUTABLE AND FITLYZERC_MAKE_EXECUTABLE)
-            set(FITLYZERC_FFMPEG_INSTALL_DIR "${CMAKE_BINARY_DIR}/ffmpeg/install")
-            set(FITLYZERC_FFMPEG_BUILD_DIR "${CMAKE_BINARY_DIR}/ffmpeg/build")
-
-            set(_ffmpeg_configure
-                "${FITLYZERC_BASH_EXECUTABLE}" "${_ffmpeg_source_dir}/configure"
-                "--prefix=${FITLYZERC_FFMPEG_INSTALL_DIR}"
-                "--disable-shared"
-                "--enable-static"
-                "--disable-debug"
-                "--disable-doc"
-                "--enable-ffmpeg"
-                "--disable-ffplay"
-                "--disable-ffprobe"
-            )
-
-            ExternalProject_Add(FitlyzerFFmpeg
-                SOURCE_DIR "${_ffmpeg_source_dir}"
-                BINARY_DIR "${FITLYZERC_FFMPEG_BUILD_DIR}"
-                ${_ffmpeg_download_args}
-                CONFIGURE_COMMAND ${_ffmpeg_configure}
-                BUILD_COMMAND "${FITLYZERC_MAKE_EXECUTABLE}" -j
-                INSTALL_COMMAND "${FITLYZERC_MAKE_EXECUTABLE}" install
-                BUILD_BYPRODUCTS "${FITLYZERC_FFMPEG_INSTALL_DIR}/bin/ffmpeg${_ffmpeg_suffix}"
-                LOG_DOWNLOAD ON
-                LOG_CONFIGURE ON
-                LOG_BUILD ON
-                LOG_INSTALL ON
-            )
-
-            add_dependencies(FitlyzerC FitlyzerFFmpeg)
-            set(FITLYZERC_BUNDLED_FFMPEG_BINARY "${FITLYZERC_FFMPEG_INSTALL_DIR}/bin/ffmpeg${_ffmpeg_suffix}")
-            if(_ffmpeg_download_args)
-                message(STATUS "FFmpeg will be downloaded and built from source into ${_ffmpeg_source_dir}")
-            else()
-                message(STATUS "FFmpeg will be built from source: ${_ffmpeg_source_dir}")
-            endif()
+    set(_ffmpeg_prebuilt "${FITLYZERC_FFMPEG_BINARY_PATH}")
+    if(NOT _ffmpeg_prebuilt)
+        if(WIN32)
+            set(_ffmpeg_prebuilt "${CMAKE_SOURCE_DIR}/resources/ffmpeg/windows/ffmpeg.exe")
+        elseif(APPLE)
+            set(_ffmpeg_prebuilt "${CMAKE_SOURCE_DIR}/resources/ffmpeg/macos/ffmpeg")
         else()
-            message(WARNING "FFmpeg source was found but build tools are missing (bash/make). Falling back to prebuilt FFmpeg lookup.")
+            set(_ffmpeg_prebuilt "${CMAKE_SOURCE_DIR}/resources/ffmpeg/linux/ffmpeg")
+        endif()
+    endif()
+
+    if(_ffmpeg_prebuilt AND NOT IS_ABSOLUTE "${_ffmpeg_prebuilt}")
+        get_filename_component(_ffmpeg_prebuilt "${_ffmpeg_prebuilt}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
+    endif()
+
+    if(APPLE AND EXISTS "${_ffmpeg_prebuilt}")
+        set(FITLYZERC_BUNDLED_FFMPEG_BINARY "${_ffmpeg_prebuilt}")
+        message(STATUS "Using bundled macOS FFmpeg resource: ${FITLYZERC_BUNDLED_FFMPEG_BINARY}")
+    endif()
+
+    if(NOT FITLYZERC_BUNDLED_FFMPEG_BINARY)
+        set(_ffmpeg_source_dir "${FITLYZERC_FFMPEG_SOURCE_DIR}")
+        if(_ffmpeg_source_dir AND NOT IS_ABSOLUTE "${_ffmpeg_source_dir}")
+            get_filename_component(_ffmpeg_source_dir "${_ffmpeg_source_dir}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
+        endif()
+
+        set(_ffmpeg_download_args)
+        if(_ffmpeg_source_dir AND EXISTS "${_ffmpeg_source_dir}/configure")
+            message(STATUS "FFmpeg source tree found: ${_ffmpeg_source_dir}")
+        elseif(FITLYZERC_AUTO_DOWNLOAD_FFMPEG)
+            set(_ffmpeg_source_dir "${CMAKE_BINARY_DIR}/_deps/ffmpeg-src")
+            set(_ffmpeg_download_args
+                GIT_REPOSITORY "${FITLYZERC_FFMPEG_GIT_REPOSITORY}"
+                GIT_TAG "${FITLYZERC_FFMPEG_GIT_TAG}"
+                GIT_SHALLOW TRUE
+            )
+            message(STATUS
+                "FFmpeg source tree not found; cloning ${FITLYZERC_FFMPEG_GIT_REPOSITORY} (${FITLYZERC_FFMPEG_GIT_TAG})"
+            )
+        endif()
+
+        if(_ffmpeg_source_dir)
+            find_program(FITLYZERC_BASH_EXECUTABLE NAMES bash)
+            find_program(FITLYZERC_MAKE_EXECUTABLE NAMES make gmake mingw32-make)
+
+            if(FITLYZERC_BASH_EXECUTABLE AND FITLYZERC_MAKE_EXECUTABLE)
+                set(FITLYZERC_FFMPEG_INSTALL_DIR "${CMAKE_BINARY_DIR}/ffmpeg/install")
+                set(FITLYZERC_FFMPEG_BUILD_DIR "${CMAKE_BINARY_DIR}/ffmpeg/build")
+
+                set(_ffmpeg_configure
+                    "${FITLYZERC_BASH_EXECUTABLE}" "${_ffmpeg_source_dir}/configure"
+                    "--prefix=${FITLYZERC_FFMPEG_INSTALL_DIR}"
+                    "--disable-shared"
+                    "--enable-static"
+                    "--disable-debug"
+                    "--disable-doc"
+                    "--enable-ffmpeg"
+                    "--disable-ffplay"
+                    "--disable-ffprobe"
+                )
+
+                ExternalProject_Add(FitlyzerFFmpeg
+                    SOURCE_DIR "${_ffmpeg_source_dir}"
+                    BINARY_DIR "${FITLYZERC_FFMPEG_BUILD_DIR}"
+                    ${_ffmpeg_download_args}
+                    CONFIGURE_COMMAND ${_ffmpeg_configure}
+                    BUILD_COMMAND "${FITLYZERC_MAKE_EXECUTABLE}" -j
+                    INSTALL_COMMAND "${FITLYZERC_MAKE_EXECUTABLE}" install
+                    BUILD_BYPRODUCTS "${FITLYZERC_FFMPEG_INSTALL_DIR}/bin/ffmpeg${_ffmpeg_suffix}"
+                    LOG_DOWNLOAD ON
+                    LOG_CONFIGURE ON
+                    LOG_BUILD ON
+                    LOG_INSTALL ON
+                )
+
+                add_dependencies(FitlyzerC FitlyzerFFmpeg)
+                set(FITLYZERC_BUNDLED_FFMPEG_BINARY "${FITLYZERC_FFMPEG_INSTALL_DIR}/bin/ffmpeg${_ffmpeg_suffix}")
+                if(_ffmpeg_download_args)
+                    message(STATUS "FFmpeg will be downloaded and built from source into ${_ffmpeg_source_dir}")
+                else()
+                    message(STATUS "FFmpeg will be built from source: ${_ffmpeg_source_dir}")
+                endif()
+            else()
+                message(WARNING "FFmpeg source was found but build tools are missing (bash/make). Falling back to prebuilt FFmpeg lookup.")
+            endif()
         endif()
     endif()
 
     if(NOT FITLYZERC_BUNDLED_FFMPEG_BINARY)
-        set(_ffmpeg_prebuilt "${FITLYZERC_FFMPEG_BINARY_PATH}")
-        if(NOT _ffmpeg_prebuilt)
-            if(WIN32)
-                set(_ffmpeg_prebuilt "${CMAKE_SOURCE_DIR}/resources/ffmpeg/windows/ffmpeg.exe")
-            elseif(APPLE)
-                set(_ffmpeg_prebuilt "${CMAKE_SOURCE_DIR}/resources/ffmpeg/macos/ffmpeg")
-            else()
-                set(_ffmpeg_prebuilt "${CMAKE_SOURCE_DIR}/resources/ffmpeg/linux/ffmpeg")
-            endif()
-        endif()
-
-        if(_ffmpeg_prebuilt AND NOT IS_ABSOLUTE "${_ffmpeg_prebuilt}")
-            get_filename_component(_ffmpeg_prebuilt "${_ffmpeg_prebuilt}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
-        endif()
-
         if(EXISTS "${_ffmpeg_prebuilt}")
             set(FITLYZERC_BUNDLED_FFMPEG_BINARY "${_ffmpeg_prebuilt}")
             message(STATUS "Using prebuilt bundled FFmpeg: ${FITLYZERC_BUNDLED_FFMPEG_BINARY}")
@@ -420,8 +431,25 @@ if(FITLYZERC_BUNDLE_FFMPEG)
 
         if(NOT WIN32)
             add_custom_command(TARGET FitlyzerC POST_BUILD
-                COMMAND "${CMAKE_COMMAND}" -E chmod +x "${FITLYZERC_RUNTIME_FFMPEG_DEST}"
+                COMMAND /bin/chmod +x "${FITLYZERC_RUNTIME_FFMPEG_DEST}"
                 COMMENT "Ensuring bundled FFmpeg is executable"
+                VERBATIM
+            )
+        endif()
+
+        if(APPLE AND CODESIGN_EXECUTABLE)
+            add_custom_command(TARGET FitlyzerC POST_BUILD
+                COMMAND "${CODESIGN_EXECUTABLE}"
+                    --force
+                    --sign
+                    -
+                    "${FITLYZERC_RUNTIME_FFMPEG_DEST}"
+                COMMAND "${CODESIGN_EXECUTABLE}"
+                    --verify
+                    --strict
+                    --verbose=4
+                    "${FITLYZERC_RUNTIME_FFMPEG_DEST}"
+                COMMENT "Re-signing and verifying bundled FFmpeg"
                 VERBATIM
             )
         endif()
@@ -471,15 +499,17 @@ if(WIN32)
 endif()
 
 if(APPLE)
-    # Deploy Qt frameworks/plugins into the .app bundle after build.
-    get_target_property(QT_QMAKE_EXECUTABLE Qt6::qmake IMPORTED_LOCATION)
-    get_filename_component(QT_BIN_DIR "${QT_QMAKE_EXECUTABLE}" DIRECTORY)
-    find_program(MACDEPLOYQT_EXECUTABLE macdeployqt HINTS "${QT_BIN_DIR}")
-
-    # Help macdeployqt resolve Homebrew-provided transitive dylibs used by Qt plugins.
+    # Deploy/sign during install packaging on macOS to avoid mutating the live
+    # build-tree bundle while linking.
+    # Help Qt's deploy tooling resolve Homebrew-provided transitive dylibs used by Qt plugins.
     set(MACDEPLOYQT_EXTRA_ARGS)
     foreach(MACDEPLOYQT_LIBPATH IN ITEMS
+        "/opt/homebrew/opt/qt/lib"
         "/opt/homebrew/lib"
+        "/opt/homebrew/opt/qtdeclarative/lib"
+        "/opt/homebrew/opt/qtsvg/lib"
+        "/opt/homebrew/opt/qtvirtualkeyboard/lib"
+        "/opt/homebrew/opt/qtshadertools/lib"
         "/opt/homebrew/opt/brotli/lib"
         "/opt/homebrew/opt/webp/lib"
     )
@@ -487,30 +517,6 @@ if(APPLE)
             list(APPEND MACDEPLOYQT_EXTRA_ARGS "-libpath=${MACDEPLOYQT_LIBPATH}")
         endif()
     endforeach()
-
-    if(MACDEPLOYQT_EXECUTABLE)
-        add_custom_command(
-            TARGET FitlyzerC
-            POST_BUILD
-            COMMAND
-                /bin/chmod
-                -R
-                u+w
-                "$<TARGET_BUNDLE_DIR:FitlyzerC>"
-            COMMAND
-                "${MACDEPLOYQT_EXECUTABLE}"
-                "$<TARGET_BUNDLE_DIR:FitlyzerC>"
-                ${MACDEPLOYQT_EXTRA_ARGS}
-                -always-overwrite
-                -no-strip
-                -codesign=-
-            COMMENT
-                "Deploying Qt runtime with macdeployqt"
-            VERBATIM
-        )
-    else()
-        message(WARNING "macdeployqt not found. Qt frameworks will not be embedded automatically.")
-    endif()
 endif()
 
 include(GNUInstallDirs)
@@ -526,6 +532,76 @@ install(
     BUNDLE DESTINATION .
     RUNTIME DESTINATION .
 )
+
+if(APPLE)
+    if(COMMAND qt_generate_deploy_app_script)
+        qt_generate_deploy_app_script(
+            TARGET FitlyzerC
+            OUTPUT_SCRIPT FITLYZERC_DEPLOY_SCRIPT
+            NO_UNSUPPORTED_PLATFORM_ERROR
+            DEPLOY_TOOL_OPTIONS
+                ${MACDEPLOYQT_EXTRA_ARGS}
+                -always-overwrite
+                -no-strip
+        )
+        install(SCRIPT ${FITLYZERC_DEPLOY_SCRIPT})
+    else()
+        message(WARNING "qt_generate_deploy_app_script is unavailable; macOS bundle may miss runtime dependencies.")
+    endif()
+endif()
+
+if(APPLE AND CODESIGN_EXECUTABLE)
+    install(CODE
+        "execute_process(
+            COMMAND /bin/chmod -R u+w \"\${CMAKE_INSTALL_PREFIX}/FitlyzerC.app\"
+            RESULT_VARIABLE FITLYZERC_STAGE_CHMOD_RESULT
+        )
+        if(NOT FITLYZERC_STAGE_CHMOD_RESULT EQUAL 0)
+            message(FATAL_ERROR \"Failed to make staged app writable before codesign: \${FITLYZERC_STAGE_CHMOD_RESULT}\")
+        endif()
+
+        if(EXISTS \"\${CMAKE_INSTALL_PREFIX}/FitlyzerC.app/Contents/MacOS/ffmpeg\")
+            execute_process(
+                COMMAND \"${CODESIGN_EXECUTABLE}\"
+                    --force
+                    --sign
+                    -
+                    \"\${CMAKE_INSTALL_PREFIX}/FitlyzerC.app/Contents/MacOS/ffmpeg\"
+                RESULT_VARIABLE FITLYZERC_STAGE_FFMPEG_CODESIGN_RESULT
+            )
+            if(NOT FITLYZERC_STAGE_FFMPEG_CODESIGN_RESULT EQUAL 0)
+                message(FATAL_ERROR \"Failed to sign bundled FFmpeg in staged app: \${FITLYZERC_STAGE_FFMPEG_CODESIGN_RESULT}\")
+            endif()
+        endif()
+
+        execute_process(
+            COMMAND \"${CODESIGN_EXECUTABLE}\"
+                --force
+                --deep
+                --sign
+                -
+                \"\${CMAKE_INSTALL_PREFIX}/FitlyzerC.app\"
+            RESULT_VARIABLE FITLYZERC_STAGE_CODESIGN_RESULT
+        )
+        if(NOT FITLYZERC_STAGE_CODESIGN_RESULT EQUAL 0)
+            message(FATAL_ERROR \"Failed to re-sign staged macOS bundle: \${FITLYZERC_STAGE_CODESIGN_RESULT}\")
+        endif()
+
+        execute_process(
+            COMMAND \"${CODESIGN_EXECUTABLE}\"
+                --verify
+                --deep
+                --strict
+                --verbose=4
+                \"\${CMAKE_INSTALL_PREFIX}/FitlyzerC.app\"
+            RESULT_VARIABLE FITLYZERC_STAGE_VERIFY_RESULT
+        )
+        if(NOT FITLYZERC_STAGE_VERIFY_RESULT EQUAL 0)
+            message(FATAL_ERROR \"Staged macOS bundle failed codesign verification: \${FITLYZERC_STAGE_VERIFY_RESULT}\")
+        endif()
+        "
+    )
+endif()
 
 if(UNIX AND NOT APPLE AND FITLYZERC_ENABLE_APPIMAGE_PACKAGE)
     if(COMMAND qt_generate_deploy_app_script)
