@@ -39,7 +39,6 @@
 #include <QSqlQuery>
 #include <QStatusBar>
 #include <QStackedLayout>
-#include <QStandardPaths>
 #include <QStyle>
 #include <QTableWidgetItem>
 #include <QToolBar>
