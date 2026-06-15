@@ -61,18 +61,32 @@ private:
 static void filterGpsOutliers(RideData& rideData)
 {
     constexpr double kMaxSpeedKmh = 150.0;
+    constexpr double kMinSpeedKmh = 0.0;
 
     bool   prevValid = false;
     double prevLat = 0, prevLon = 0, prevSec = 0;
 
     for (auto& r : rideData.records)
     {
-        if (!r.hasGps) continue;
+        if (!r.hasGps) 
+        {
+            prevValid = false;
+            continue;
+        }
+
+        // Additional sanity check on GPS coordinates
+        if (r.latitude < -90.0 || r.latitude > 90.0 ||
+            r.longitude < -180.0 || r.longitude > 180.0)
+        {
+            r.hasGps = false;
+            prevValid = false;
+            continue;
+        }
 
         if (prevValid)
         {
             const double dt = r.elapsedSeconds - prevSec;
-            if (dt > 0.0)
+            if (dt > 0.0 && dt < 3600.0)  // Sanity: max 1 hour between samples
             {
                 const double dLat = (r.latitude  - prevLat) * std::numbers::pi_v<double> / 180.0;
                 const double dLon = (r.longitude - prevLon) * std::numbers::pi_v<double> / 180.0;
@@ -81,11 +95,19 @@ static void filterGpsOutliers(RideData& rideData)
                     std::hypot(dLat, dLon * std::cos(mLat)) * 6371.0;
                 const double speedKmh = distKm / (dt / 3600.0);
 
-                if (speedKmh > kMaxSpeedKmh)
+                if (speedKmh > kMaxSpeedKmh || speedKmh < kMinSpeedKmh)
                 {
                     r.hasGps = false;
+                    prevValid = false;
                     continue;
                 }
+            }
+            else if (dt <= 0.0 || dt >= 3600.0)
+            {
+                // Invalid time jump; don't trust this GPS point
+                r.hasGps = false;
+                prevValid = false;
+                continue;
             }
         }
 
@@ -129,6 +151,20 @@ RideData FitParser::load(const QString& fileName)
         throw std::runtime_error(
             "No activity records found in this FIT file.\n"
             "The file may be a device configuration or course file, not an activity.");
+
+    // Count records with power or heart rate data (key fields for cycling analysis)
+    int recordsWithData = 0;
+    for (const auto& r : rideData.records)
+    {
+        if (r.hasPower || r.hasHeartRate)
+            ++recordsWithData;
+    }
+
+    // If less than 10% of records have key data, file is likely invalid
+    if (recordsWithData == 0 || recordsWithData < static_cast<int>(rideData.records.size() * 0.1))
+        throw std::runtime_error(
+            "Activity file contains insufficient data.\n"
+            "Expected power or heart rate data in most samples.");
 
     filterGpsOutliers(rideData);
 
