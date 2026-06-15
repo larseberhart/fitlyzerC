@@ -101,7 +101,10 @@ private:
     ColorMetric     m_metricOverlayMetric = ColorMetric::None;
     ColorMetric     m_colorMetric   = ColorMetric::None;
     ColorContext    m_colorContext;
-    std::unordered_map<int, std::vector<double>> m_powerSmoothingCache;
+
+    // Cache for smoothed metric series: keyed by (metric * 1000 + smoothing_seconds)
+    // Avoids recomputation when chart is redrawn or multiple overlays use same smoothing
+    mutable std::unordered_map<int, std::vector<double>> m_smoothedSeriesCache;
     std::vector<QPointF> m_tooltipPoints;
     std::vector<double>  m_tooltipRawValues;
     std::vector<double>  m_tooltipDisplayValues;

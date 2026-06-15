@@ -382,6 +382,17 @@ std::vector<double> RideChartWidget::computeSmoothedSeries(Metric metric, int se
     if (n == 0)
         return out;
 
+    // Check cache: key = (metric_id * 1000 + seconds)
+    // Only cache if seconds > 0 (raw data doesn't need caching)
+    if (seconds > 0)
+    {
+        const int metricId = static_cast<int>(metric);
+        const int cacheKey = metricId * 1000 + seconds;
+        auto cached = m_smoothedSeriesCache.find(cacheKey);
+        if (cached != m_smoothedSeriesCache.end())
+            return cached->second;
+    }
+
     if (seconds <= 0)
     {
         for (int i = 0; i < n; ++i)
@@ -425,6 +436,11 @@ std::vector<double> RideChartWidget::computeSmoothedSeries(Metric metric, int se
         if (count > 0)
             out[static_cast<size_t>(i)] = sum / static_cast<double>(count);
     }
+
+    // Store in cache
+    const int metricId = static_cast<int>(metric);
+    const int cacheKey = metricId * 1000 + seconds;
+    m_smoothedSeriesCache[cacheKey] = out;
 
     return out;
 }
@@ -779,7 +795,7 @@ void RideChartWidget::setRideData(const RideData& rideData,
     m_rideData = rideData;
     m_colorMetric = colorMetric;
     m_colorContext = colorContext;
-    m_powerSmoothingCache.clear();
+    m_smoothedSeriesCache.clear();
     rebuildChart(false);
 }
 
@@ -847,22 +863,8 @@ void RideChartWidget::rebuildChart(bool preserveXRange)
     std::vector<double> primarySeries(total, std::numeric_limits<double>::quiet_NaN());
     if (m_effectivePowerSmoothingSeconds > 0)
     {
-        if (m_metric == Metric::Power)
-        {
-            auto cached = m_powerSmoothingCache.find(m_effectivePowerSmoothingSeconds);
-            if (cached == m_powerSmoothingCache.end())
-            {
-                m_powerSmoothingCache[m_effectivePowerSmoothingSeconds] =
-                    computeSmoothedPowerSeries(m_effectivePowerSmoothingSeconds);
-                cached = m_powerSmoothingCache.find(m_effectivePowerSmoothingSeconds);
-            }
-
-            primarySeries = cached->second;
-        }
-        else
-        {
-            primarySeries = computeSmoothedSeries(m_metric, m_effectivePowerSmoothingSeconds);
-        }
+        // computeSmoothedSeries handles caching internally for all metrics
+        primarySeries = computeSmoothedSeries(m_metric, m_effectivePowerSmoothingSeconds);
     }
     else
     {
@@ -1326,7 +1328,7 @@ void RideChartWidget::clearChart()
     m_referenceSeries.clear();
     clearBackgroundSeries();
     m_series->clear();
-    m_powerSmoothingCache.clear();
+    m_smoothedSeriesCache.clear();
     m_tooltipPoints.clear();
     m_tooltipRawValues.clear();
     m_tooltipDisplayValues.clear();
