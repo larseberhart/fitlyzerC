@@ -1,7 +1,7 @@
 #pragma once
 
+#include <deque>
 #include <memory>
-#include <vector>
 
 #include <QObject>
 #include <QString>
@@ -40,6 +40,6 @@ private:
     void notify();
 
     int m_maxStackSize;
-    std::vector<std::unique_ptr<UndoCommand>> m_undoStack;
-    std::vector<std::unique_ptr<UndoCommand>> m_redoStack;
+    std::deque<std::unique_ptr<UndoCommand>> m_undoStack;
+    std::deque<std::unique_ptr<UndoCommand>> m_redoStack;
 };

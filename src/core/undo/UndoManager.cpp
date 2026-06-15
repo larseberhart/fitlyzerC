@@ -11,8 +11,9 @@ void UndoManager::push(std::unique_ptr<UndoCommand> cmd)
     m_undoStack.push_back(std::move(cmd));
 
     // Trim oldest entries when the stack exceeds the limit.
+    // std::deque::pop_front() is O(1), whereas vector::erase(begin()) is O(n).
     while (static_cast<int>(m_undoStack.size()) > m_maxStackSize)
-        m_undoStack.erase(m_undoStack.begin());
+        m_undoStack.pop_front();
 
     notify();
 }
