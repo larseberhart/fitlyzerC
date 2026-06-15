@@ -130,13 +130,27 @@ TileCache::TileCache(const TileCacheConfig& config, QObject* parent)
 
 QString TileCache::key(int z, int x, int y) const
 {
-    return QString("%1/%2/%3/%4").arg(styleKey(m_mapStyle)).arg(z).arg(x).arg(y);
+    return keyForStyle(styleKey(m_mapStyle), z, x, y);
+}
+
+QString TileCache::keyForStyle(const QString& style, int z, int x, int y)
+{
+    return QString("%1/%2/%3/%4").arg(style).arg(z).arg(x).arg(y);
 }
 
 QString TileCache::diskTilePathForRoot(const QString& root, int z, int x, int y) const
 {
+    return diskTilePathForRoot(root, styleKey(m_mapStyle), z, x, y);
+}
+
+QString TileCache::diskTilePathForRoot(const QString& root,
+                                       const QString& style,
+                                       int z,
+                                       int x,
+                                       int y)
+{
     return QDir(root).filePath(QString("%1/%2/%3/%4.png")
-                                   .arg(styleKey(m_mapStyle))
+                                   .arg(style)
                                    .arg(z)
                                    .arg(x)
                                    .arg(y));
@@ -183,6 +197,14 @@ void TileCache::setMapStyle(MapStyle style)
 {
     if (m_mapStyle == style)
         return;
+
+    // Cancel in-flight downloads from the previous style to reduce stale work.
+    const auto activeReplies = m_nam.findChildren<QNetworkReply*>();
+    for (QNetworkReply* reply : activeReplies)
+    {
+        if (reply)
+            reply->abort();
+    }
 
     m_mapStyle = style;
     m_provider = providerForStyle(style);
@@ -355,14 +377,14 @@ void TileCache::onReplyFinished(QNetworkReply* reply)
     const int z = reply->property("z").toInt();
     const int x = reply->property("x").toInt();
     const int y = reply->property("y").toInt();
-    const QString style = reply->property("style").toString();
-    const QString k = key(z, x, y);
+    const QString replyStyle = reply->property("style").toString();
+    const QString k = keyForStyle(replyStyle, z, x, y);
     m_pending.remove(k);
 
     // Always redispatch so queued tiles are sent as slots free up.
     dispatchNextDownloads();
 
-    if (style != styleKey(m_mapStyle))
+    if (replyStyle != styleKey(m_mapStyle))
         return;
 
     if (reply->error() != QNetworkReply::NoError)
@@ -372,7 +394,7 @@ void TileCache::onReplyFinished(QNetworkReply* reply)
     if (!px.loadFromData(reply->readAll()))
         return;
 
-    const QString diskPath = diskTilePath(z, x, y);
+    const QString diskPath = diskTilePathForRoot(m_diskCacheRoot, replyStyle, z, x, y);
     const QFileInfo fi(diskPath);
     QDir().mkpath(fi.path());
     px.save(diskPath);

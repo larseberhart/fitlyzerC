@@ -68,7 +68,13 @@ private:
     static constexpr int kMaxConcurrentDownloads = 6;
 
     QString key(int z, int x, int y) const;
+    static QString keyForStyle(const QString& style, int z, int x, int y);
     QString diskTilePathForRoot(const QString& root, int z, int x, int y) const;
+    static QString diskTilePathForRoot(const QString& root,
+                                       const QString& style,
+                                       int z,
+                                       int x,
+                                       int y);
     QString diskTilePath(int z, int x, int y) const;
     static QString styleKey(MapStyle style);
     static QString styleDisplayName(MapStyle style);
