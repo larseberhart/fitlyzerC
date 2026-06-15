@@ -184,28 +184,42 @@ std::vector<Climb> ClimbDetector::detect(const RideData& rideData, const Config&
 
     while (i < n)
     {
-        int runStart = -1;
+        int localMinIdx = -1;
         int climbStart = -1;
+        double localMinAlt = std::numeric_limits<double>::quiet_NaN();
+
+        const double startGainRequiredMeters =
+            (config.startGradient / 100.0) * config.minStartContinuousDistanceMeters;
 
         for (; i < n; ++i)
         {
-            const double g = localGradientPct[static_cast<size_t>(i)];
-            if (isFinite(g) && g >= config.startGradient)
-            {
-                if (runStart < 0)
-                    runStart = i;
+            const double alt = smoothedAltitudeMeters[static_cast<size_t>(i)];
+            if (!isFinite(alt))
+                continue;
 
-                const double runDistance =
-                    cumulativeDistanceMeters[static_cast<size_t>(i)] - cumulativeDistanceMeters[static_cast<size_t>(runStart)];
-                if (runDistance >= config.minStartContinuousDistanceMeters)
-                {
-                    climbStart = runStart;
-                    break;
-                }
-            }
-            else
+            if (localMinIdx < 0)
             {
-                runStart = -1;
+                localMinIdx = i;
+                localMinAlt = alt;
+                continue;
+            }
+
+            if (alt <= localMinAlt)
+            {
+                localMinIdx = i;
+                localMinAlt = alt;
+                continue;
+            }
+
+            const double gainFromMin = alt - localMinAlt;
+            const double distFromMin =
+                cumulativeDistanceMeters[static_cast<size_t>(i)] - cumulativeDistanceMeters[static_cast<size_t>(localMinIdx)];
+
+            if (distFromMin >= config.minStartContinuousDistanceMeters &&
+                gainFromMin >= startGainRequiredMeters)
+            {
+                climbStart = localMinIdx;
+                break;
             }
         }
 

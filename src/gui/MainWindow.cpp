@@ -38,6 +38,7 @@
 #include <QSplitter>
 #include <QSqlQuery>
 #include <QStatusBar>
+#include <QStackedLayout>
 #include <QStandardPaths>
 #include <QStyle>
 #include <QTableWidgetItem>
@@ -157,6 +158,108 @@ static QString sanitizeVideoFilePart(QString text)
     return text.trimmed();
 }
 
+static QWidget* wrapWithNoActivityState(
+    QWidget* content,
+    QStackedLayout** outStack,
+    const QString& message = QStringLiteral("No Activity Selected"))
+{
+    auto* root = new QWidget;
+    auto* stack = new QStackedLayout(root);
+    stack->setContentsMargins(0, 0, 0, 0);
+
+    auto* emptyPage = new QWidget(root);
+    auto* emptyLayout = new QVBoxLayout(emptyPage);
+    emptyLayout->setContentsMargins(0, 0, 0, 0);
+    auto* label = new QLabel(message, emptyPage);
+    label->setAlignment(Qt::AlignCenter);
+    label->setStyleSheet("color: #64748b; font-size: 16px; font-weight: 600;");
+    emptyLayout->addWidget(label, 1);
+
+    stack->addWidget(emptyPage);
+    stack->addWidget(content);
+    stack->setCurrentIndex(0);
+
+    if (outStack)
+        *outStack = stack;
+    return root;
+}
+
+class ClimbNameTableItem final : public QTableWidgetItem
+{
+public:
+    explicit ClimbNameTableItem(const QString& text)
+        : QTableWidgetItem(text)
+    {}
+
+    bool operator<(const QTableWidgetItem& other) const override
+    {
+        bool leftOk = false;
+        bool rightOk = false;
+        const int leftNumber = trailingNumber(text(), &leftOk);
+        const int rightNumber = trailingNumber(other.text(), &rightOk);
+
+        if (leftOk && rightOk)
+            return leftNumber < rightNumber;
+
+        return QString::localeAwareCompare(text(), other.text()) < 0;
+    }
+
+private:
+    static int trailingNumber(const QString& text, bool* ok)
+    {
+        if (ok)
+            *ok = false;
+
+        int i = text.size() - 1;
+        while (i >= 0 && text[i].isSpace())
+            --i;
+
+        if (i < 0 || !text[i].isDigit())
+            return 0;
+
+        int end = i;
+        while (i >= 0 && text[i].isDigit())
+            --i;
+
+        const QString number = text.mid(i + 1, end - i);
+        bool converted = false;
+        const int value = number.toInt(&converted);
+        if (ok)
+            *ok = converted;
+        return value;
+    }
+};
+
+class ClimbSortKeyTableItem final : public QTableWidgetItem
+{
+public:
+    explicit ClimbSortKeyTableItem(const QString& text, double sortKey)
+        : QTableWidgetItem(text)
+        , m_sortKey(sortKey)
+    {}
+
+    bool operator<(const QTableWidgetItem& other) const override
+    {
+        const auto* rhs = dynamic_cast<const ClimbSortKeyTableItem*>(&other);
+        if (!rhs)
+            return QString::localeAwareCompare(text(), other.text()) < 0;
+
+        const bool leftNaN = std::isnan(m_sortKey);
+        const bool rightNaN = std::isnan(rhs->m_sortKey);
+        if (leftNaN != rightNaN)
+            return !leftNaN;
+        if (leftNaN && rightNaN)
+            return QString::localeAwareCompare(text(), rhs->text()) < 0;
+
+        if (m_sortKey == rhs->m_sortKey)
+            return QString::localeAwareCompare(text(), rhs->text()) < 0;
+        return m_sortKey < rhs->m_sortKey;
+    }
+
+private:
+    double m_sortKey = std::numeric_limits<double>::quiet_NaN();
+};
+
 // ── Constructor ─────────────────────────────────────────────────────────────
 
 MainWindow::MainWindow(QWidget* parent)
@@ -216,6 +319,14 @@ MainWindow::MainWindow(QWidget* parent)
                 refreshAthleteSelector();
             if (m_activityBrowser)
                 m_activityBrowser->refresh(m_currentAthleteId);
+
+            const int lastActivityId = s.value("lastActivityId", -1).toInt();
+            if (lastActivityId > 0)
+            {
+                QString loadErr;
+                if (!m_controller->loadActivity(lastActivityId, loadErr))
+                    s.remove("lastActivityId");
+            }
         }
     }
 
@@ -368,6 +479,7 @@ void MainWindow::buildUI()
                 QMessageBox::critical(this, "Load Error", err);
             else
             {
+                QSettings("Fitlyzer", "FitlyzerC").setValue("lastActivityId", activityId);
                 m_tabWidget->setCurrentIndex(kTabAnalysis);
                 if (m_analysisTabWidget)
                     m_analysisTabWidget->setCurrentIndex(kAnalysisTabCharts);
@@ -699,7 +811,9 @@ void MainWindow::buildUI()
 
         chartsVL->addWidget(activitySplit, 1);
 
-        m_analysisTabWidget->addTab(chartsTab, "Activity");
+        m_analysisTabWidget->addTab(
+            wrapWithNoActivityState(chartsTab, &m_activityTabStack),
+            "Activity");
 
         // Checkbox <-> chart visibility; adjustSize keeps container height in sync
         auto makeVisToggle = [this](QCheckBox* cb, RideChartWidget* chart) {
@@ -909,19 +1023,25 @@ void MainWindow::buildUI()
         auto* w  = new QWidget;
         auto* vl = new QVBoxLayout(w);
         vl->addWidget(m_zonesTable);
-        m_analysisTabWidget->addTab(w, "Zones");
+        m_analysisTabWidget->addTab(
+            wrapWithNoActivityState(w, &m_zonesTabStack),
+            "Zones");
     }
 
     // == Tab 2: Power Histogram ==
     {
         m_histogram = new PowerHistogramWidget;
-        m_analysisTabWidget->addTab(m_histogram, "Histogram");
+        m_analysisTabWidget->addTab(
+            wrapWithNoActivityState(m_histogram, &m_histogramTabStack),
+            "Histogram");
     }
 
     // == Tab 3: Power Duration Curve ==
     {
         m_pdcWidget = new PowerCurveWidget;
-        m_analysisTabWidget->addTab(m_pdcWidget, "Power Curve");
+        m_analysisTabWidget->addTab(
+            wrapWithNoActivityState(m_pdcWidget, &m_powerCurveTabStack),
+            "Power Curve");
     }
 
     // == Tab 4: Calendar ==
@@ -929,13 +1049,17 @@ void MainWindow::buildUI()
         m_calendarWidget = new CalendarWidget(this);
         m_calendarWidget->setDatabaseManager(&m_dbManager);
         m_calendarWidget->setAthleteId(m_currentAthleteId);
-        m_analysisTabWidget->addTab(m_calendarWidget, "Calendar");
+        m_analysisTabWidget->addTab(
+            wrapWithNoActivityState(m_calendarWidget, &m_calendarTabStack),
+            "Calendar");
     }
 
     // == Tab 5: Fitness/Fatigue/Form ==
     {
         m_fitnessChart = new FitnessChartWidget(this);
-        m_analysisTabWidget->addTab(m_fitnessChart, "Fitness");
+        m_analysisTabWidget->addTab(
+            wrapWithNoActivityState(m_fitnessChart, &m_fitnessTabStack),
+            "Fitness");
     }
 
     // == Tab 6: Climbing ==
@@ -951,68 +1075,101 @@ void MainWindow::buildUI()
         m_climbCadenceChart = new RideChartWidget(Metric::Cadence, climbingTab);
         m_climbSpeedChart = new RideChartWidget(Metric::Speed, climbingTab);
         m_climbAltitudeChart->setClimbEditingEnabled(true);
+        m_climbAltitudeChart->setMinimumHeight(320);
+        m_climbAltitudeChart->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        m_climbPowerChart->hide();
+        m_climbHrChart->hide();
+        m_climbCadenceChart->hide();
+        m_climbSpeedChart->hide();
 
         auto* climbCharts = new QWidget(climbingTab);
         auto* climbChartsVL = new QVBoxLayout(climbCharts);
         climbChartsVL->setContentsMargins(0, 0, 0, 0);
         climbChartsVL->setSpacing(4);
         climbChartsVL->addWidget(m_climbAltitudeChart);
-        climbChartsVL->addWidget(m_climbPowerChart);
-        climbChartsVL->addWidget(m_climbHrChart);
-        climbChartsVL->addWidget(m_climbCadenceChart);
-        climbChartsVL->addWidget(m_climbSpeedChart);
 
-        auto* paramsGroup = new QGroupBox("Detection Parameters", climbingTab);
-        auto* paramsForm = new QFormLayout(paramsGroup);
-        m_climbMinLengthSpin = new QDoubleSpinBox(paramsGroup);
+        m_climbMinLengthSpin = new QDoubleSpinBox(climbingTab);
         m_climbMinLengthSpin->setRange(0.1, 20.0);
         m_climbMinLengthSpin->setDecimals(2);
         m_climbMinLengthSpin->setSingleStep(0.1);
         m_climbMinLengthSpin->setValue(0.5);
 
-        m_climbMinGainSpin = new QDoubleSpinBox(paramsGroup);
+        m_climbMinGainSpin = new QDoubleSpinBox(climbingTab);
         m_climbMinGainSpin->setRange(1.0, 2000.0);
         m_climbMinGainSpin->setDecimals(0);
         m_climbMinGainSpin->setSingleStep(5.0);
         m_climbMinGainSpin->setValue(30.0);
 
-        m_climbMinGradientSpin = new QDoubleSpinBox(paramsGroup);
+        m_climbMinGradientSpin = new QDoubleSpinBox(climbingTab);
         m_climbMinGradientSpin->setRange(0.5, 20.0);
         m_climbMinGradientSpin->setDecimals(1);
         m_climbMinGradientSpin->setSingleStep(0.5);
         m_climbMinGradientSpin->setValue(3.0);
 
-        m_climbStartGradientSpin = new QDoubleSpinBox(paramsGroup);
+        m_climbStartGradientSpin = new QDoubleSpinBox(climbingTab);
         m_climbStartGradientSpin->setRange(0.5, 20.0);
         m_climbStartGradientSpin->setDecimals(1);
         m_climbStartGradientSpin->setSingleStep(0.5);
         m_climbStartGradientSpin->setValue(3.0);
 
-        m_climbDipMetersSpin = new QDoubleSpinBox(paramsGroup);
+        m_climbDipMetersSpin = new QDoubleSpinBox(climbingTab);
         m_climbDipMetersSpin->setRange(0.0, 200.0);
         m_climbDipMetersSpin->setDecimals(1);
         m_climbDipMetersSpin->setSingleStep(1.0);
         m_climbDipMetersSpin->setValue(10.0);
 
-        m_climbDipDistanceSpin = new QDoubleSpinBox(paramsGroup);
+        m_climbDipDistanceSpin = new QDoubleSpinBox(climbingTab);
         m_climbDipDistanceSpin->setRange(10.0, 2000.0);
         m_climbDipDistanceSpin->setDecimals(0);
         m_climbDipDistanceSpin->setSingleStep(10.0);
         m_climbDipDistanceSpin->setValue(200.0);
 
-        m_climbSmoothingSpin = new QDoubleSpinBox(paramsGroup);
+        m_climbSmoothingSpin = new QDoubleSpinBox(climbingTab);
         m_climbSmoothingSpin->setRange(1.0, 500.0);
         m_climbSmoothingSpin->setDecimals(0);
         m_climbSmoothingSpin->setSingleStep(5.0);
         m_climbSmoothingSpin->setValue(50.0);
 
-        paramsForm->addRow("Min Length (km)", m_climbMinLengthSpin);
-        paramsForm->addRow("Min Gain (m)", m_climbMinGainSpin);
-        paramsForm->addRow("Min Avg Gradient (%)", m_climbMinGradientSpin);
-        paramsForm->addRow("Start Gradient (%)", m_climbStartGradientSpin);
-        paramsForm->addRow("Max Dip (m)", m_climbDipMetersSpin);
-        paramsForm->addRow("Max Dip Distance (m)", m_climbDipDistanceSpin);
-        paramsForm->addRow("Elevation Smoothing (m)", m_climbSmoothingSpin);
+        m_climbOverlayEnabledCheck = new QCheckBox("Overlay", climbingTab);
+        m_climbOverlayEnabledCheck->setChecked(false);
+        m_climbOverlayEnabledCheck->setStyleSheet(
+            "QCheckBox { color: #0f172a; font-weight: 600; }"
+            "QCheckBox::indicator { width: 16px; height: 16px; border: 2px solid #334155; background: #ffffff; }"
+            "QCheckBox::indicator:checked { background: #0f172a; border-color: #0f172a; }");
+        m_climbOverlayMetricCombo = new QComboBox(climbingTab);
+        m_climbOverlayMetricCombo->addItem("Power", static_cast<int>(ColorMetric::Power));
+        m_climbOverlayMetricCombo->addItem("Heart Rate", static_cast<int>(ColorMetric::HeartRate));
+        m_climbOverlayMetricCombo->addItem("Cadence", static_cast<int>(ColorMetric::Cadence));
+        m_climbOverlayMetricCombo->addItem("Speed", static_cast<int>(ColorMetric::Speed));
+        m_climbOverlayMetricCombo->setCurrentIndex(0);
+        m_climbOverlayMetricCombo->setEnabled(false);
+
+        auto* climbParamsInline = new QWidget(analysisContainer);
+        auto* climbParamsHL = new QHBoxLayout(climbParamsInline);
+        climbParamsHL->setContentsMargins(0, 0, 0, 0);
+        climbParamsHL->setSpacing(4);
+
+        auto addParam = [climbParamsHL](const QString& label, QDoubleSpinBox* spin)
+        {
+            auto* tag = new QLabel(label);
+            tag->setStyleSheet("color: #334155;");
+            spin->setButtonSymbols(QAbstractSpinBox::NoButtons);
+            spin->setFixedWidth(62);
+            climbParamsHL->addWidget(tag);
+            climbParamsHL->addWidget(spin);
+        };
+
+        climbParamsHL->addWidget(new QLabel("Climb:"));
+        addParam("Len", m_climbMinLengthSpin);
+        addParam("Gain", m_climbMinGainSpin);
+        addParam("AvgGrad", m_climbMinGradientSpin);
+        addParam("StartGrad", m_climbStartGradientSpin);
+        addParam("DipM", m_climbDipMetersSpin);
+        addParam("DipDist", m_climbDipDistanceSpin);
+        addParam("Smooth", m_climbSmoothingSpin);
+
+        colorBar->insertSpacing(2, 12);
+        colorBar->insertWidget(3, climbParamsInline);
 
           m_climbsTable = new QTableWidget(0, 15, climbingTab);
         m_climbsTable->setHorizontalHeaderLabels(
@@ -1021,18 +1178,50 @@ void MainWindow::buildUI()
         m_climbsTable->horizontalHeader()->setStretchLastSection(true);
         m_climbsTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
         m_climbsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
-        m_climbsTable->setSelectionMode(QAbstractItemView::SingleSelection);
+        m_climbsTable->setSelectionMode(QAbstractItemView::ExtendedSelection);
         m_climbsTable->setAlternatingRowColors(true);
-          m_climbsTable->setSortingEnabled(true);
+                m_climbsTable->setSortingEnabled(true);
+                m_climbsTable->sortItems(0, Qt::AscendingOrder);
+        m_climbsTable->setContextMenuPolicy(Qt::CustomContextMenu);
 
         m_climbSummaryLabel = new QLabel("Climb summary: select a climb", climbingTab);
         m_climbSummaryLabel->setStyleSheet("color: #334155;");
 
-        climbingVL->addWidget(climbCharts);
-        climbingVL->addWidget(paramsGroup);
-        climbingVL->addWidget(new QLabel("Recognized Climbs", climbingTab));
-        climbingVL->addWidget(m_climbsTable, 1);
-        climbingVL->addWidget(m_climbSummaryLabel);
+        auto* climbOverlayBar = new QWidget(climbingTab);
+        auto* climbOverlayHL = new QHBoxLayout(climbOverlayBar);
+        climbOverlayHL->setContentsMargins(0, 0, 0, 0);
+        climbOverlayHL->setSpacing(6);
+        climbOverlayHL->addWidget(new QLabel("Chart Overlay:", climbOverlayBar));
+        climbOverlayHL->addWidget(m_climbOverlayEnabledCheck);
+        climbOverlayHL->addWidget(m_climbOverlayMetricCombo);
+        climbOverlayHL->addStretch(1);
+
+        auto* climbsBottom = new QWidget(climbingTab);
+        auto* climbsBottomVL = new QVBoxLayout(climbsBottom);
+        climbsBottomVL->setContentsMargins(0, 0, 0, 0);
+        climbsBottomVL->setSpacing(4);
+        climbsBottomVL->addWidget(new QLabel("Recognized Climbs", climbsBottom));
+        climbsBottomVL->addWidget(m_climbsTable, 1);
+        climbsBottomVL->addWidget(m_climbSummaryLabel);
+
+        auto* climbingSplit = new QSplitter(Qt::Vertical, climbingTab);
+        climbingSplit->addWidget(climbCharts);
+        climbingSplit->addWidget(climbsBottom);
+        climbingSplit->setStretchFactor(0, 3);
+        climbingSplit->setStretchFactor(1, 2);
+        climbingSplit->setCollapsible(0, false);
+        climbingSplit->setCollapsible(1, false);
+
+        QTimer::singleShot(0, climbingSplit, [climbingSplit]()
+        {
+            const QList<int> sizes = climbingSplit->sizes();
+            const int total = std::accumulate(sizes.begin(), sizes.end(), 0);
+            if (total > 0)
+                climbingSplit->setSizes({ (total * 60) / 100, (total * 40) / 100 });
+        });
+
+        climbingVL->addWidget(climbOverlayBar);
+        climbingVL->addWidget(climbingSplit, 1);
 
         auto wireDetectionChange = [this](QDoubleSpinBox* spin)
         {
@@ -1051,10 +1240,52 @@ void MainWindow::buildUI()
         wireDetectionChange(m_climbDipDistanceSpin);
         wireDetectionChange(m_climbSmoothingSpin);
 
+        connect(m_climbOverlayEnabledCheck, &QCheckBox::toggled, this, [this](bool checked)
+        {
+            if (!m_climbOverlayMetricCombo || !m_climbAltitudeChart)
+                return;
+            m_climbOverlayMetricCombo->setEnabled(checked);
+            const ColorMetric metric = static_cast<ColorMetric>(m_climbOverlayMetricCombo->currentData().toInt());
+            m_climbAltitudeChart->setMetricOverlay(metric, checked);
+        });
+
+        connect(m_climbOverlayMetricCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, [this](int)
+        {
+            if (!m_climbOverlayEnabledCheck || !m_climbOverlayEnabledCheck->isChecked() || !m_climbAltitudeChart || !m_climbOverlayMetricCombo)
+                return;
+            const ColorMetric metric = static_cast<ColorMetric>(m_climbOverlayMetricCombo->currentData().toInt());
+            m_climbAltitudeChart->setMetricOverlay(metric, true);
+        });
+
         connect(m_climbsTable, &QTableWidget::itemSelectionChanged,
                 this, &MainWindow::onClimbSelectionChanged);
+        connect(m_climbsTable, &QTableWidget::itemDoubleClicked,
+            this, &MainWindow::onClimbRowDoubleClicked);
+        connect(m_climbsTable, &QWidget::customContextMenuRequested,
+            this, &MainWindow::onClimbTableContextMenuRequested);
         connect(m_climbAltitudeChart, &RideChartWidget::climbBoundaryEdited,
             this, &MainWindow::onClimbBoundaryEdited);
+        connect(m_climbAltitudeChart, &RideChartWidget::newClimbRequested,
+            this, &MainWindow::onNewClimbRequested);
+        connect(m_climbAltitudeChart, &RideChartWidget::climbClicked,
+            this, [this](int climbIndex)
+        {
+            if (!m_climbsTable || climbIndex < 0 || climbIndex >= static_cast<int>(m_detectedClimbs.size()))
+                return;
+            const Climb& c = m_detectedClimbs[static_cast<size_t>(climbIndex)];
+            for (int row = 0; row < m_climbsTable->rowCount(); ++row)
+            {
+                auto* item = m_climbsTable->item(row, 0);
+                if (!item) continue;
+                if (std::abs(item->data(kClimbStartRole).toDouble() - c.startSeconds) < 0.75 &&
+                    std::abs(item->data(kClimbEndRole).toDouble()   - c.endSeconds)   < 0.75)
+                {
+                    m_climbsTable->setCurrentCell(row, 0);
+                    m_climbsTable->scrollToItem(item);
+                    break;
+                }
+            }
+        });
 
         const std::initializer_list<RideChartWidget*> climbChartsAll =
             { m_climbAltitudeChart, m_climbPowerChart, m_climbHrChart, m_climbCadenceChart, m_climbSpeedChart };
@@ -1068,8 +1299,12 @@ void MainWindow::buildUI()
                 if (src != dst)
                     connect(src, &RideChartWidget::crosshairMoved, dst, &RideChartWidget::setCrosshair);
 
-        m_analysisTabWidget->addTab(climbingTab, "Climbing");
+        m_analysisTabWidget->addTab(
+            wrapWithNoActivityState(climbingTab, &m_climbingTabStack),
+            "Climbing");
     }
+
+    updateAnalysisEmptyStates();
 
     analysisLayout->addWidget(m_analysisTabWidget, 1);
     m_tabWidget->addTab(analysisContainer, "Analysis");
@@ -1440,6 +1675,7 @@ void MainWindow::saveSettings()
     s.setValue("watchFolderPath",    m_watchFolderPath);
     s.setValue("chartHeight",        m_chartHeight);
     s.setValue("currentAthleteId",   m_currentAthleteId);
+    s.setValue("lastActivityId",     m_controller ? m_controller->currentActivityId() : -1);
     if (m_dbManager.isOpen())
         s.setValue("lastDatabase",   m_dbManager.path());
 }
@@ -2170,7 +2406,7 @@ void MainWindow::createVideo()
 
 void MainWindow::onActivityImported(int activityId)
 {
-    (void)activityId;
+    QSettings("Fitlyzer", "FitlyzerC").setValue("lastActivityId", activityId);
     if (!m_firstLaunchCompleted)
     {
         m_firstLaunchCompleted = true;
@@ -2427,6 +2663,7 @@ void MainWindow::onAthleteSelectionChanged(int index)
         m_activityBrowser->refresh(m_currentAthleteId);
     if (m_calendarWidget)
         m_calendarWidget->setAthleteId(m_currentAthleteId);
+    updateAnalysisEmptyStates();
     updateImportAvailability();
     updateStatsLabel();
     updateStatusBarInfo();
@@ -2439,6 +2676,7 @@ void MainWindow::onWorkoutLoaded()
         m_controller->statistics().maximumPower > 0.0;
 
     updateStatsLabel();
+    updateAnalysisEmptyStates();
     updateCharts();
     updateColorLegend();
     updateZoneAvailability();
@@ -2467,6 +2705,27 @@ void MainWindow::onWorkoutLoaded()
 
     // Activity selection should always start from the full-ride chart extent.
     resetAllZoom();
+}
+
+void MainWindow::updateAnalysisEmptyStates()
+{
+    const bool hasActivity = !m_controller->rideData().records.empty();
+    const int page = hasActivity ? 1 : 0;
+
+    const std::initializer_list<QStackedLayout*> stacks =
+        { m_activityTabStack,
+          m_zonesTabStack,
+          m_histogramTabStack,
+          m_powerCurveTabStack,
+          m_calendarTabStack,
+          m_fitnessTabStack,
+          m_climbingTabStack };
+
+    for (auto* stack : stacks)
+    {
+        if (stack)
+            stack->setCurrentIndex(page);
+    }
 }
 
 // ── Update helpers ────────────────────────────────────────────────────────────
@@ -2558,6 +2817,14 @@ void MainWindow::updateCharts()
         m_climbCadenceChart->setRideData(m_controller->rideData(), colorMetric, colorContext);
         m_climbSpeedChart->setRideData(m_controller->rideData(), colorMetric, colorContext);
         m_climbAltitudeChart->setRideData(m_controller->rideData(), colorMetric, colorContext);
+
+        if (m_climbAltitudeChart && m_climbOverlayEnabledCheck && m_climbOverlayMetricCombo)
+        {
+            const ColorMetric overlayMetric = static_cast<ColorMetric>(m_climbOverlayMetricCombo->currentData().toInt());
+            m_climbAltitudeChart->setMetricOverlay(
+                overlayMetric,
+                m_climbOverlayEnabledCheck->isChecked());
+        }
     }
     setUpdatesEnabled(true);
 }
@@ -3230,6 +3497,108 @@ void MainWindow::updateClimbingTab()
     detectClimbsAndRefresh();
 }
 
+void MainWindow::refreshClimbViews(double preferredStartSeconds, double preferredEndSeconds)
+{
+    if (!m_climbsTable)
+        return;
+
+    const auto applyClimbOverlays = [this](RideChartWidget* chart)
+    {
+        if (chart)
+            chart->setClimbs(m_detectedClimbs);
+    };
+
+    applyClimbOverlays(m_powerChart);
+    applyClimbOverlays(m_hrChart);
+    applyClimbOverlays(m_cadenceChart);
+    applyClimbOverlays(m_speedChart);
+    applyClimbOverlays(m_altitudeChart);
+    applyClimbOverlays(m_climbPowerChart);
+    applyClimbOverlays(m_climbHrChart);
+    applyClimbOverlays(m_climbCadenceChart);
+    applyClimbOverlays(m_climbSpeedChart);
+    applyClimbOverlays(m_climbAltitudeChart);
+
+    const int previousRow = m_climbsTable->currentRow();
+    QSignalBlocker blocker(m_climbsTable);
+    m_climbsTable->setSortingEnabled(false);
+    m_climbsTable->setRowCount(static_cast<int>(m_detectedClimbs.size()));
+
+    auto mkSortKeyItem = [](const QString& text, double sortKey)
+    {
+        auto* item = new ClimbSortKeyTableItem(text, sortKey);
+        item->setTextAlignment(Qt::AlignCenter);
+        return item;
+    };
+
+    auto mkNumericItem = [mkSortKeyItem](double value, int decimals, const QString& fallback = QStringLiteral("—"))
+    {
+        if (std::isnan(value))
+            return mkSortKeyItem(fallback, std::numeric_limits<double>::quiet_NaN());
+        return mkSortKeyItem(QString::number(value, 'f', decimals), value);
+    };
+
+    for (int row = 0; row < static_cast<int>(m_detectedClimbs.size()); ++row)
+    {
+        const Climb& climb = m_detectedClimbs[static_cast<size_t>(row)];
+        auto* nameItem = new ClimbNameTableItem(climb.name.isEmpty() ? QString("Climb %1").arg(row + 1) : climb.name);
+        nameItem->setData(kClimbStartRole, climb.startSeconds);
+        nameItem->setData(kClimbEndRole, climb.endSeconds);
+        nameItem->setBackground(QBrush(QColor(34, 197, 94, 45)));
+        m_climbsTable->setItem(row, 0, nameItem);
+        m_climbsTable->setItem(row, 1, mkNumericItem(climb.lengthKm, 2));
+        m_climbsTable->setItem(row, 2, mkNumericItem(climb.elevationGainM, 0));
+        m_climbsTable->setItem(row, 3, mkNumericItem(climb.averageGradient, 1));
+        m_climbsTable->setItem(row, 4, mkNumericItem(climb.maximumGradient, 1));
+        m_climbsTable->setItem(row, 5, mkSortKeyItem(fmtDur(climb.durationSeconds), climb.durationSeconds));
+        m_climbsTable->setItem(row, 6, mkNumericItem(climb.averagePower > 0.0 ? climb.averagePower : std::numeric_limits<double>::quiet_NaN(), 0));
+        m_climbsTable->setItem(row, 7, mkNumericItem(climb.normalizedPower > 0.0 ? climb.normalizedPower : std::numeric_limits<double>::quiet_NaN(), 0));
+        m_climbsTable->setItem(row, 8, mkNumericItem(climb.averageHeartRate > 0.0 ? climb.averageHeartRate : std::numeric_limits<double>::quiet_NaN(), 0));
+        m_climbsTable->setItem(row, 9, mkNumericItem(climb.averageCadence > 0.0 ? climb.averageCadence : std::numeric_limits<double>::quiet_NaN(), 0));
+        m_climbsTable->setItem(row, 10, mkNumericItem(climb.averageSpeed > 0.0 ? climb.averageSpeed : std::numeric_limits<double>::quiet_NaN(), 1));
+        m_climbsTable->setItem(row, 11, mkNumericItem(climb.vam > 0.0 ? climb.vam : std::numeric_limits<double>::quiet_NaN(), 0));
+        m_climbsTable->setItem(row, 12, mkNumericItem(climb.powerFadePct, 1));
+        m_climbsTable->setItem(row, 13, mkNumericItem(climb.hrDriftPct, 1));
+        m_climbsTable->setItem(row, 14, mkNumericItem(climb.difficultyScore, 0));
+    }
+
+    m_climbsTable->resizeColumnsToContents();
+
+    m_climbsTable->setSortingEnabled(true);
+    m_climbsTable->sortItems(0, Qt::AscendingOrder);
+
+    int targetRow = -1;
+    if (preferredStartSeconds >= 0.0 && preferredEndSeconds >= 0.0)
+    {
+        for (int row = 0; row < m_climbsTable->rowCount(); ++row)
+        {
+            auto* item = m_climbsTable->item(row, 0);
+            if (!item)
+                continue;
+            const double s = item->data(kClimbStartRole).toDouble();
+            const double e = item->data(kClimbEndRole).toDouble();
+            if (std::abs(s - preferredStartSeconds) < 0.75 &&
+                std::abs(e - preferredEndSeconds) < 0.75)
+            {
+                targetRow = row;
+                break;
+            }
+        }
+    }
+
+    if (targetRow < 0 && m_climbsTable->rowCount() > 0)
+        targetRow = std::clamp(previousRow >= 0 ? previousRow : 0, 0, m_climbsTable->rowCount() - 1);
+
+    if (targetRow >= 0)
+        m_climbsTable->setCurrentCell(targetRow, 0);
+
+    blocker.unblock();
+    updateClimbRowStyles();
+    m_suppressClimbAutoZoom = true;
+    onClimbSelectionChanged();
+    m_suppressClimbAutoZoom = false;
+}
+
 void MainWindow::detectClimbsAndRefresh()
 {
     if (!m_climbsTable)
@@ -3256,88 +3625,169 @@ void MainWindow::detectClimbsAndRefresh()
 
     m_detectedClimbs = ClimbDetector::detect(ride, cfg);
 
-    const auto applyClimbOverlays = [this](RideChartWidget* chart)
+    refreshClimbViews();
+}
+
+std::vector<int> MainWindow::selectedClimbIndicesFromTable() const
+{
+    std::vector<int> indices;
+    if (!m_climbsTable || !m_climbsTable->selectionModel())
+        return indices;
+
+    const QModelIndexList rows = m_climbsTable->selectionModel()->selectedRows(0);
+    for (const QModelIndex& modelIndex : rows)
     {
-        if (chart)
-            chart->setClimbs(m_detectedClimbs);
-    };
+        auto* item = m_climbsTable->item(modelIndex.row(), 0);
+        if (!item)
+            continue;
 
-    applyClimbOverlays(m_powerChart);
-    applyClimbOverlays(m_hrChart);
-    applyClimbOverlays(m_cadenceChart);
-    applyClimbOverlays(m_speedChart);
-    applyClimbOverlays(m_altitudeChart);
-    applyClimbOverlays(m_climbPowerChart);
-    applyClimbOverlays(m_climbHrChart);
-    applyClimbOverlays(m_climbCadenceChart);
-    applyClimbOverlays(m_climbSpeedChart);
-    applyClimbOverlays(m_climbAltitudeChart);
+        const double selectedStart = item->data(kClimbStartRole).toDouble();
+        const double selectedEnd = item->data(kClimbEndRole).toDouble();
 
-    const int previousRow = m_climbsTable->currentRow();
-    QSignalBlocker blocker(m_climbsTable);
-    m_climbsTable->setSortingEnabled(false);
-    m_climbsTable->setRowCount(static_cast<int>(m_detectedClimbs.size()));
-
-    auto mkItem = [](const QString& text)
-    {
-        auto* item = new QTableWidgetItem(text);
-        item->setTextAlignment(Qt::AlignCenter);
-        return item;
-    };
-
-    auto mkNumericItem = [](double value, int decimals, const QString& fallback = QStringLiteral("—"))
-    {
-        auto* item = new QTableWidgetItem;
-        item->setTextAlignment(Qt::AlignCenter);
-        if (value > 0.0 || fallback == QStringLiteral("0.0"))
+        for (int i = 0; i < static_cast<int>(m_detectedClimbs.size()); ++i)
         {
-            item->setData(Qt::EditRole, value);
-            item->setText(QString::number(value, 'f', decimals));
+            const Climb& c = m_detectedClimbs[static_cast<size_t>(i)];
+            if (std::abs(c.startSeconds - selectedStart) < 0.75 &&
+                std::abs(c.endSeconds - selectedEnd) < 0.75)
+            {
+                indices.push_back(i);
+                break;
+            }
         }
-        else
-        {
-            item->setText(fallback);
-            item->setData(Qt::EditRole, -1.0);
-        }
-        return item;
-    };
-
-    for (int row = 0; row < static_cast<int>(m_detectedClimbs.size()); ++row)
-    {
-        const Climb& climb = m_detectedClimbs[static_cast<size_t>(row)];
-        auto* nameItem = new QTableWidgetItem(climb.name.isEmpty() ? QString("Climb %1").arg(row + 1) : climb.name);
-        nameItem->setData(kClimbStartRole, climb.startSeconds);
-        nameItem->setData(kClimbEndRole, climb.endSeconds);
-        nameItem->setBackground(QBrush(QColor(34, 197, 94, 45)));
-        m_climbsTable->setItem(row, 0, nameItem);
-        m_climbsTable->setItem(row, 1, mkNumericItem(climb.lengthKm, 2, QStringLiteral("0.00")));
-        m_climbsTable->setItem(row, 2, mkNumericItem(climb.elevationGainM, 0, QStringLiteral("0")));
-        m_climbsTable->setItem(row, 3, mkNumericItem(climb.averageGradient, 1, QStringLiteral("0.0")));
-        m_climbsTable->setItem(row, 4, mkNumericItem(climb.maximumGradient, 1, QStringLiteral("0.0")));
-        m_climbsTable->setItem(row, 5, mkItem(fmtDur(climb.durationSeconds)));
-        m_climbsTable->setItem(row, 6, mkNumericItem(climb.averagePower, 0));
-        m_climbsTable->setItem(row, 7, mkNumericItem(climb.normalizedPower, 0));
-        m_climbsTable->setItem(row, 8, mkNumericItem(climb.averageHeartRate, 0));
-        m_climbsTable->setItem(row, 9, mkNumericItem(climb.averageCadence, 0));
-        m_climbsTable->setItem(row, 10, mkNumericItem(climb.averageSpeed, 1));
-        m_climbsTable->setItem(row, 11, mkNumericItem(climb.vam, 0));
-        m_climbsTable->setItem(row, 12, mkNumericItem(climb.powerFadePct, 1, QStringLiteral("0.0")));
-        m_climbsTable->setItem(row, 13, mkNumericItem(climb.hrDriftPct, 1, QStringLiteral("0.0")));
-        m_climbsTable->setItem(row, 14, mkNumericItem(climb.difficultyScore, 0, QStringLiteral("0")));
     }
 
-    m_climbsTable->resizeColumnsToContents();
+    std::sort(indices.begin(), indices.end());
+    indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
+    return indices;
+}
 
-    if (m_climbsTable->rowCount() > 0)
+void MainWindow::onClimbTableContextMenuRequested(const QPoint& pos)
+{
+    if (!m_climbsTable)
+        return;
+
+    const int clickedRow = m_climbsTable->rowAt(pos.y());
+    if (clickedRow >= 0 && !m_climbsTable->item(clickedRow, 0)->isSelected())
     {
-        const int target = std::clamp(previousRow >= 0 ? previousRow : 0, 0, m_climbsTable->rowCount() - 1);
-        m_climbsTable->setCurrentCell(target, 0);
+        m_climbsTable->clearSelection();
+        m_climbsTable->setCurrentCell(clickedRow, 0);
+        m_climbsTable->selectRow(clickedRow);
     }
 
-    m_climbsTable->setSortingEnabled(true);
-    blocker.unblock();
-    updateClimbRowStyles();
-    onClimbSelectionChanged();
+    const std::vector<int> selected = selectedClimbIndicesFromTable();
+    if (selected.empty())
+        return;
+
+    QMenu menu(m_climbsTable);
+    QAction* editAct = menu.addAction("Edit");
+    QAction* removeAct = menu.addAction("Remove");
+    QAction* joinAct = menu.addAction("Join");
+
+    editAct->setEnabled(selected.size() == 1);
+    joinAct->setEnabled(selected.size() >= 2);
+    removeAct->setEnabled(!selected.empty());
+
+    QAction* chosen = menu.exec(m_climbsTable->viewport()->mapToGlobal(pos));
+    if (!chosen)
+        return;
+
+    if (chosen == editAct)
+        editSelectedClimbBoundaries();
+    else if (chosen == removeAct)
+        removeSelectedClimbs();
+    else if (chosen == joinAct)
+        joinSelectedClimbs();
+}
+
+void MainWindow::removeSelectedClimbs()
+{
+    std::vector<int> selected = selectedClimbIndicesFromTable();
+    if (selected.empty())
+        return;
+
+    std::sort(selected.rbegin(), selected.rend());
+    for (int idx : selected)
+    {
+        if (idx >= 0 && idx < static_cast<int>(m_detectedClimbs.size()))
+            m_detectedClimbs.erase(m_detectedClimbs.begin() + idx);
+    }
+
+    for (int i = 0; i < static_cast<int>(m_detectedClimbs.size()); ++i)
+        m_detectedClimbs[static_cast<size_t>(i)].name = QString("Climb %1").arg(i + 1);
+
+    refreshClimbViews();
+}
+
+void MainWindow::editSelectedClimbBoundaries()
+{
+    std::vector<int> selected = selectedClimbIndicesFromTable();
+    if (selected.size() != 1)
+        return;
+
+    const int idx = selected.front();
+    if (idx < 0 || idx >= static_cast<int>(m_detectedClimbs.size()))
+        return;
+
+    const Climb& climb = m_detectedClimbs[static_cast<size_t>(idx)];
+
+    // Graphical edit mode: focus the selected climb and let the user drag
+    // the vertical start/end handles directly in the climb altitude chart.
+    if (m_climbAltitudeChart)
+    {
+        m_climbAltitudeChart->setClimbEditingEnabled(true);
+        m_climbAltitudeChart->setSelectedClimbIndex(idx);
+
+        const double padding = std::max(5.0, climb.durationSeconds * 0.08);
+        const double rangeStart = std::max(0.0, climb.startSeconds - padding);
+        const double rangeEnd = climb.endSeconds + padding;
+        m_climbAltitudeChart->setXRange(rangeStart / 60.0, rangeEnd / 60.0);
+        m_climbAltitudeChart->setCrosshair(climb.startSeconds / 60.0);
+        m_climbAltitudeChart->setFocus();
+    }
+
+    statusBar()->showMessage(
+        "Graphical edit enabled: drag the climb start/end handles in the elevation chart.",
+        5000);
+}
+
+void MainWindow::joinSelectedClimbs()
+{
+    std::vector<int> selected = selectedClimbIndicesFromTable();
+    if (selected.size() < 2)
+        return;
+
+    std::sort(selected.begin(), selected.end());
+    const int keepIdx = selected.front();
+    if (keepIdx < 0 || keepIdx >= static_cast<int>(m_detectedClimbs.size()))
+        return;
+
+    double newStart = m_detectedClimbs[static_cast<size_t>(keepIdx)].startSeconds;
+    double newEnd = m_detectedClimbs[static_cast<size_t>(keepIdx)].endSeconds;
+    for (int idx : selected)
+    {
+        if (idx < 0 || idx >= static_cast<int>(m_detectedClimbs.size()))
+            continue;
+        const Climb& c = m_detectedClimbs[static_cast<size_t>(idx)];
+        newStart = std::min(newStart, c.startSeconds);
+        newEnd = std::max(newEnd, c.endSeconds);
+    }
+
+    const Climb keep = m_detectedClimbs[static_cast<size_t>(keepIdx)];
+    onClimbBoundaryEdited(keep.startSeconds, keep.endSeconds, newStart, newEnd);
+
+    std::sort(selected.rbegin(), selected.rend());
+    for (int idx : selected)
+    {
+        if (idx == keepIdx)
+            continue;
+        if (idx >= 0 && idx < static_cast<int>(m_detectedClimbs.size()))
+            m_detectedClimbs.erase(m_detectedClimbs.begin() + idx);
+    }
+
+    for (int i = 0; i < static_cast<int>(m_detectedClimbs.size()); ++i)
+        m_detectedClimbs[static_cast<size_t>(i)].name = QString("Climb %1").arg(i + 1);
+
+    refreshClimbViews(newStart, newEnd);
 }
 
 void MainWindow::updateClimbRowStyles()
@@ -3411,22 +3861,8 @@ void MainWindow::onClimbSelectionChanged()
     const double startSeconds = std::max(0.0, climb.startSeconds - padding);
     const double endSeconds = climb.endSeconds + padding;
 
-    const std::initializer_list<RideChartWidget*> all =
-        { m_powerChart, m_hrChart, m_cadenceChart, m_speedChart, m_altitudeChart,
-          m_climbPowerChart, m_climbHrChart, m_climbCadenceChart, m_climbSpeedChart, m_climbAltitudeChart };
-    for (auto* chart : all)
-    {
-        if (!chart)
-            continue;
-        chart->setXRange(startSeconds / 60.0, endSeconds / 60.0);
-        chart->setCrosshair(climb.startSeconds / 60.0);
-    }
-
-    if (m_mapRenderer)
-    {
-        m_mapRenderer->setVisibleTimeRange(climb.startSeconds, climb.endSeconds);
-        m_mapRenderer->fitToVisibleRange();
-    }
+    (void)startSeconds;
+    (void)endSeconds;
 
     if (m_climbSummaryLabel)
     {
@@ -3442,6 +3878,58 @@ void MainWindow::onClimbSelectionChanged()
     }
 
     updateClimbRowStyles();
+}
+
+void MainWindow::onClimbRowDoubleClicked(QTableWidgetItem* item)
+{
+    if (!item || !m_climbsTable)
+        return;
+
+    const int row = item->row();
+    auto* firstItem = m_climbsTable->item(row, 0);
+    if (!firstItem)
+        return;
+
+    const double selectedStart = firstItem->data(kClimbStartRole).toDouble();
+    const double selectedEnd = firstItem->data(kClimbEndRole).toDouble();
+
+    int climbIndex = -1;
+    for (int i = 0; i < static_cast<int>(m_detectedClimbs.size()); ++i)
+    {
+        const Climb& c = m_detectedClimbs[static_cast<size_t>(i)];
+        if (std::abs(c.startSeconds - selectedStart) < 0.75 &&
+            std::abs(c.endSeconds - selectedEnd) < 0.75)
+        {
+            climbIndex = i;
+            break;
+        }
+    }
+
+    if (climbIndex < 0)
+        return;
+
+    const Climb& climb = m_detectedClimbs[static_cast<size_t>(climbIndex)];
+    const double padding = std::max(5.0, climb.durationSeconds * 0.08);
+    const double rangeStart = std::max(0.0, climb.startSeconds - padding);
+    const double rangeEnd = climb.endSeconds + padding;
+
+    const std::initializer_list<RideChartWidget*> all =
+        { m_powerChart, m_hrChart, m_cadenceChart, m_speedChart, m_altitudeChart,
+          m_climbPowerChart, m_climbHrChart, m_climbCadenceChart, m_climbSpeedChart, m_climbAltitudeChart };
+    for (auto* chart : all)
+    {
+        if (!chart)
+            continue;
+        chart->setXRange(rangeStart / 60.0, rangeEnd / 60.0);
+        chart->setCrosshair(climb.startSeconds / 60.0);
+    }
+
+    if (m_mapRenderer)
+    {
+        m_mapRenderer->setVisibleTimeRange(climb.startSeconds, climb.endSeconds);
+        m_mapRenderer->fitToVisibleRange();
+        m_mapRenderer->setCurrentTime(climb.startSeconds);
+    }
 }
 
 void MainWindow::onClimbBoundaryEdited(
@@ -3554,29 +4042,19 @@ void MainWindow::onClimbBoundaryEdited(
 
         auto setNumericCell = [this, idx](int col, double value, int decimals, const QString& fallback = QStringLiteral("—"), bool alwaysNumeric = false)
         {
-            auto* item = m_climbsTable->item(idx, col);
-            if (!item)
-            {
-                item = new QTableWidgetItem;
-                m_climbsTable->setItem(idx, col, item);
-            }
-            item->setTextAlignment(Qt::AlignCenter);
+            QTableWidgetItem* item = nullptr;
             if (alwaysNumeric || value > 0.0)
-            {
-                item->setData(Qt::EditRole, value);
-                item->setText(QString::number(value, 'f', decimals));
-            }
+                item = new ClimbSortKeyTableItem(QString::number(value, 'f', decimals), value);
             else
-            {
-                item->setData(Qt::EditRole, -1.0);
-                item->setText(fallback);
-            }
+                item = new ClimbSortKeyTableItem(fallback, std::numeric_limits<double>::quiet_NaN());
+            item->setTextAlignment(Qt::AlignCenter);
+            m_climbsTable->setItem(idx, col, item);
         };
 
         auto* nameItem = m_climbsTable->item(idx, 0);
         if (!nameItem)
         {
-            nameItem = new QTableWidgetItem(rebuilt.name);
+            nameItem = new ClimbNameTableItem(rebuilt.name);
             m_climbsTable->setItem(idx, 0, nameItem);
         }
         nameItem->setData(kClimbStartRole, rebuilt.startSeconds);
@@ -3586,7 +4064,8 @@ void MainWindow::onClimbBoundaryEdited(
         setNumericCell(2, rebuilt.elevationGainM, 0, QStringLiteral("0"), true);
         setNumericCell(3, rebuilt.averageGradient, 1, QStringLiteral("0.0"), true);
         setNumericCell(4, rebuilt.maximumGradient, 1, QStringLiteral("0.0"), true);
-        setCell(5, fmtDur(rebuilt.durationSeconds));
+        m_climbsTable->setItem(idx, 5, new ClimbSortKeyTableItem(fmtDur(rebuilt.durationSeconds), rebuilt.durationSeconds));
+        m_climbsTable->item(idx, 5)->setTextAlignment(Qt::AlignCenter);
         setNumericCell(6, rebuilt.averagePower, 0);
         setNumericCell(7, rebuilt.normalizedPower, 0);
         setNumericCell(8, rebuilt.averageHeartRate, 0);
@@ -3599,6 +4078,82 @@ void MainWindow::onClimbBoundaryEdited(
     }
 
     onClimbSelectionChanged();
+}
+
+void MainWindow::onNewClimbRequested(double startSeconds, double endSeconds)
+{
+    if (!m_controller)
+        return;
+
+    const auto& ride = m_controller->rideData();
+    if (ride.records.empty())
+        return;
+
+    const double orderedStart = std::min(startSeconds, endSeconds);
+    const double orderedEnd = std::max(startSeconds, endSeconds);
+    if (orderedEnd - orderedStart < 1.0)
+        return;
+
+    auto nearestIndexForSecond = [&ride](double sec)
+    {
+        auto it = std::lower_bound(
+            ride.records.begin(),
+            ride.records.end(),
+            sec,
+            [](const RideRecord& r, double s) { return r.elapsedSeconds < s; });
+
+        if (it == ride.records.end())
+            return static_cast<int>(ride.records.size()) - 1;
+
+        int index = static_cast<int>(std::distance(ride.records.begin(), it));
+        if (index > 0)
+        {
+            const double currDist = std::abs(ride.records[static_cast<size_t>(index)].elapsedSeconds - sec);
+            const double prevDist = std::abs(ride.records[static_cast<size_t>(index - 1)].elapsedSeconds - sec);
+            if (prevDist < currDist)
+                --index;
+        }
+        return index;
+    };
+
+    int startIdx = nearestIndexForSecond(orderedStart);
+    int endIdx = nearestIndexForSecond(orderedEnd);
+    if (endIdx < startIdx)
+        std::swap(startIdx, endIdx);
+    if (endIdx <= startIdx)
+        endIdx = std::min(static_cast<int>(ride.records.size()) - 1, startIdx + 1);
+
+    const std::vector<double> cumulative = ClimbDetector::buildCumulativeDistanceMeters(ride);
+    const std::vector<double> smoothed = ClimbDetector::smoothAltitudeByDistance(
+        ride,
+        cumulative,
+        m_climbSmoothingSpin ? m_climbSmoothingSpin->value() : 50.0);
+    const std::vector<double> gradient = ClimbDetector::computeLocalGradientPct(smoothed, cumulative, 25.0);
+
+    Climb newClimb = ClimbMetrics::build(
+        ride,
+        cumulative,
+        smoothed,
+        gradient,
+        startIdx,
+        endIdx,
+        static_cast<int>(m_detectedClimbs.size()) + 1);
+
+    m_detectedClimbs.push_back(newClimb);
+    std::sort(
+        m_detectedClimbs.begin(),
+        m_detectedClimbs.end(),
+        [](const Climb& a, const Climb& b)
+        {
+            if (std::abs(a.startSeconds - b.startSeconds) > 0.1)
+                return a.startSeconds < b.startSeconds;
+            return a.endSeconds < b.endSeconds;
+        });
+
+    for (int i = 0; i < static_cast<int>(m_detectedClimbs.size()); ++i)
+        m_detectedClimbs[static_cast<size_t>(i)].name = QString("Climb %1").arg(i + 1);
+
+    refreshClimbViews(newClimb.startSeconds, newClimb.endSeconds);
 }
 
 void MainWindow::editCurrentActivityProperties()

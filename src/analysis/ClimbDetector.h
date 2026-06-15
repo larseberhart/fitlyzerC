@@ -12,6 +12,7 @@ struct ClimbDetectorConfig
 
     double startGradient = 3.0;
     double minStartContinuousDistanceMeters = 100.0;
+    double maxStartInterruptionMeters = 30.0;
 
     double maxDipMeters = 10.0;
     double maxDipDistanceMeters = 200.0;

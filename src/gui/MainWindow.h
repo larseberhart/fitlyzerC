@@ -9,6 +9,7 @@
 #include <QMainWindow>
 #include <QMenu>
 #include <QSplitter>
+#include <QStackedLayout>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSet>
@@ -36,6 +37,7 @@ class WelcomeWidget;
 class QCloseEvent;
 class QFileSystemWatcher;
 class QMimeData;
+class QPoint;
 class QTimer;
 
 class MainWindow : public QMainWindow
@@ -92,12 +94,21 @@ private:
     void updateHistogram();
     void updatePowerCurve();
     void updateFitnessChart();
+    void updateAnalysisEmptyStates();
     void updateIntervals();
     void updateClimbingTab();
     void detectClimbsAndRefresh();
+    void refreshClimbViews(double preferredStartSeconds = -1.0, double preferredEndSeconds = -1.0);
+    std::vector<int> selectedClimbIndicesFromTable() const;
+    void onClimbTableContextMenuRequested(const QPoint& pos);
+    void removeSelectedClimbs();
+    void editSelectedClimbBoundaries();
+    void joinSelectedClimbs();
     void updateClimbRowStyles();
     void onClimbSelectionChanged();
+    void onClimbRowDoubleClicked(QTableWidgetItem* item);
     void onClimbBoundaryEdited(double oldStartSeconds, double oldEndSeconds, double newStartSeconds, double newEndSeconds);
+    void onNewClimbRequested(double startSeconds, double endSeconds);
     void onIntervalSelectionChanged();
     void onIntervalRowDoubleClicked(QTableWidgetItem* item);
     void navigateToInterval(double startSeconds, double endSeconds, bool exactZoom);
@@ -179,6 +190,13 @@ private:
     // -- Tab widget ---------------------------------------------------------
     QTabWidget* m_tabWidget = nullptr;
     QTabWidget* m_analysisTabWidget = nullptr;
+    QStackedLayout* m_activityTabStack = nullptr;
+    QStackedLayout* m_zonesTabStack = nullptr;
+    QStackedLayout* m_histogramTabStack = nullptr;
+    QStackedLayout* m_powerCurveTabStack = nullptr;
+    QStackedLayout* m_calendarTabStack = nullptr;
+    QStackedLayout* m_fitnessTabStack = nullptr;
+    QStackedLayout* m_climbingTabStack = nullptr;
 
     static constexpr int kTabActivities = 0;
     static constexpr int kTabAnalysis   = 1;
@@ -254,7 +272,10 @@ private:
     QDoubleSpinBox* m_climbDipMetersSpin = nullptr;
     QDoubleSpinBox* m_climbDipDistanceSpin = nullptr;
     QDoubleSpinBox* m_climbSmoothingSpin = nullptr;
+    QCheckBox* m_climbOverlayEnabledCheck = nullptr;
+    QComboBox* m_climbOverlayMetricCombo = nullptr;
     std::vector<Climb> m_detectedClimbs;
+    bool m_suppressClimbAutoZoom = false;
 
     // Integrated map panel
     MapRenderer* m_mapRenderer = nullptr;

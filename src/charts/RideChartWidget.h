@@ -31,6 +31,7 @@ public:
     void setAutoSmoothingEnabled(bool enabled);
     void setIntervals(const std::vector<Interval>& intervals);
     void setClimbs(const std::vector<Climb>& climbs);
+    void setMetricOverlay(ColorMetric metric, bool enabled);
     void setSelectedClimbIndex(int index);
     void setClimbEditingEnabled(bool enabled);
     void clearChart();
@@ -55,6 +56,8 @@ signals:
         double oldEndSeconds,
         double newStartSeconds,
         double newEndSeconds);
+    void newClimbRequested(double startSeconds, double endSeconds);
+    void climbClicked(int climbIndex);
 
 protected:
     void wheelEvent(QWheelEvent* event) override;
@@ -73,23 +76,29 @@ private:
     std::vector<int> buildSampleIndices(const std::vector<double>& values, int targetPointBudget) const;
     void clearBackgroundSeries();
     void addZoneBackgroundBands(double minY, double maxY, double maxXMinutes);
+    void addMetricOverlayBands(double minY, double maxY);
     void addIntervalBackgroundBands(double minY, double maxY);
     void addClimbBackgroundBands(double minY, double maxY);
     void updateXTicks(double minVal, double maxVal);
-    void updateYAxis();   // recalculates nice range + tick count
+    void updateYAxis();   // recalculates nice range + tick count from full data
+    void updateYAxisForVisibleRange(double xMinMin, double xMaxMin); // rescale to visible window
 
     Metric          m_metric;
     QLineSeries*    m_series        = nullptr;
     std::vector<QLineSeries*> m_rawSeries;
     std::vector<QLineSeries*> m_colorSeries;
+    std::vector<QLineSeries*> m_overlaySeries;
     std::vector<QLineSeries*> m_referenceSeries;
     std::vector<QAreaSeries*> m_backgroundSeries;
     QValueAxis*     m_axisX         = nullptr;
     QCategoryAxis*  m_axisXDisplay  = nullptr;
     QValueAxis*     m_axisY         = nullptr;
+    QValueAxis*     m_axisYOverlay  = nullptr;
     RideData        m_rideData;
     std::vector<Interval> m_intervals;
     std::vector<Climb> m_climbs;
+    bool            m_metricOverlayEnabled = false;
+    ColorMetric     m_metricOverlayMetric = ColorMetric::None;
     ColorMetric     m_colorMetric   = ColorMetric::None;
     ColorContext    m_colorContext;
     std::unordered_map<int, std::vector<double>> m_powerSmoothingCache;
@@ -119,6 +128,10 @@ private:
     ClimbHandleDrag m_climbHandleDrag = ClimbHandleDrag::None;
     double          m_dragOriginalClimbStartSec = -1.0;
     double          m_dragOriginalClimbEndSec = -1.0;
+    bool            m_newClimbCreating = false;
+    bool            m_newClimbDragging = false;
+    double          m_newClimbStartSec = -1.0;
+    double          m_newClimbCurrentSec = -1.0;
     double          m_dataMinY      = 0.0;   // raw min from ride data
     double          m_dataMaxY      = 1.0;   // raw max from ride data
 };
