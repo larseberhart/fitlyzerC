@@ -210,6 +210,9 @@ void WorkoutController::reanalyze()
     IntervalDetector::Config cfg;
     cfg.ftp    = m_ftp;
     m_intervals = IntervalDetector::detect(m_rideData, cfg);
+
+    ClimbDetector::Config climbCfg;
+    m_climbs = ClimbDetector::detect(m_rideData, climbCfg);
 }
 
 void WorkoutController::loadOrGenerateIntervals()

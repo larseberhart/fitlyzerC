@@ -5,6 +5,7 @@
 #include <QString>
 
 #include "analysis/IntervalDetector.h"
+#include "analysis/ClimbDetector.h"
 #include "analysis/PowerCurve.h"
 #include "analysis/TrainingLoad.h"
 #include "analysis/TrainingMetrics.h"
@@ -40,6 +41,7 @@ public:
     const std::vector<ZoneDistribution>& powerZones()  const { return m_powerZones; }
     const std::vector<PowerCurvePoint>&  pdcPoints()   const { return m_pdcPoints; }
     const std::vector<Interval>&         intervals()   const { return m_intervals; }
+    const std::vector<Climb>&            climbs()      const { return m_climbs; }
 
     double normalizedPower()     const { return m_np;  }
     double intensityFactor()     const { return m_if;  }
@@ -70,6 +72,7 @@ private:
     std::vector<ZoneDistribution> m_powerZones;
     std::vector<PowerCurvePoint> m_pdcPoints;
     std::vector<Interval>        m_intervals;
+    std::vector<Climb>           m_climbs;
 
     double m_np  = 0.0;
     double m_if  = 0.0;
