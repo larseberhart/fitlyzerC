@@ -13,6 +13,7 @@
 #include "core/zones/ZoneDefinition.h"
 #include "database/ActivityRepository.h"
 #include "database/AthleteRepository.h"
+#include "database/ClimbRepository.h"
 #include "database/ImportRepository.h"
 #include "database/IntervalRepository.h"
 #include "fit/RideData.h"
@@ -33,7 +34,7 @@ public:
     int  currentAthleteId() const { return m_currentAthleteId; }
 
     bool loadFile(const QString& path, QString& errorOut);
-    int  importFile(const QString& path, QString& errorOut);
+    int  importFile(const QString& path, QString& errorOut, bool allowTimeOverlap = false);
     bool loadActivity(int activityId, QString& errorOut);
 
     const RideData&                      rideData()    const { return m_rideData; }
@@ -59,6 +60,7 @@ signals:
 private:
     void reanalyze();
     void loadOrGenerateIntervals();
+    void loadOrGenerateClimbs();
 
     double m_ftp               = 250.0;
     int    m_currentAthleteId  = -1;

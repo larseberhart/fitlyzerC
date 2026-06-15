@@ -16,6 +16,8 @@ struct ClimbQuarterMetrics
 
 struct Climb
 {
+    int    id = -1; // database row id (-1 = not yet persisted)
+
     double startSeconds = 0.0;
     double endSeconds = 0.0;
 
@@ -31,6 +33,7 @@ struct Climb
     double maximumGradient = 0.0;
 
     double averagePower = 0.0;
+    double averageWattsPerKg = 0.0;
     double normalizedPower = 0.0;
 
     double averageHeartRate = 0.0;
@@ -44,11 +47,15 @@ struct Climb
 
     double powerFadePct = 0.0;
 
+    double aerobicDecouplingPct = 0.0;
     double hrDriftPct = 0.0;
     double difficultyScore = 0.0;
 
     std::array<ClimbQuarterMetrics, 4> quarterMetrics{};
 
+    QString category;
+    QString shapeClass;
+    QString wattsPerKgRank;
     QString name;
 };
 

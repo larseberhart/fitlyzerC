@@ -12,9 +12,9 @@ int IntervalRepository::insertInterval(const IntervalRecord& interval)
     QSqlQuery q(m_db);
     q.prepare(
         "INSERT INTO intervals("
-        "activity_id, start_sample, end_sample, name, type, avg_power, np, avg_hr, avg_cadence, notes"
+        "activity_id, start_sample, end_sample, name, type, avg_power, np, avg_hr, avg_cadence, notes, source, locked"
         ") VALUES("
-        ":activity_id, :start_sample, :end_sample, :name, :type, :avg_power, :np, :avg_hr, :avg_cadence, :notes"
+        ":activity_id, :start_sample, :end_sample, :name, :type, :avg_power, :np, :avg_hr, :avg_cadence, :notes, :source, :locked"
         ")");
 
     q.bindValue(":activity_id", interval.activityId);
@@ -27,6 +27,8 @@ int IntervalRepository::insertInterval(const IntervalRecord& interval)
     q.bindValue(":avg_hr", interval.avgHr);
     q.bindValue(":avg_cadence", interval.avgCadence);
     q.bindValue(":notes", interval.notes);
+    q.bindValue(":source", interval.source);
+    q.bindValue(":locked", interval.locked ? 1 : 0);
 
     if (!q.exec())
         return -1;
@@ -56,7 +58,8 @@ QList<IntervalRecord> IntervalRepository::listIntervalsForActivity(int activityI
 
     QSqlQuery q(m_db);
     q.prepare(
-        "SELECT id, activity_id, start_sample, end_sample, name, type, avg_power, np, avg_hr, avg_cadence, notes "
+        "SELECT id, activity_id, start_sample, end_sample, name, type, avg_power, np, avg_hr, avg_cadence, notes, "
+        "COALESCE(source,'auto'), COALESCE(locked,0) "
         "FROM intervals WHERE activity_id=:id ORDER BY start_sample ASC");
     q.bindValue(":id", activityId);
     q.exec();
@@ -76,8 +79,18 @@ QList<IntervalRecord> IntervalRepository::listIntervalsForActivity(int activityI
         record.avgHr = q.value(col++).toDouble();
         record.avgCadence = q.value(col++).toDouble();
         record.notes = q.value(col++).toString();
+        record.source = q.value(col++).toString();
+        record.locked = q.value(col++).toInt() != 0;
         out.push_back(record);
     }
 
     return out;
+}
+
+bool IntervalRepository::hasLockedIntervals(int activityId)
+{
+    QSqlQuery q(m_db);
+    q.prepare("SELECT 1 FROM intervals WHERE activity_id=:id AND locked=1 LIMIT 1");
+    q.bindValue(":id", activityId);
+    return q.exec() && q.next();
 }

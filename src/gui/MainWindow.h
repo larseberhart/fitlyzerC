@@ -23,6 +23,7 @@
 #include "database/DatabaseManager.h"
 #include "database/ActivityRepository.h"
 #include "database/AthleteRepository.h"
+#include "database/ClimbRepository.h"
 #include "database/ImportRepository.h"
 
 class RideChartWidget;
@@ -39,6 +40,7 @@ class QFileSystemWatcher;
 class QMimeData;
 class QPoint;
 class QTimer;
+class QChartView;
 
 class MainWindow : public QMainWindow
 {
@@ -67,6 +69,8 @@ private slots:
     void onAthleteSelectionChanged(int index);
     void createVideo();
     void showAbout();
+    void triggerDetectClimbs();
+    void triggerDetectIntervals();
 
 private:
     void buildUI();
@@ -99,6 +103,10 @@ private:
     void updateClimbingTab();
     void detectClimbsAndRefresh();
     void refreshClimbViews(double preferredStartSeconds = -1.0, double preferredEndSeconds = -1.0);
+    void updateClimbQuarterCharts(const Climb* climb);
+    double resolveActiveActivityWeightKg() const;
+    void assignClimbWeightMetrics(Climb& climb, double riderWeightKg) const;
+    void applyWeightMetricsToClimbs(std::vector<Climb>& climbs, double riderWeightKg) const;
     std::vector<int> selectedClimbIndicesFromTable() const;
     void onClimbTableContextMenuRequested(const QPoint& pos);
     void removeSelectedClimbs();
@@ -227,6 +235,9 @@ private:
     RideChartWidget* m_climbHrChart = nullptr;
     RideChartWidget* m_climbCadenceChart = nullptr;
     RideChartWidget* m_climbSpeedChart = nullptr;
+    QChartView* m_climbQuarterPowerChart = nullptr;
+    QChartView* m_climbQuarterHrChart = nullptr;
+    QChartView* m_climbQuarterCadenceChart = nullptr;
 
     // Chart controls
     QPushButton* m_fitChartsButton            = nullptr;

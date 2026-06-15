@@ -5,7 +5,7 @@
 
 namespace DatabaseSchema {
 
-static constexpr int kCurrentVersion = 5;
+static constexpr int kCurrentVersion = 6;
 
 // Each string is one DDL statement (no semicolons needed for exec()).
 inline constexpr std::array kStatements = {
@@ -146,8 +146,43 @@ inline constexpr std::array kStatements = {
         "  np            REAL,"
         "  avg_hr        REAL,"
         "  avg_cadence   REAL,"
-        "  notes         TEXT"
+        "  notes         TEXT,"
+        "  source        TEXT    NOT NULL DEFAULT 'auto',"
+        "  locked        INTEGER NOT NULL DEFAULT 0,"
+        "  updated_at    TEXT"
         ")"
+    },
+    std::string_view{
+        "CREATE TABLE IF NOT EXISTS climbs ("
+        "  id               INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  activity_id      INTEGER NOT NULL REFERENCES activities(id) ON DELETE CASCADE,"
+        "  start_seconds    REAL    NOT NULL,"
+        "  end_seconds      REAL    NOT NULL,"
+        "  name             TEXT,"
+        "  elevation_gain_m REAL,"
+        "  length_km        REAL,"
+        "  average_gradient REAL,"
+        "  source           TEXT    NOT NULL DEFAULT 'auto',"
+        "  locked           INTEGER NOT NULL DEFAULT 0,"
+        "  created_at       TEXT    DEFAULT CURRENT_TIMESTAMP,"
+        "  updated_at       TEXT    DEFAULT CURRENT_TIMESTAMP"
+        ")"
+    },
+    std::string_view{
+        "CREATE INDEX IF NOT EXISTS idx_climbs_activity_id"
+        "  ON climbs(activity_id)"
+    },
+    std::string_view{
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_activity_filehash"
+        "  ON activities(fit_hash) WHERE fit_hash IS NOT NULL"
+    },
+    std::string_view{
+        "CREATE INDEX IF NOT EXISTS idx_activity_start_time"
+        "  ON activities(activity_start_time)"
+    },
+    std::string_view{
+        "CREATE INDEX IF NOT EXISTS idx_activity_end_time"
+        "  ON activities(end_time)"
     },
     std::string_view{
         "CREATE INDEX IF NOT EXISTS idx_intervals_activity"

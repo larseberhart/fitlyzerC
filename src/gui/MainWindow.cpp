@@ -48,6 +48,15 @@
 #include <QUrl>
 #include <QVBoxLayout>
 #include <QWidget>
+#include <QPainter>
+
+#include <QtCharts/QAbstractAxis>
+#include <QtCharts/QBarCategoryAxis>
+#include <QtCharts/QBarSeries>
+#include <QtCharts/QBarSet>
+#include <QtCharts/QChart>
+#include <QtCharts/QChartView>
+#include <QtCharts/QValueAxis>
 
 #include "ActivityBrowser.h"
 #include "AboutDialog.h"
@@ -65,10 +74,12 @@
 #include "charts/RideChartWidget.h"
 #include "analysis/ClimbDetector.h"
 #include "analysis/ClimbMetrics.h"
+#include "analysis/IntervalDetector.h"
 #include "core/settings/AppSettings.h"
 #include "core/settings/DateFormatter.h"
 #include "core/zones/ZoneCalculator.h"
 #include "database/AthleteRepository.h"
+#include "database/ClimbRepository.h"
 #include "database/IntervalRepository.h"
 #include "maps/MapRenderer.h"
 #include "model/RideDataSerializer.h"
@@ -79,6 +90,7 @@
 
 #include <cfloat>
 #include <cmath>
+#include <functional>
 #include <map>
 #include <numeric>
 
@@ -113,6 +125,14 @@ static QString formatActivityDateLabel(const QString& isoDate)
 }
 
 static QDate activityDateForFtpContext(const Activity& activity)
+{
+    const QString rawDate = !activity.startTime.isEmpty()
+        ? activity.startTime.left(10)
+        : activity.importedAt.left(10);
+    return QDate::fromString(rawDate, Qt::ISODate);
+}
+
+static QDate activityDateForWeightContext(const Activity& activity)
 {
     const QString rawDate = !activity.startTime.isEmpty()
         ? activity.startTime.left(10)
@@ -390,6 +410,16 @@ void MainWindow::buildUI()
         auto* createVideoAct = new QAction("Create Video...", this);
         connect(createVideoAct, &QAction::triggered, this, &MainWindow::createVideo);
         actsMenu->addAction(createVideoAct);
+
+        actsMenu->addSeparator();
+
+        auto* detectClimbsAct = new QAction("Detect Climbs...", this);
+        connect(detectClimbsAct, &QAction::triggered, this, &MainWindow::triggerDetectClimbs);
+        actsMenu->addAction(detectClimbsAct);
+
+        auto* detectIntervalsAct = new QAction("Detect Intervals...", this);
+        connect(detectIntervalsAct, &QAction::triggered, this, &MainWindow::triggerDetectIntervals);
+        actsMenu->addAction(detectIntervalsAct);
 
         // Athletes menu
         m_athletesMenu = menuBar()->addMenu("&Athletes");
@@ -949,6 +979,8 @@ void MainWindow::buildUI()
             record.avgHr = countHr > 0 ? (sumHr / static_cast<double>(countHr)) : 0.0;
             record.avgCadence = countCadence > 0 ? (sumCadence / static_cast<double>(countCadence)) : 0.0;
             record.notes = dlg.intervalNotes();
+            record.source = QStringLiteral("manual");
+            record.locked = true;
             repo.insertInterval(record);
             updateIntervals();
             statusBar()->showMessage("Manual interval saved from chart selection.", 2200);
@@ -1004,6 +1036,8 @@ void MainWindow::buildUI()
             record.name = dlg.intervalName();
             record.type = dlg.intervalType().isEmpty() ? QStringLiteral("Manual") : dlg.intervalType();
             record.notes = dlg.intervalNotes();
+            record.source = QStringLiteral("manual");
+            record.locked = true;
             repo.insertInterval(record);
             updateIntervals();
             statusBar()->showMessage("Manual interval saved.", 2000);
@@ -1088,6 +1122,53 @@ void MainWindow::buildUI()
         climbChartsVL->setSpacing(4);
         climbChartsVL->addWidget(m_climbAltitudeChart);
 
+        auto createQuarterChart = [climbingTab](const QString& title, const QColor& color)
+        {
+            auto* view = new QChartView(new QChart, climbingTab);
+            view->setRenderHint(QPainter::Antialiasing);
+            view->setMinimumHeight(160);
+            view->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+            view->chart()->setTitle(title);
+            view->chart()->setAnimationOptions(QChart::NoAnimation);
+            view->chart()->legend()->hide();
+            view->chart()->setBackgroundVisible(false);
+            view->setStyleSheet("background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px;");
+
+            auto* set = new QBarSet(title);
+            set->setColor(color);
+            *set << 0.0 << 0.0 << 0.0 << 0.0;
+
+            auto* series = new QBarSeries(view->chart());
+            series->append(set);
+            view->chart()->addSeries(series);
+
+            auto* axisX = new QBarCategoryAxis(view->chart());
+            axisX->append({ "Q1", "Q2", "Q3", "Q4" });
+            view->chart()->addAxis(axisX, Qt::AlignBottom);
+            series->attachAxis(axisX);
+
+            auto* axisY = new QValueAxis(view->chart());
+            axisY->setRange(0.0, 1.0);
+            view->chart()->addAxis(axisY, Qt::AlignLeft);
+            series->attachAxis(axisY);
+
+            return view;
+        };
+
+        auto* quarterCharts = new QWidget(climbingTab);
+        auto* quarterChartsHL = new QHBoxLayout(quarterCharts);
+        quarterChartsHL->setContentsMargins(0, 0, 0, 0);
+        quarterChartsHL->setSpacing(6);
+
+        m_climbQuarterPowerChart = createQuarterChart(QStringLiteral("Power by Quarter"), QColor(37, 99, 235));
+        m_climbQuarterHrChart = createQuarterChart(QStringLiteral("Heart Rate by Quarter"), QColor(220, 38, 38));
+        m_climbQuarterCadenceChart = createQuarterChart(QStringLiteral("Cadence by Quarter"), QColor(5, 150, 105));
+
+        quarterChartsHL->addWidget(m_climbQuarterPowerChart, 1);
+        quarterChartsHL->addWidget(m_climbQuarterHrChart, 1);
+        quarterChartsHL->addWidget(m_climbQuarterCadenceChart, 1);
+        climbChartsVL->addWidget(quarterCharts);
+
         m_climbMinLengthSpin = new QDoubleSpinBox(climbingTab);
         m_climbMinLengthSpin->setRange(0.1, 20.0);
         m_climbMinLengthSpin->setDecimals(2);
@@ -1110,7 +1191,7 @@ void MainWindow::buildUI()
         m_climbStartGradientSpin->setRange(0.5, 20.0);
         m_climbStartGradientSpin->setDecimals(1);
         m_climbStartGradientSpin->setSingleStep(0.5);
-        m_climbStartGradientSpin->setValue(3.0);
+        m_climbStartGradientSpin->setValue(3.5);
 
         m_climbDipMetersSpin = new QDoubleSpinBox(climbingTab);
         m_climbDipMetersSpin->setRange(0.0, 200.0);
@@ -1171,10 +1252,10 @@ void MainWindow::buildUI()
         colorBar->insertSpacing(2, 12);
         colorBar->insertWidget(3, climbParamsInline);
 
-          m_climbsTable = new QTableWidget(0, 15, climbingTab);
+                        m_climbsTable = new QTableWidget(0, 19, climbingTab);
         m_climbsTable->setHorizontalHeaderLabels(
             { "Name", "Length (km)", "Gain (m)", "Avg Gradient %", "Max Gradient %",
-              "Duration", "Avg Power", "NP", "Avg HR", "Avg Cadence", "Avg Speed", "VAM", "Fade %", "HR Drift %", "Difficulty" });
+                            "Duration", "Avg Power", "W/kg", "W/kg Rank", "NP", "Avg HR", "Avg Cadence", "Avg Speed", "VAM", "Fade %", "Decouple %", "Difficulty", "Category", "Shape" });
         m_climbsTable->horizontalHeader()->setStretchLastSection(true);
         m_climbsTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
         m_climbsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -1298,6 +1379,8 @@ void MainWindow::buildUI()
             for (auto* dst : climbChartsAll)
                 if (src != dst)
                     connect(src, &RideChartWidget::crosshairMoved, dst, &RideChartWidget::setCrosshair);
+
+        updateClimbQuarterCharts(nullptr);
 
         m_analysisTabWidget->addTab(
             wrapWithNoActivityState(climbingTab, &m_climbingTabStack),
@@ -2176,18 +2259,56 @@ void MainWindow::importFilesInternal(const QStringList& filePaths,
     for (const QString& filePath : filePaths)
     {
         QString err;
-        const int activityId = m_controller->importFile(filePath, err);
+        int activityId = m_controller->importFile(filePath, err);
         if (activityId > 0)
         {
             ++imported;
             continue;
         }
 
+        // Check for time-overlap warning (importFile returns -1 with err = "time_overlap:...")
+        if (err.startsWith("time_overlap:"))
+        {
+            // Parse overlap info: time_overlap:existStart:existDuration:newStart:newDuration
+            const QStringList parts = err.split(':');
+            // parts[0]="time_overlap", [1]=existStart date, [2]=existStart time, [3]=existDuration,
+            //   [4]=newStart date, [5]=newStart time, [6]=newDuration
+            // (ISO dates may have ':' in time portion, so reconstruct)
+            // Simple: extract known field positions
+            // Format was set as: "time_overlap:%1:%2:%3:%4" with ISO date strings and ints
+            // ISO strings look like 2026-06-15T09:02:33Z — they contain ':'
+            // We need to be smarter. Let's use a different separator.
+            // Actually the format uses %1 %2 %3 %4 with ints for durations; the issue is colons in ISO times.
+            // Since we can't parse reliably here, just show a simple dialog.
+            const int res = QMessageBox::warning(
+                this,
+                "Potential Duplicate Activity",
+                QString("A potential duplicate was detected for:\n%1\n\n"
+                        "An activity with the same start time already exists in the database.\n\n"
+                        "Import anyway?")
+                    .arg(QFileInfo(filePath).fileName()),
+                QMessageBox::Cancel | QMessageBox::Yes,
+                QMessageBox::Cancel);
+
+            if (res == QMessageBox::Yes)
+            {
+                err.clear();
+                activityId = m_controller->importFile(filePath, err, /*allowTimeOverlap=*/true);
+                if (activityId > 0)
+                {
+                    ++imported;
+                    continue;
+                }
+            }
+        }
+
         if (err.contains("duplicate", Qt::CaseInsensitive) ||
             err.contains("already", Qt::CaseInsensitive))
             ++duplicates;
-        else
+        else if (!err.startsWith("time_overlap:"))
             ++failed;
+        else
+            ++duplicates; // user cancelled overlap import counts as skipped
     }
 
     if (m_activityBrowser)
@@ -3494,7 +3615,24 @@ void MainWindow::updateIntervals()
 
 void MainWindow::updateClimbingTab()
 {
-    detectClimbsAndRefresh();
+    if (!m_climbsTable)
+        return;
+
+    const auto& ride = m_controller->rideData();
+    if (ride.records.empty())
+    {
+        m_detectedClimbs.clear();
+        m_climbsTable->setRowCount(0);
+        updateClimbQuarterCharts(nullptr);
+        if (m_climbSummaryLabel)
+            m_climbSummaryLabel->setText("Climb summary: select a climb");
+        return;
+    }
+
+    // Load stored climbs from controller (which loaded from DB, or detected+stored on first import)
+    m_detectedClimbs = m_controller->climbs();
+    applyWeightMetricsToClimbs(m_detectedClimbs, resolveActiveActivityWeightKg());
+    refreshClimbViews();
 }
 
 void MainWindow::refreshClimbViews(double preferredStartSeconds, double preferredEndSeconds)
@@ -3552,14 +3690,18 @@ void MainWindow::refreshClimbViews(double preferredStartSeconds, double preferre
         m_climbsTable->setItem(row, 4, mkNumericItem(climb.maximumGradient, 1));
         m_climbsTable->setItem(row, 5, mkSortKeyItem(fmtDur(climb.durationSeconds), climb.durationSeconds));
         m_climbsTable->setItem(row, 6, mkNumericItem(climb.averagePower > 0.0 ? climb.averagePower : std::numeric_limits<double>::quiet_NaN(), 0));
-        m_climbsTable->setItem(row, 7, mkNumericItem(climb.normalizedPower > 0.0 ? climb.normalizedPower : std::numeric_limits<double>::quiet_NaN(), 0));
-        m_climbsTable->setItem(row, 8, mkNumericItem(climb.averageHeartRate > 0.0 ? climb.averageHeartRate : std::numeric_limits<double>::quiet_NaN(), 0));
-        m_climbsTable->setItem(row, 9, mkNumericItem(climb.averageCadence > 0.0 ? climb.averageCadence : std::numeric_limits<double>::quiet_NaN(), 0));
-        m_climbsTable->setItem(row, 10, mkNumericItem(climb.averageSpeed > 0.0 ? climb.averageSpeed : std::numeric_limits<double>::quiet_NaN(), 1));
-        m_climbsTable->setItem(row, 11, mkNumericItem(climb.vam > 0.0 ? climb.vam : std::numeric_limits<double>::quiet_NaN(), 0));
-        m_climbsTable->setItem(row, 12, mkNumericItem(climb.powerFadePct, 1));
-        m_climbsTable->setItem(row, 13, mkNumericItem(climb.hrDriftPct, 1));
-        m_climbsTable->setItem(row, 14, mkNumericItem(climb.difficultyScore, 0));
+        m_climbsTable->setItem(row, 7, mkNumericItem(climb.averageWattsPerKg > 0.0 ? climb.averageWattsPerKg : std::numeric_limits<double>::quiet_NaN(), 2));
+        m_climbsTable->setItem(row, 8, mkSortKeyItem(climb.wattsPerKgRank.isEmpty() ? QStringLiteral("—") : climb.wattsPerKgRank, row));
+        m_climbsTable->setItem(row, 9, mkNumericItem(climb.normalizedPower > 0.0 ? climb.normalizedPower : std::numeric_limits<double>::quiet_NaN(), 0));
+        m_climbsTable->setItem(row, 10, mkNumericItem(climb.averageHeartRate > 0.0 ? climb.averageHeartRate : std::numeric_limits<double>::quiet_NaN(), 0));
+        m_climbsTable->setItem(row, 11, mkNumericItem(climb.averageCadence > 0.0 ? climb.averageCadence : std::numeric_limits<double>::quiet_NaN(), 0));
+        m_climbsTable->setItem(row, 12, mkNumericItem(climb.averageSpeed > 0.0 ? climb.averageSpeed : std::numeric_limits<double>::quiet_NaN(), 1));
+        m_climbsTable->setItem(row, 13, mkNumericItem(climb.vam > 0.0 ? climb.vam : std::numeric_limits<double>::quiet_NaN(), 0));
+        m_climbsTable->setItem(row, 14, mkNumericItem(climb.powerFadePct, 1));
+        m_climbsTable->setItem(row, 15, mkNumericItem(climb.aerobicDecouplingPct, 1));
+        m_climbsTable->setItem(row, 16, mkNumericItem(climb.difficultyScore, 0));
+        m_climbsTable->setItem(row, 17, mkSortKeyItem(climb.category.isEmpty() ? QStringLiteral("—") : climb.category, row));
+        m_climbsTable->setItem(row, 18, mkSortKeyItem(climb.shapeClass.isEmpty() ? QStringLiteral("—") : climb.shapeClass, row));
     }
 
     m_climbsTable->resizeColumnsToContents();
@@ -3599,6 +3741,89 @@ void MainWindow::refreshClimbViews(double preferredStartSeconds, double preferre
     m_suppressClimbAutoZoom = false;
 }
 
+void MainWindow::updateClimbQuarterCharts(const Climb* climb)
+{
+    auto updateChart = [climb](QChartView* view,
+                               const QString& title,
+                               const QColor& color,
+                               const std::function<double(const ClimbQuarterMetrics&)>& metric,
+                               int decimals,
+                               const QString& axisLabel)
+    {
+        if (!view || !view->chart())
+            return;
+
+        QChart* chart = view->chart();
+        chart->setTitle(title);
+        chart->removeAllSeries();
+
+        const auto oldAxes = chart->axes();
+        for (QAbstractAxis* axis : oldAxes)
+        {
+            chart->removeAxis(axis);
+            delete axis;
+        }
+
+        auto* set = new QBarSet(title);
+        set->setColor(color);
+
+        double maxValue = 1.0;
+        for (int q = 0; q < 4; ++q)
+        {
+            double value = 0.0;
+            if (climb)
+            {
+                value = metric(climb->quarterMetrics[static_cast<size_t>(q)]);
+                if (!std::isfinite(value) || value < 0.0)
+                    value = 0.0;
+            }
+
+            *set << value;
+            maxValue = std::max(maxValue, value);
+        }
+
+        auto* series = new QBarSeries(chart);
+        series->append(set);
+        chart->addSeries(series);
+
+        auto* axisX = new QBarCategoryAxis(chart);
+        axisX->append({ QStringLiteral("Q1"), QStringLiteral("Q2"), QStringLiteral("Q3"), QStringLiteral("Q4") });
+        chart->addAxis(axisX, Qt::AlignBottom);
+        series->attachAxis(axisX);
+
+        auto* axisY = new QValueAxis(chart);
+        axisY->setRange(0.0, maxValue * 1.15);
+        axisY->setLabelFormat(decimals > 0 ? QString("%%.%1f").arg(decimals) : QString("%.0f"));
+        axisY->setTitleText(axisLabel);
+        chart->addAxis(axisY, Qt::AlignLeft);
+        series->attachAxis(axisY);
+    };
+
+    updateChart(
+        m_climbQuarterPowerChart,
+        QStringLiteral("Power by Quarter"),
+        QColor(37, 99, 235),
+        [](const ClimbQuarterMetrics& m) { return m.averagePower; },
+        0,
+        QStringLiteral("W"));
+
+    updateChart(
+        m_climbQuarterHrChart,
+        QStringLiteral("Heart Rate by Quarter"),
+        QColor(220, 38, 38),
+        [](const ClimbQuarterMetrics& m) { return m.averageHeartRate; },
+        0,
+        QStringLiteral("bpm"));
+
+    updateChart(
+        m_climbQuarterCadenceChart,
+        QStringLiteral("Cadence by Quarter"),
+        QColor(5, 150, 105),
+        [](const ClimbQuarterMetrics& m) { return m.averageCadence; },
+        0,
+        QStringLiteral("rpm"));
+}
+
 void MainWindow::detectClimbsAndRefresh()
 {
     if (!m_climbsTable)
@@ -3609,6 +3834,7 @@ void MainWindow::detectClimbsAndRefresh()
     {
         m_detectedClimbs.clear();
         m_climbsTable->setRowCount(0);
+        updateClimbQuarterCharts(nullptr);
         if (m_climbSummaryLabel)
             m_climbSummaryLabel->setText("Climb summary: select a climb");
         return;
@@ -3618,14 +3844,82 @@ void MainWindow::detectClimbsAndRefresh()
     cfg.minLengthKm = m_climbMinLengthSpin ? m_climbMinLengthSpin->value() : 0.5;
     cfg.minElevationGainM = m_climbMinGainSpin ? m_climbMinGainSpin->value() : 30.0;
     cfg.minAverageGradient = m_climbMinGradientSpin ? m_climbMinGradientSpin->value() : 3.0;
-    cfg.startGradient = m_climbStartGradientSpin ? m_climbStartGradientSpin->value() : 3.0;
+    cfg.startGradient = m_climbStartGradientSpin ? m_climbStartGradientSpin->value() : 3.5;
     cfg.maxDipMeters = m_climbDipMetersSpin ? m_climbDipMetersSpin->value() : 10.0;
     cfg.maxDipDistanceMeters = m_climbDipDistanceSpin ? m_climbDipDistanceSpin->value() : 200.0;
     cfg.elevationSmoothingMeters = m_climbSmoothingSpin ? m_climbSmoothingSpin->value() : 50.0;
 
     m_detectedClimbs = ClimbDetector::detect(ride, cfg);
+    applyWeightMetricsToClimbs(m_detectedClimbs, resolveActiveActivityWeightKg());
 
     refreshClimbViews();
+}
+
+double MainWindow::resolveActiveActivityWeightKg() const
+{
+    if (!m_dbManager.isOpen() || !m_controller || m_controller->currentActivityId() <= 0)
+        return 0.0;
+
+    auto db = m_dbManager.database();
+    ActivityRepository activityRepo(db);
+    const Activity activity = activityRepo.getActivity(m_controller->currentActivityId());
+
+    if (activity.weightKg > 0.0)
+        return activity.weightKg;
+
+    if (m_currentAthleteId <= 0)
+        return 0.0;
+
+    const QDate activityDate = activityDateForWeightContext(activity);
+    AthleteRepository athleteRepo(db);
+    const QList<WeightEntry> weightHistory = athleteRepo.getWeightHistory(m_currentAthleteId);
+
+    if (weightHistory.isEmpty())
+        return 0.0;
+
+    if (activityDate.isValid())
+    {
+        for (const WeightEntry& entry : weightHistory)
+        {
+            const QDate entryDate = QDate::fromString(entry.effectiveFrom, Qt::ISODate);
+            if (!entryDate.isValid() || entryDate <= activityDate)
+            {
+                if (entry.weightKg > 0.0)
+                    return entry.weightKg;
+            }
+        }
+    }
+
+    return weightHistory.front().weightKg > 0.0 ? weightHistory.front().weightKg : 0.0;
+}
+
+void MainWindow::assignClimbWeightMetrics(Climb& climb, double riderWeightKg) const
+{
+    climb.averageWattsPerKg = 0.0;
+    climb.wattsPerKgRank.clear();
+
+    if (riderWeightKg <= 0.0 || climb.averagePower <= 0.0)
+        return;
+
+    climb.averageWattsPerKg = climb.averagePower / riderWeightKg;
+    const double wkg = climb.averageWattsPerKg;
+
+    if (wkg >= 4.5)
+        climb.wattsPerKgRank = QStringLiteral("Elite");
+    else if (wkg >= 3.8)
+        climb.wattsPerKgRank = QStringLiteral("Very Strong");
+    else if (wkg >= 3.2)
+        climb.wattsPerKgRank = QStringLiteral("Strong");
+    else if (wkg >= 2.5)
+        climb.wattsPerKgRank = QStringLiteral("Moderate");
+    else
+        climb.wattsPerKgRank = QStringLiteral("Developing");
+}
+
+void MainWindow::applyWeightMetricsToClimbs(std::vector<Climb>& climbs, double riderWeightKg) const
+{
+    for (Climb& climb : climbs)
+        assignClimbWeightMetrics(climb, riderWeightKg);
 }
 
 std::vector<int> MainWindow::selectedClimbIndicesFromTable() const
@@ -3705,6 +3999,22 @@ void MainWindow::removeSelectedClimbs()
     if (selected.empty())
         return;
 
+    // Persist deletions to DB
+    if (m_dbManager.isOpen() && m_controller->currentActivityId() > 0)
+    {
+        auto db = m_dbManager.database();
+        ClimbRepository repo(db);
+        for (int idx : selected)
+        {
+            if (idx >= 0 && idx < static_cast<int>(m_detectedClimbs.size()))
+            {
+                const int climbId = m_detectedClimbs[static_cast<size_t>(idx)].id;
+                if (climbId > 0)
+                    repo.deleteClimb(climbId);
+            }
+        }
+    }
+
     std::sort(selected.rbegin(), selected.rend());
     for (int idx : selected)
     {
@@ -3772,16 +4082,39 @@ void MainWindow::joinSelectedClimbs()
         newEnd = std::max(newEnd, c.endSeconds);
     }
 
+    // Update the kept climb boundaries (persists to DB with locked=1, source='edited')
     const Climb keep = m_detectedClimbs[static_cast<size_t>(keepIdx)];
     onClimbBoundaryEdited(keep.startSeconds, keep.endSeconds, newStart, newEnd);
 
-    std::sort(selected.rbegin(), selected.rend());
-    for (int idx : selected)
+    // Delete the merged-away climbs from DB
+    if (m_dbManager.isOpen() && m_controller->currentActivityId() > 0)
     {
-        if (idx == keepIdx)
-            continue;
-        if (idx >= 0 && idx < static_cast<int>(m_detectedClimbs.size()))
-            m_detectedClimbs.erase(m_detectedClimbs.begin() + idx);
+        auto db = m_dbManager.database();
+        ClimbRepository repo(db);
+        std::sort(selected.rbegin(), selected.rend());
+        for (int idx : selected)
+        {
+            if (idx == keepIdx)
+                continue;
+            if (idx >= 0 && idx < static_cast<int>(m_detectedClimbs.size()))
+            {
+                const int climbId = m_detectedClimbs[static_cast<size_t>(idx)].id;
+                if (climbId > 0)
+                    repo.deleteClimb(climbId);
+                m_detectedClimbs.erase(m_detectedClimbs.begin() + idx);
+            }
+        }
+    }
+    else
+    {
+        std::sort(selected.rbegin(), selected.rend());
+        for (int idx : selected)
+        {
+            if (idx == keepIdx)
+                continue;
+            if (idx >= 0 && idx < static_cast<int>(m_detectedClimbs.size()))
+                m_detectedClimbs.erase(m_detectedClimbs.begin() + idx);
+        }
     }
 
     for (int i = 0; i < static_cast<int>(m_detectedClimbs.size()); ++i)
@@ -3821,6 +4154,7 @@ void MainWindow::onClimbSelectionChanged()
     {
         if (m_climbAltitudeChart)
             m_climbAltitudeChart->setSelectedClimbIndex(-1);
+        updateClimbQuarterCharts(nullptr);
         updateClimbRowStyles();
         if (m_climbSummaryLabel)
             m_climbSummaryLabel->setText("Climb summary: select a climb");
@@ -3850,6 +4184,7 @@ void MainWindow::onClimbSelectionChanged()
     {
         if (m_climbAltitudeChart)
             m_climbAltitudeChart->setSelectedClimbIndex(-1);
+        updateClimbQuarterCharts(nullptr);
         return;
     }
 
@@ -3857,6 +4192,7 @@ void MainWindow::onClimbSelectionChanged()
         m_climbAltitudeChart->setSelectedClimbIndex(climbIndex);
 
     const Climb& climb = m_detectedClimbs[static_cast<size_t>(climbIndex)];
+    updateClimbQuarterCharts(&climb);
     const double padding = std::max(5.0, climb.durationSeconds * 0.08);
     const double startSeconds = std::max(0.0, climb.startSeconds - padding);
     const double endSeconds = climb.endSeconds + padding;
@@ -3866,15 +4202,22 @@ void MainWindow::onClimbSelectionChanged()
 
     if (m_climbSummaryLabel)
     {
+        const QString wkgText = climb.averageWattsPerKg > 0.0
+            ? QString::number(climb.averageWattsPerKg, 'f', 2)
+            : QStringLiteral("—");
         m_climbSummaryLabel->setText(
-            QString("%1 | %2 | Gain %3 m | Avg %4%% | VAM %5 m/h | Fade %6%% | HR drift %7%%")
+            QString("%1 | %2 | Gain %3 m | Avg %4%% | W/kg %5 (%6) | VAM %7 m/h | Fade %8%% | Decouple %9%% | %10 | %11")
                 .arg(climb.name)
                 .arg(fmtDur(climb.durationSeconds))
                 .arg(climb.elevationGainM, 0, 'f', 0)
                 .arg(climb.averageGradient, 0, 'f', 1)
+                .arg(wkgText)
+                .arg(climb.wattsPerKgRank.isEmpty() ? QStringLiteral("—") : climb.wattsPerKgRank)
                 .arg(climb.vam, 0, 'f', 0)
                 .arg(climb.powerFadePct, 0, 'f', 1)
-                .arg(climb.hrDriftPct, 0, 'f', 1));
+                .arg(climb.aerobicDecouplingPct, 0, 'f', 1)
+                .arg(climb.category)
+                .arg(climb.shapeClass));
     }
 
     updateClimbRowStyles();
@@ -4007,8 +4350,49 @@ void MainWindow::onClimbBoundaryEdited(
         endIdx,
         idx + 1);
 
+    assignClimbWeightMetrics(rebuilt, resolveActiveActivityWeightKg());
+
     rebuilt.name = m_detectedClimbs[static_cast<size_t>(idx)].name;
+    rebuilt.id   = m_detectedClimbs[static_cast<size_t>(idx)].id;
     m_detectedClimbs[static_cast<size_t>(idx)] = rebuilt;
+
+    // Persist boundary change to DB
+    if (m_dbManager.isOpen() && m_controller->currentActivityId() > 0)
+    {
+        auto db = m_dbManager.database();
+        ClimbRepository repo(db);
+        const Climb& c = m_detectedClimbs[static_cast<size_t>(idx)];
+        if (c.id > 0)
+        {
+            ClimbRecord record;
+            record.id              = c.id;
+            record.activityId      = m_controller->currentActivityId();
+            record.startSeconds    = c.startSeconds;
+            record.endSeconds      = c.endSeconds;
+            record.name            = c.name;
+            record.elevationGainM  = c.elevationGainM;
+            record.lengthKm        = c.lengthKm;
+            record.averageGradient = c.averageGradient;
+            record.source          = QStringLiteral("edited");
+            record.locked          = true;
+            repo.updateClimb(record);
+        }
+        else
+        {
+            // Not yet in DB (e.g., live preview detection), insert it
+            ClimbRecord record;
+            record.activityId      = m_controller->currentActivityId();
+            record.startSeconds    = c.startSeconds;
+            record.endSeconds      = c.endSeconds;
+            record.name            = c.name;
+            record.elevationGainM  = c.elevationGainM;
+            record.lengthKm        = c.lengthKm;
+            record.averageGradient = c.averageGradient;
+            record.source          = QStringLiteral("edited");
+            record.locked          = true;
+            m_detectedClimbs[static_cast<size_t>(idx)].id = repo.insertClimb(record);
+        }
+    }
 
     const auto applyClimbOverlays = [this](RideChartWidget* chart)
     {
@@ -4067,14 +4451,18 @@ void MainWindow::onClimbBoundaryEdited(
         m_climbsTable->setItem(idx, 5, new ClimbSortKeyTableItem(fmtDur(rebuilt.durationSeconds), rebuilt.durationSeconds));
         m_climbsTable->item(idx, 5)->setTextAlignment(Qt::AlignCenter);
         setNumericCell(6, rebuilt.averagePower, 0);
-        setNumericCell(7, rebuilt.normalizedPower, 0);
-        setNumericCell(8, rebuilt.averageHeartRate, 0);
-        setNumericCell(9, rebuilt.averageCadence, 0);
-        setNumericCell(10, rebuilt.averageSpeed, 1);
-        setNumericCell(11, rebuilt.vam, 0);
-        setNumericCell(12, rebuilt.powerFadePct, 1, QStringLiteral("0.0"), true);
-        setNumericCell(13, rebuilt.hrDriftPct, 1, QStringLiteral("0.0"), true);
-        setNumericCell(14, rebuilt.difficultyScore, 0, QStringLiteral("0"), true);
+        setNumericCell(7, rebuilt.averageWattsPerKg, 2);
+        setCell(8, rebuilt.wattsPerKgRank.isEmpty() ? QStringLiteral("—") : rebuilt.wattsPerKgRank);
+        setNumericCell(9, rebuilt.normalizedPower, 0);
+        setNumericCell(10, rebuilt.averageHeartRate, 0);
+        setNumericCell(11, rebuilt.averageCadence, 0);
+        setNumericCell(12, rebuilt.averageSpeed, 1);
+        setNumericCell(13, rebuilt.vam, 0);
+        setNumericCell(14, rebuilt.powerFadePct, 1, QStringLiteral("0.0"), true);
+        setNumericCell(15, rebuilt.aerobicDecouplingPct, 1, QStringLiteral("0.0"), true);
+        setNumericCell(16, rebuilt.difficultyScore, 0, QStringLiteral("0"), true);
+        setCell(17, rebuilt.category.isEmpty() ? QStringLiteral("—") : rebuilt.category);
+        setCell(18, rebuilt.shapeClass.isEmpty() ? QStringLiteral("—") : rebuilt.shapeClass);
     }
 
     onClimbSelectionChanged();
@@ -4139,6 +4527,26 @@ void MainWindow::onNewClimbRequested(double startSeconds, double endSeconds)
         endIdx,
         static_cast<int>(m_detectedClimbs.size()) + 1);
 
+    assignClimbWeightMetrics(newClimb, resolveActiveActivityWeightKg());
+
+    // Persist new manual climb to DB
+    if (m_dbManager.isOpen() && m_controller->currentActivityId() > 0)
+    {
+        auto db = m_dbManager.database();
+        ClimbRepository repo(db);
+        ClimbRecord record;
+        record.activityId      = m_controller->currentActivityId();
+        record.startSeconds    = newClimb.startSeconds;
+        record.endSeconds      = newClimb.endSeconds;
+        record.name            = newClimb.name;
+        record.elevationGainM  = newClimb.elevationGainM;
+        record.lengthKm        = newClimb.lengthKm;
+        record.averageGradient = newClimb.averageGradient;
+        record.source          = QStringLiteral("manual");
+        record.locked          = true;
+        newClimb.id = repo.insertClimb(record);
+    }
+
     m_detectedClimbs.push_back(newClimb);
     std::sort(
         m_detectedClimbs.begin(),
@@ -4154,6 +4562,129 @@ void MainWindow::onNewClimbRequested(double startSeconds, double endSeconds)
         m_detectedClimbs[static_cast<size_t>(i)].name = QString("Climb %1").arg(i + 1);
 
     refreshClimbViews(newClimb.startSeconds, newClimb.endSeconds);
+}
+
+void MainWindow::triggerDetectClimbs()
+{
+    if (!m_dbManager.isOpen() || m_controller->currentActivityId() <= 0)
+    {
+        QMessageBox::information(this, "Detect Climbs", "No activity loaded.");
+        return;
+    }
+
+    const auto& ride = m_controller->rideData();
+    if (ride.records.empty())
+        return;
+
+    // Check for locked (user-edited) climbs
+    auto db = m_dbManager.database();
+    ClimbRepository repo(db);
+    if (repo.hasLockedClimbs(m_controller->currentActivityId()))
+    {
+        const int answer = QMessageBox::warning(
+            this,
+            "Detect Climbs",
+            "This activity contains manually edited climbs.\n\n"
+            "Re-detecting climbs will overwrite all existing climbs,\n"
+            "including manual changes.\n\nContinue?",
+            QMessageBox::Cancel | QMessageBox::Yes,
+            QMessageBox::Cancel);
+        if (answer != QMessageBox::Yes)
+            return;
+    }
+
+    // Delete all existing climbs for this activity
+    repo.deleteClimbsForActivity(m_controller->currentActivityId());
+
+    // Run detection with current spin box params
+    ClimbDetector::Config cfg;
+    cfg.minLengthKm          = m_climbMinLengthSpin    ? m_climbMinLengthSpin->value()    : 0.5;
+    cfg.minElevationGainM    = m_climbMinGainSpin      ? m_climbMinGainSpin->value()      : 30.0;
+    cfg.minAverageGradient   = m_climbMinGradientSpin  ? m_climbMinGradientSpin->value()  : 3.0;
+    cfg.startGradient        = m_climbStartGradientSpin? m_climbStartGradientSpin->value(): 3.5;
+    cfg.maxDipMeters         = m_climbDipMetersSpin    ? m_climbDipMetersSpin->value()    : 10.0;
+    cfg.maxDipDistanceMeters = m_climbDipDistanceSpin  ? m_climbDipDistanceSpin->value()  : 200.0;
+    cfg.elevationSmoothingMeters = m_climbSmoothingSpin? m_climbSmoothingSpin->value()    : 50.0;
+
+    m_detectedClimbs = ClimbDetector::detect(ride, cfg);
+    applyWeightMetricsToClimbs(m_detectedClimbs, resolveActiveActivityWeightKg());
+
+    // Store to DB
+    for (Climb& c : m_detectedClimbs)
+    {
+        ClimbRecord record;
+        record.activityId      = m_controller->currentActivityId();
+        record.startSeconds    = c.startSeconds;
+        record.endSeconds      = c.endSeconds;
+        record.name            = c.name;
+        record.elevationGainM  = c.elevationGainM;
+        record.lengthKm        = c.lengthKm;
+        record.averageGradient = c.averageGradient;
+        record.source          = QStringLiteral("auto");
+        record.locked          = false;
+        c.id = repo.insertClimb(record);
+    }
+
+    refreshClimbViews();
+    statusBar()->showMessage(
+        QString("Detected %1 climb(s) and saved to database.").arg(m_detectedClimbs.size()),
+        3000);
+}
+
+void MainWindow::triggerDetectIntervals()
+{
+    if (!m_dbManager.isOpen() || m_controller->currentActivityId() <= 0)
+    {
+        QMessageBox::information(this, "Detect Intervals", "No activity loaded.");
+        return;
+    }
+
+    auto db = m_dbManager.database();
+    IntervalRepository repo(db);
+
+    // Check for locked (user-edited) intervals
+    if (repo.hasLockedIntervals(m_controller->currentActivityId()))
+    {
+        const int answer = QMessageBox::warning(
+            this,
+            "Detect Intervals",
+            "This activity contains manually edited intervals.\n\n"
+            "Re-detecting intervals will overwrite all existing intervals,\n"
+            "including manual changes.\n\nContinue?",
+            QMessageBox::Cancel | QMessageBox::Yes,
+            QMessageBox::Cancel);
+        if (answer != QMessageBox::Yes)
+            return;
+    }
+
+    repo.deleteIntervalsForActivity(m_controller->currentActivityId());
+
+    // Run detection
+    IntervalDetector::Config cfg;
+    cfg.ftp = m_controller->ftp();
+    const std::vector<Interval> detected = IntervalDetector::detect(m_controller->rideData(), cfg);
+
+    for (const Interval& iv : detected)
+    {
+        IntervalRecord record;
+        record.activityId  = m_controller->currentActivityId();
+        record.startSample = static_cast<int>(std::round(iv.startSeconds));
+        record.endSample   = static_cast<int>(std::round(iv.endSeconds));
+        record.name        = QString::fromStdString(iv.label);
+        record.type        = QString::fromStdString(iv.label);
+        record.avgPower    = iv.averagePower;
+        record.np          = iv.normalizedPower;
+        record.avgHr       = iv.averageHeartRate;
+        record.avgCadence  = iv.averageCadence;
+        record.source      = QStringLiteral("auto");
+        record.locked      = false;
+        repo.insertInterval(record);
+    }
+
+    updateIntervals();
+    statusBar()->showMessage(
+        QString("Detected %1 interval(s) and saved to database.").arg(detected.size()),
+        3000);
 }
 
 void MainWindow::editCurrentActivityProperties()

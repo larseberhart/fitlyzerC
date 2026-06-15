@@ -3,12 +3,17 @@
 #include <QCryptographicHash>
 #include <QFile>
 #include <QFileInfo>
+#include <QSqlQuery>
 
+#include <algorithm>
 #include <cmath>
 
+#include "analysis/ClimbDetector.h"
+#include "analysis/ClimbMetrics.h"
 #include "analysis/TrainingLoad.h"
 #include "analysis/TrainingMetrics.h"
 #include "core/zones/ZoneCalculator.h"
+#include "database/ClimbRepository.h"
 #include "database/DatabaseManager.h"
 #include "database/IntervalRepository.h"
 #include "fit/FitParser.h"
@@ -94,7 +99,7 @@ bool WorkoutController::loadFile(const QString& path, QString& errorOut)
     }
 }
 
-int WorkoutController::importFile(const QString& path, QString& errorOut)
+int WorkoutController::importFile(const QString& path, QString& errorOut, bool allowTimeOverlap)
 {
     if (!m_dbManager || !m_dbManager->isOpen())
     {
@@ -126,6 +131,32 @@ int WorkoutController::importFile(const QString& path, QString& errorOut)
         fitHash = QCryptographicHash::hash(f.readAll(), QCryptographicHash::Sha256)
                   .toHex();
         f.close();
+    }
+
+    // ── Level 2: Time-overlap detection ───────────────────────────────────
+    if (!allowTimeOverlap && !ride.activityStartTimeUtc.isEmpty())
+    {
+        auto db = m_dbManager->database();
+        QSqlQuery q(db);
+        q.prepare(
+            "SELECT id, activity_start_time, end_time, duration_sec "
+            "FROM activities WHERE athlete_id=:aid AND activity_start_time=:st LIMIT 1");
+        q.bindValue(":aid", m_currentAthleteId);
+        q.bindValue(":st",  ride.activityStartTimeUtc);
+        if (q.exec() && q.next())
+        {
+            const QString existStart    = q.value(1).toString();
+            const double  existDuration = q.value(3).toDouble();
+            const double  newDuration   = ride.records.empty() ? 0.0 : ride.records.back().elapsedSeconds;
+
+            // Build info string for the dialog shown in MainWindow
+            errorOut = QString("time_overlap:%1:%2:%3:%4")
+                           .arg(existStart)
+                           .arg(static_cast<int>(existDuration))
+                           .arg(ride.activityStartTimeUtc)
+                           .arg(static_cast<int>(newDuration));
+            return -1;
+        }
     }
 
     WorkoutAnalyzer analyzer;
@@ -181,6 +212,7 @@ bool WorkoutController::loadActivity(int activityId, QString& errorOut)
 
     reanalyze();
     loadOrGenerateIntervals();
+    loadOrGenerateClimbs();
     emit workoutLoaded();
     return true;
 }
@@ -260,6 +292,87 @@ void WorkoutController::loadOrGenerateIntervals()
         record.np = iv.normalizedPower;
         record.avgHr = iv.averageHeartRate;
         record.avgCadence = iv.averageCadence;
+        record.source = QStringLiteral("auto");
+        record.locked = false;
         repo.insertInterval(record);
+    }
+}
+
+void WorkoutController::loadOrGenerateClimbs()
+{
+    if (!m_dbManager || !m_dbManager->isOpen() || m_currentActivityId <= 0)
+        return;
+
+    auto db = m_dbManager->database();
+    ClimbRepository repo(db);
+
+    if (repo.hasClimbs(m_currentActivityId))
+    {
+        // Load from DB: rebuild full metrics from ride data using stored boundaries
+        const QList<ClimbRecord> stored = repo.climbsForActivity(m_currentActivityId);
+        m_climbs.clear();
+        m_climbs.reserve(static_cast<size_t>(stored.size()));
+
+        if (m_rideData.records.empty())
+            return;
+
+        // Build analysis vectors once with default config
+        ClimbDetector::Config cfg;
+        const std::vector<double> cumulative = ClimbDetector::buildCumulativeDistanceMeters(m_rideData);
+        const std::vector<double> smoothed   = ClimbDetector::smoothAltitudeByDistance(
+            m_rideData, cumulative, cfg.elevationSmoothingMeters);
+        const std::vector<double> gradient   = ClimbDetector::computeLocalGradientPct(
+            smoothed, cumulative, cfg.gradientWindowHalfMeters);
+
+        auto nearestIdx = [this](double sec) -> int
+        {
+            auto it = std::lower_bound(
+                m_rideData.records.begin(), m_rideData.records.end(), sec,
+                [](const RideRecord& r, double s) { return r.elapsedSeconds < s; });
+            if (it == m_rideData.records.end())
+                return static_cast<int>(m_rideData.records.size()) - 1;
+            int idx = static_cast<int>(std::distance(m_rideData.records.begin(), it));
+            if (idx > 0)
+            {
+                const double curr = std::abs(m_rideData.records[static_cast<size_t>(idx)].elapsedSeconds - sec);
+                const double prev = std::abs(m_rideData.records[static_cast<size_t>(idx - 1)].elapsedSeconds - sec);
+                if (prev < curr) --idx;
+            }
+            return idx;
+        };
+
+        for (int ordinal = 0; ordinal < stored.size(); ++ordinal)
+        {
+            const ClimbRecord& record = stored[ordinal];
+            int startIdx = nearestIdx(record.startSeconds);
+            int endIdx   = nearestIdx(record.endSeconds);
+            if (endIdx < startIdx) std::swap(startIdx, endIdx);
+            if (endIdx <= startIdx)
+                endIdx = std::min(static_cast<int>(m_rideData.records.size()) - 1, startIdx + 1);
+
+            Climb c = ClimbMetrics::build(m_rideData, cumulative, smoothed, gradient,
+                                          startIdx, endIdx, ordinal + 1);
+            c.id = record.id;
+            if (!record.name.isEmpty())
+                c.name = record.name;
+            m_climbs.push_back(c);
+        }
+        return;
+    }
+
+    // No stored climbs yet: m_climbs was populated by reanalyze(). Persist them now.
+    for (Climb& c : m_climbs)
+    {
+        ClimbRecord record;
+        record.activityId     = m_currentActivityId;
+        record.startSeconds   = c.startSeconds;
+        record.endSeconds     = c.endSeconds;
+        record.name           = c.name;
+        record.elevationGainM = c.elevationGainM;
+        record.lengthKm       = c.lengthKm;
+        record.averageGradient = c.averageGradient;
+        record.source         = QStringLiteral("auto");
+        record.locked         = false;
+        c.id = repo.insertClimb(record);
     }
 }

@@ -10,15 +10,26 @@ struct ClimbDetectorConfig
     double minElevationGainM = 30.0;
     double minAverageGradient = 3.0;
 
-    double startGradient = 3.0;
+    double startGradient = 3.5;
+    double continueGradient = 2.0;
+    double endGradient = 0.5;
     double minStartContinuousDistanceMeters = 100.0;
     double maxStartInterruptionMeters = 30.0;
 
     double maxDipMeters = 10.0;
     double maxDipDistanceMeters = 200.0;
+    double maxDipPctOfGain = 10.0;
+
+    double maxPlateauDistanceMeters = 500.0;
+    double plateauMinGradient = -1.0;
 
     double elevationSmoothingMeters = 50.0;
+    bool useAdaptiveSmoothing = true;
+    double adaptiveSmoothingMinMeters = 25.0;
+    double adaptiveSmoothingMaxMeters = 100.0;
     double gradientWindowHalfMeters = 25.0;
+
+    double altitudeSpikeVerticalSpeedMps = 8.0;
 };
 
 class ClimbDetector
@@ -34,7 +45,13 @@ public:
     static std::vector<double> smoothAltitudeByDistance(
         const RideData& rideData,
         const std::vector<double>& cumulativeDistanceMeters,
-        double windowMeters);
+        double windowMeters,
+        const std::vector<double>& adaptiveWindowMeters = {},
+        double altitudeSpikeVerticalSpeedMps = 8.0);
+    static std::vector<double> computeAdaptiveSmoothingWindowsMeters(
+        const RideData& rideData,
+        const std::vector<double>& cumulativeDistanceMeters,
+        const Config& config);
     static std::vector<double> computeLocalGradientPct(
         const std::vector<double>& smoothedAltitudeMeters,
         const std::vector<double>& cumulativeDistanceMeters,

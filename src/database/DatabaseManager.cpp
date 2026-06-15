@@ -190,6 +190,65 @@ bool DatabaseManager::upgradeSchema(int fromVersion, QString* errorOut)
             " ON activities(athlete_id, activity_start_time DESC)");
     }
 
+    if (fromVersion < 6)
+    {
+        // Add climbs table
+        {
+            QSqlQuery q(m_db);
+            q.exec(
+                "CREATE TABLE IF NOT EXISTS climbs ("
+                "  id               INTEGER PRIMARY KEY AUTOINCREMENT,"
+                "  activity_id      INTEGER NOT NULL REFERENCES activities(id) ON DELETE CASCADE,"
+                "  start_seconds    REAL    NOT NULL,"
+                "  end_seconds      REAL    NOT NULL,"
+                "  name             TEXT,"
+                "  elevation_gain_m REAL,"
+                "  length_km        REAL,"
+                "  average_gradient REAL,"
+                "  source           TEXT    NOT NULL DEFAULT 'auto',"
+                "  locked           INTEGER NOT NULL DEFAULT 0,"
+                "  created_at       TEXT    DEFAULT CURRENT_TIMESTAMP,"
+                "  updated_at       TEXT    DEFAULT CURRENT_TIMESTAMP"
+                ")");
+        }
+        {
+            QSqlQuery q(m_db);
+            q.exec("CREATE INDEX IF NOT EXISTS idx_climbs_activity_id ON climbs(activity_id)");
+        }
+
+        // Add source, locked, updated_at to intervals
+        struct ColDef { const char* name; const char* definition; };
+        static const ColDef kIntervalCols[] = {
+            { "source",     "TEXT NOT NULL DEFAULT 'auto'" },
+            { "locked",     "INTEGER NOT NULL DEFAULT 0"   },
+            { "updated_at", "TEXT"                         },
+        };
+        for (const ColDef& col : kIntervalCols)
+        {
+            if (columnExists(m_db, "intervals", col.name))
+                continue;
+            QSqlQuery q(m_db);
+            q.exec(QString("ALTER TABLE intervals ADD COLUMN %1 %2")
+                   .arg(col.name).arg(col.definition));
+        }
+
+        // Indexes on activities for fast overlap / hash lookup
+        {
+            QSqlQuery q(m_db);
+            q.exec(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_activity_filehash"
+                " ON activities(fit_hash) WHERE fit_hash IS NOT NULL");
+        }
+        {
+            QSqlQuery q(m_db);
+            q.exec("CREATE INDEX IF NOT EXISTS idx_activity_start_time ON activities(activity_start_time)");
+        }
+        {
+            QSqlQuery q(m_db);
+            q.exec("CREATE INDEX IF NOT EXISTS idx_activity_end_time ON activities(end_time)");
+        }
+    }
+
     return applySchema(errorOut);
 }
 

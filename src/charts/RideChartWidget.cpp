@@ -1523,7 +1523,10 @@ void RideChartWidget::mousePressEvent(QMouseEvent* event)
         }
     }
 
-    if (m_metric == Metric::Power && m_hasData && event->button() == Qt::RightButton)
+    if (m_metric == Metric::Power &&
+        m_hasData &&
+        event->button() == Qt::RightButton &&
+        (event->modifiers() & Qt::ShiftModifier))
     {
         const QPointF scenePos = mapToScene(event->pos());
         if (chart()->plotArea().contains(scenePos))
@@ -1536,6 +1539,12 @@ void RideChartWidget::mousePressEvent(QMouseEvent* event)
             event->accept();
             return;
         }
+    }
+
+    if (event->button() == Qt::RightButton)
+    {
+        event->accept();
+        return;
     }
 
     QChartView::mousePressEvent(event);
@@ -1604,11 +1613,23 @@ void RideChartWidget::mouseReleaseEvent(QMouseEvent* event)
         return;
     }
 
+    if (event->button() == Qt::RightButton)
+    {
+        event->accept();
+        return;
+    }
+
     QChartView::mouseReleaseEvent(event);
 }
 
 void RideChartWidget::mouseDoubleClickEvent(QMouseEvent* event)
 {
+    if (event->button() == Qt::RightButton)
+    {
+        event->accept();
+        return;
+    }
+
     if (m_newClimbCreating)
     {
         event->accept();
