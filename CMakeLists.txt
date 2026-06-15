@@ -21,6 +21,21 @@ option(
     ON
 )
 
+set(FITLYZERC_WARNINGS_AS_ERRORS_DEFAULT OFF)
+if(DEFINED ENV{CI}
+   AND NOT "$ENV{CI}" STREQUAL ""
+   AND NOT "$ENV{CI}" STREQUAL "0"
+   AND NOT "$ENV{CI}" STREQUAL "false"
+   AND NOT "$ENV{CI}" STREQUAL "FALSE")
+    set(FITLYZERC_WARNINGS_AS_ERRORS_DEFAULT ON)
+endif()
+
+option(
+    FITLYZERC_WARNINGS_AS_ERRORS
+    "Treat compiler warnings as errors (defaults ON in CI)"
+    ${FITLYZERC_WARNINGS_AS_ERRORS_DEFAULT}
+)
+
 # Build profile tuning:
 # - Debug: prioritize fast compile + clear debugging
 # - Release/RelWithDebInfo: prioritize runtime execution speed
@@ -416,6 +431,15 @@ target_link_libraries(FitlyzerC PRIVATE
     Qt6::Charts
     FitSDK
 )
+
+if(FITLYZERC_WARNINGS_AS_ERRORS)
+    if(MSVC)
+        target_compile_options(FitlyzerC PRIVATE /WX)
+    else()
+        target_compile_options(FitlyzerC PRIVATE -Werror)
+    endif()
+    message(STATUS "Warnings-as-errors enabled for FitlyzerC")
+endif()
 
 if(APPLE)
     find_program(CODESIGN_EXECUTABLE codesign HINTS "/usr/bin")
