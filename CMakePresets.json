@@ -38,6 +38,17 @@
       }
     },
     {
+      "name": "macos-debug-sanitize",
+      "displayName": "macOS Debug (ASan+UBSan)",
+      "description": "Configure a macOS debug build with AddressSanitizer and UndefinedBehaviorSanitizer",
+      "inherits": "macos-debug",
+      "cacheVariables": {
+        "CMAKE_CXX_FLAGS_DEBUG": "-O0 -g -fno-omit-frame-pointer -fsanitize=address,undefined",
+        "CMAKE_EXE_LINKER_FLAGS_DEBUG": "-fsanitize=address,undefined",
+        "CMAKE_SHARED_LINKER_FLAGS_DEBUG": "-fsanitize=address,undefined"
+      }
+    },
+    {
       "name": "macos-dmg",
       "displayName": "macOS DMG",
       "description": "Configure a macOS release build intended for DMG packaging",
@@ -133,6 +144,11 @@
       "name": "macos-release",
       "displayName": "macOS Release",
       "configurePreset": "macos-release"
+    },
+    {
+      "name": "macos-debug-sanitize",
+      "displayName": "macOS Debug (ASan+UBSan)",
+      "configurePreset": "macos-debug-sanitize"
     },
     {
       "name": "macos-dmg",
