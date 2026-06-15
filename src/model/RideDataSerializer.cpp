@@ -180,6 +180,7 @@ RideData RideDataSerializer::loadRideFromDatabase(int activityId,
         " WHERE activity_id=:id"
         " ORDER BY elapsed_seconds ASC");
     q.bindValue(":id", activityId);
+    q.setForwardOnly(true);
     q.exec();
 
     while (q.next())

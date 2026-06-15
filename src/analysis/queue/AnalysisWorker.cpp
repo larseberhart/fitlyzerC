@@ -81,6 +81,7 @@ void AnalysisWorker::processTask(int activityId)
         "  has_gps, has_power, has_heart_rate, has_cadence, has_speed, has_altitude"
         " FROM activity_samples WHERE activity_id=:id ORDER BY elapsed_seconds ASC");
     samplesQuery.bindValue(":id", activityId);
+    samplesQuery.setForwardOnly(true);
 
     RideData ride;
     if (samplesQuery.exec())
