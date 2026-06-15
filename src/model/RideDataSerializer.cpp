@@ -170,6 +170,19 @@ RideData RideDataSerializer::loadRideFromDatabase(int activityId,
     RideData rideData;
     QSqlDatabase db = dbManager.database();
 
+    // Pre-reserve vector to avoid repeated reallocations during large sample loads
+    {
+        QSqlQuery countQ(db);
+        countQ.prepare("SELECT COUNT(*) FROM activity_samples WHERE activity_id=:id");
+        countQ.bindValue(":id", activityId);
+        if (countQ.exec() && countQ.next())
+        {
+            const int sampleCount = countQ.value(0).toInt();
+            if (sampleCount > 0)
+                rideData.records.reserve(sampleCount);
+        }
+    }
+
     QSqlQuery q(db);
     q.prepare(
         "SELECT elapsed_seconds,"

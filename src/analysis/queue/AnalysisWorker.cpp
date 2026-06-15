@@ -74,6 +74,21 @@ void AnalysisWorker::processTask(int activityId)
     // and we can't construct one from an existing connection, we load samples
     // directly here.
 
+    RideData ride;
+
+    // Pre-reserve vector to avoid repeated reallocations during large sample loads
+    {
+        QSqlQuery countQ(db);
+        countQ.prepare("SELECT COUNT(*) FROM activity_samples WHERE activity_id=:id");
+        countQ.bindValue(":id", activityId);
+        if (countQ.exec() && countQ.next())
+        {
+            const int sampleCount = countQ.value(0).toInt();
+            if (sampleCount > 0)
+                ride.records.reserve(sampleCount);
+        }
+    }
+
     QSqlQuery samplesQuery(db);
     samplesQuery.prepare(
         "SELECT elapsed_seconds, power_total, heart_rate, cadence, speed,"
@@ -83,7 +98,6 @@ void AnalysisWorker::processTask(int activityId)
     samplesQuery.bindValue(":id", activityId);
     samplesQuery.setForwardOnly(true);
 
-    RideData ride;
     if (samplesQuery.exec())
     {
         while (samplesQuery.next())
