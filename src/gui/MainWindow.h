@@ -97,6 +97,7 @@ private:
     void detectClimbsAndRefresh();
     void updateClimbRowStyles();
     void onClimbSelectionChanged();
+    void onClimbBoundaryEdited(double oldStartSeconds, double oldEndSeconds, double newStartSeconds, double newEndSeconds);
     void onIntervalSelectionChanged();
     void onIntervalRowDoubleClicked(QTableWidgetItem* item);
     void navigateToInterval(double startSeconds, double endSeconds, bool exactZoom);

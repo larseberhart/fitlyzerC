@@ -258,6 +258,20 @@ void RideChartWidget::setClimbs(const std::vector<Climb>& climbs)
     rebuildChart();
 }
 
+void RideChartWidget::setSelectedClimbIndex(int index)
+{
+    m_selectedClimbIndex = index;
+    scene()->invalidate(chart()->plotArea(), QGraphicsScene::ForegroundLayer);
+}
+
+void RideChartWidget::setClimbEditingEnabled(bool enabled)
+{
+    m_climbEditingEnabled = enabled;
+    if (!enabled)
+        m_climbHandleDrag = ClimbHandleDrag::None;
+    scene()->invalidate(chart()->plotArea(), QGraphicsScene::ForegroundLayer);
+}
+
 std::vector<double> RideChartWidget::computeSmoothedPowerSeries(int seconds) const
 {
     return computeSmoothedSeries(Metric::Power, seconds);
@@ -1057,6 +1071,33 @@ void RideChartWidget::wheelEvent(QWheelEvent* event)
 
 void RideChartWidget::mousePressEvent(QMouseEvent* event)
 {
+    if (m_climbEditingEnabled &&
+        m_hasData &&
+        event->button() == Qt::LeftButton &&
+        m_selectedClimbIndex >= 0 &&
+        m_selectedClimbIndex < static_cast<int>(m_climbs.size()))
+    {
+        const Climb& climb = m_climbs[static_cast<size_t>(m_selectedClimbIndex)];
+        const QPointF scenePos = mapToScene(event->pos());
+        if (chart()->plotArea().contains(scenePos))
+        {
+            const QPointF startPos = chart()->mapToPosition(QPointF(climb.startSeconds / 60.0, m_axisY->min()), m_series);
+            const QPointF endPos = chart()->mapToPosition(QPointF(climb.endSeconds / 60.0, m_axisY->min()), m_series);
+            const double dxStart = std::abs(scenePos.x() - startPos.x());
+            const double dxEnd = std::abs(scenePos.x() - endPos.x());
+            constexpr double kGrabRadiusPx = 8.0;
+
+            if (dxStart <= kGrabRadiusPx || dxEnd <= kGrabRadiusPx)
+            {
+                m_climbHandleDrag = (dxStart <= dxEnd) ? ClimbHandleDrag::Start : ClimbHandleDrag::End;
+                m_dragOriginalClimbStartSec = climb.startSeconds;
+                m_dragOriginalClimbEndSec = climb.endSeconds;
+                event->accept();
+                return;
+            }
+        }
+    }
+
     if (m_metric == Metric::Power && m_hasData && event->button() == Qt::RightButton)
     {
         const QPointF scenePos = mapToScene(event->pos());
@@ -1077,6 +1118,13 @@ void RideChartWidget::mousePressEvent(QMouseEvent* event)
 
 void RideChartWidget::mouseReleaseEvent(QMouseEvent* event)
 {
+    if (event->button() == Qt::LeftButton && m_climbHandleDrag != ClimbHandleDrag::None)
+    {
+        m_climbHandleDrag = ClimbHandleDrag::None;
+        event->accept();
+        return;
+    }
+
     if (m_intervalSelecting && event->button() == Qt::RightButton)
     {
         m_intervalSelecting = false;
@@ -1110,6 +1158,34 @@ void RideChartWidget::mouseDoubleClickEvent(QMouseEvent* event)
 
 void RideChartWidget::mouseMoveEvent(QMouseEvent* event)
 {
+    if (m_climbHandleDrag != ClimbHandleDrag::None &&
+        m_selectedClimbIndex >= 0 &&
+        m_selectedClimbIndex < static_cast<int>(m_climbs.size()))
+    {
+        const QPointF scenePos = mapToScene(event->pos());
+        const QRectF plotArea = chart()->plotArea();
+        const QPointF clampedScene(
+            std::clamp(scenePos.x(), plotArea.left(), plotArea.right()),
+            std::clamp(scenePos.y(), plotArea.top(), plotArea.bottom()));
+        const double xMinutes = chart()->mapToValue(clampedScene, m_series).x();
+        const double xSec = std::clamp(xMinutes * 60.0, 0.0, m_origMaxX * 60.0);
+
+        Climb& climb = m_climbs[static_cast<size_t>(m_selectedClimbIndex)];
+        const double oldStart = climb.startSeconds;
+        const double oldEnd = climb.endSeconds;
+        constexpr double kMinClimbDurationSec = 1.0;
+
+        if (m_climbHandleDrag == ClimbHandleDrag::Start)
+            climb.startSeconds = std::min(xSec, climb.endSeconds - kMinClimbDurationSec);
+        else
+            climb.endSeconds = std::max(xSec, climb.startSeconds + kMinClimbDurationSec);
+
+        emit climbBoundaryEdited(oldStart, oldEnd, climb.startSeconds, climb.endSeconds);
+        scene()->invalidate(chart()->plotArea(), QGraphicsScene::ForegroundLayer);
+        event->accept();
+        return;
+    }
+
     if (m_hasData)
     {
         const QPointF scenePos = mapToScene(event->pos());
@@ -1291,6 +1367,28 @@ void RideChartWidget::drawForeground(QPainter* painter, const QRectF&)
         painter->fillRect(selectionRect.normalized(), fill);
         painter->setPen(QPen(QColor("#0284c7"), 1.0, Qt::DashLine));
         painter->drawRect(selectionRect.normalized());
+    }
+
+    if (m_selectedClimbIndex >= 0 && m_selectedClimbIndex < static_cast<int>(m_climbs.size()))
+    {
+        const Climb& climb = m_climbs[static_cast<size_t>(m_selectedClimbIndex)];
+        const QPointF p0 = chart()->mapToPosition(QPointF(climb.startSeconds / 60.0, m_axisY->min()), m_series);
+        const QPointF p1 = chart()->mapToPosition(QPointF(climb.endSeconds / 60.0, m_axisY->min()), m_series);
+        if (p1.x() >= plotArea.left() && p0.x() <= plotArea.right())
+        {
+            painter->setPen(QPen(QColor("#16a34a"), 1.5, Qt::SolidLine));
+            painter->setBrush(Qt::NoBrush);
+            painter->drawLine(QLineF(p0.x(), plotArea.top(), p0.x(), plotArea.bottom()));
+            painter->drawLine(QLineF(p1.x(), plotArea.top(), p1.x(), plotArea.bottom()));
+
+            if (m_climbEditingEnabled)
+            {
+                painter->setBrush(QColor("#15803d"));
+                painter->setPen(QPen(Qt::white, 1.0));
+                painter->drawEllipse(QPointF(p0.x(), plotArea.top() + 10.0), 4.5, 4.5);
+                painter->drawEllipse(QPointF(p1.x(), plotArea.top() + 10.0), 4.5, 4.5);
+            }
+        }
     }
     painter->restore();
 }

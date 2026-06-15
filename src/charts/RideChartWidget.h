@@ -31,6 +31,8 @@ public:
     void setAutoSmoothingEnabled(bool enabled);
     void setIntervals(const std::vector<Interval>& intervals);
     void setClimbs(const std::vector<Climb>& climbs);
+    void setSelectedClimbIndex(int index);
+    void setClimbEditingEnabled(bool enabled);
     void clearChart();
 
     bool hasData() const { return m_hasData; }
@@ -48,6 +50,11 @@ signals:
     void visibleRangeChanged(double startMinutes, double endMinutes);
     void crosshairMoved(double xMinutes);
     void intervalSelectionRequested(double startSeconds, double endSeconds);
+    void climbBoundaryEdited(
+        double oldStartSeconds,
+        double oldEndSeconds,
+        double newStartSeconds,
+        double newEndSeconds);
 
 protected:
     void wheelEvent(QWheelEvent* event) override;
@@ -101,6 +108,17 @@ private:
     bool            m_intervalSelecting = false;
     double          m_intervalStartMin = -1.0;
     double          m_intervalEndMin = -1.0;
+    bool            m_climbEditingEnabled = false;
+    int             m_selectedClimbIndex = -1;
+    enum class ClimbHandleDrag
+    {
+        None,
+        Start,
+        End
+    };
+    ClimbHandleDrag m_climbHandleDrag = ClimbHandleDrag::None;
+    double          m_dragOriginalClimbStartSec = -1.0;
+    double          m_dragOriginalClimbEndSec = -1.0;
     double          m_dataMinY      = 0.0;   // raw min from ride data
     double          m_dataMaxY      = 1.0;   // raw max from ride data
 };

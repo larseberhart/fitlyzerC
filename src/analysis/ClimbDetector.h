@@ -29,7 +29,6 @@ public:
         const RideData& rideData,
         const Config& config = Config{});
 
-private:
     static std::vector<double> buildCumulativeDistanceMeters(const RideData& rideData);
     static std::vector<double> smoothAltitudeByDistance(
         const RideData& rideData,
