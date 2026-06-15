@@ -16,6 +16,7 @@
 #include "core/zones/ZoneCalculator.h"
 #include "maps/MapFitMath.h"
 #include "video/VideoTileProvider.h"
+#include "utils/FfmpegPath.h"
 
 #include <algorithm>
 #include <cmath>
@@ -268,9 +269,9 @@ void VideoRenderJob::run()
         return;
     }
 
-    QString ffmpegPath = m_settings.ffmpegPath;
+    QString ffmpegPath = m_settings.ffmpegPath.trimmed();
     if (ffmpegPath.isEmpty())
-        ffmpegPath = QStringLiteral("ffmpeg");
+        ffmpegPath = resolveFfmpegExecutablePath();
 
     const QFileInfo outInfo(m_settings.outputPath);
     QDir().mkpath(outInfo.absolutePath());
@@ -469,7 +470,15 @@ void VideoRenderJob::run()
 
     if (!ffmpeg.waitForStarted())
     {
-        emit finished(false, QString("Failed to start FFmpeg at '%1'.").arg(ffmpegPath), false);
+        const QString detail = ffmpeg.errorString().trimmed();
+        if (detail.isEmpty())
+        {
+            emit finished(false, QString("Failed to start FFmpeg at '%1'.").arg(ffmpegPath), false);
+        }
+        else
+        {
+            emit finished(false, QString("Failed to start FFmpeg at '%1': %2").arg(ffmpegPath, detail), false);
+        }
         return;
     }
 

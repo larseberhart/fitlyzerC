@@ -89,6 +89,12 @@ option(
     ON
 )
 
+option(
+    FITLYZERC_AUTO_DOWNLOAD_FFMPEG
+    "Automatically download FFmpeg source when a local tree is unavailable"
+    ON
+)
+
 set(
     FITLYZER_FFMPEG_PATH
     ""
@@ -99,12 +105,6 @@ set(
 option(
     FITLYZERC_BUNDLE_FFMPEG
     "Bundle FFmpeg with FitlyzerC releases"
-    ON
-)
-
-option(
-    FITLYZERC_AUTO_DOWNLOAD_FFMPEG
-    "Automatically download FFmpeg source when a local tree is unavailable"
     ON
 )
 
@@ -386,6 +386,10 @@ if(FITLYZERC_BUNDLE_FFMPEG)
             set(FITLYZERC_RUNTIME_FFMPEG_PATH "ffmpeg.exe")
             set(FITLYZERC_RUNTIME_FFMPEG_DEST "$<TARGET_FILE_DIR:FitlyzerC>/ffmpeg.exe")
             set(FITLYZERC_INSTALL_FFMPEG_DEST ".")
+            get_filename_component(FITLYZERC_FFMPEG_RUNTIME_DIR "${FITLYZERC_BUNDLED_FFMPEG_BINARY}" DIRECTORY)
+            file(GLOB FITLYZERC_FFMPEG_RUNTIME_DLLS CONFIGURE_DEPENDS
+                "${FITLYZERC_FFMPEG_RUNTIME_DIR}/*.dll"
+            )
         elseif(APPLE)
             set(FITLYZERC_RUNTIME_FFMPEG_PATH "ffmpeg")
             set(FITLYZERC_RUNTIME_FFMPEG_DEST "$<TARGET_BUNDLE_DIR:FitlyzerC>/Contents/MacOS/ffmpeg")
@@ -404,9 +408,19 @@ if(FITLYZERC_BUNDLE_FFMPEG)
             VERBATIM
         )
 
+        if(WIN32 AND FITLYZERC_FFMPEG_RUNTIME_DLLS)
+            add_custom_command(TARGET FitlyzerC POST_BUILD
+                COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+                    ${FITLYZERC_FFMPEG_RUNTIME_DLLS}
+                    "$<TARGET_FILE_DIR:FitlyzerC>"
+                COMMENT "Copying bundled FFmpeg runtime DLLs next to FitlyzerC"
+                VERBATIM
+            )
+        endif()
+
         if(NOT WIN32)
             add_custom_command(TARGET FitlyzerC POST_BUILD
-                COMMAND chmod +x "${FITLYZERC_RUNTIME_FFMPEG_DEST}"
+                COMMAND "${CMAKE_COMMAND}" -E chmod +x "${FITLYZERC_RUNTIME_FFMPEG_DEST}"
                 COMMENT "Ensuring bundled FFmpeg is executable"
                 VERBATIM
             )
@@ -420,6 +434,13 @@ if(FITLYZERC_BUNDLE_FFMPEG)
                 GROUP_READ GROUP_EXECUTE
                 WORLD_READ WORLD_EXECUTE
         )
+
+        if(WIN32 AND FITLYZERC_FFMPEG_RUNTIME_DLLS)
+            install(FILES
+                ${FITLYZERC_FFMPEG_RUNTIME_DLLS}
+                DESTINATION "${FITLYZERC_INSTALL_FFMPEG_DEST}"
+            )
+        endif()
     endif()
 endif()
 

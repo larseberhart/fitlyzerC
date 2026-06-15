@@ -71,6 +71,7 @@
 #include "platform/Platform.h"
 #include "video/VideoExportDialog.h"
 #include "video/VideoExportSettings.h"
+#include "utils/FfmpegPath.h"
 
 #include <cfloat>
 #include <cmath>
@@ -149,34 +150,6 @@ static QString sanitizeVideoFilePart(QString text)
     while (text.contains("--"))
         text.replace("--", "-");
     return text.trimmed();
-}
-
-static QString resolveFfmpegExecutablePath()
-{
-    QStringList candidates;
-
-#ifdef FITLYZER_FFMPEG_PATH
-    const QString configured = QString::fromUtf8(FITLYZER_FFMPEG_PATH);
-    if (!configured.isEmpty())
-    {
-        candidates << configured;
-        candidates << QCoreApplication::applicationDirPath() + "/" + configured;
-        candidates << QDir(QCoreApplication::applicationDirPath()).filePath("../Resources/" + configured);
-    }
-#endif
-
-    candidates << QStandardPaths::findExecutable("ffmpeg");
-
-    for (const QString& candidate : candidates)
-    {
-        if (candidate.isEmpty())
-            continue;
-        const QFileInfo fi(candidate);
-        if (fi.exists() && fi.isFile())
-            return fi.absoluteFilePath();
-    }
-
-    return QStringLiteral("ffmpeg");
 }
 
 // ── Constructor ─────────────────────────────────────────────────────────────
