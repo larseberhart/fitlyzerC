@@ -49,9 +49,10 @@ void AnalysisWorker::processTask(int activityId)
     }
 
     // Use RAII guard to ensure connection cleanup even on exceptions
-    const QString connName = QStringLiteral("AnalysisWorker_%1_%2")
+    const QString connName = QStringLiteral("AnalysisWorker_%1_%2_%3")
         .arg(activityId)
-        .arg(reinterpret_cast<quintptr>(QThread::currentThread()));
+        .arg(reinterpret_cast<quintptr>(QThread::currentThread()))
+        .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
 
     try
     {
