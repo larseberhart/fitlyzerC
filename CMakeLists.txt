@@ -124,9 +124,9 @@ set(
 
 set(
     FITLYZERC_FFMPEG_GIT_TAG
-    "master"
+    "n7.0"
     CACHE STRING
-    "Git branch, tag, or commit used when auto-downloading FFmpeg source"
+    "Pinned FFmpeg version tag (stable release for reproducible builds)"
 )
 
 set(
@@ -141,6 +141,13 @@ set(
     "21.205.0"
     CACHE STRING
     "Pinned Garmin FIT C++ SDK version tag"
+)
+
+set(
+    FITLYZERC_FFMPEG_VERSION
+    "7.0"
+    CACHE STRING
+    "Pinned FFmpeg version (stable release for reproducible binary behavior)"
 )
 
 if(NOT GARMIN_FIT_SDK_DIR)
@@ -290,6 +297,8 @@ set(FITLYZERC_BUNDLED_FFMPEG_BINARY "")
 set(FITLYZERC_RUNTIME_FFMPEG_PATH "")
 
 if(FITLYZERC_BUNDLE_FFMPEG)
+    message(STATUS "Bundling FFmpeg ${FITLYZERC_FFMPEG_VERSION} (pinned version for reproducible builds)")
+    
     set(_ffmpeg_suffix "")
     if(WIN32)
         set(_ffmpeg_suffix ".exe")
@@ -328,11 +337,11 @@ if(FITLYZERC_BUNDLE_FFMPEG)
             set(_ffmpeg_source_dir "${CMAKE_BINARY_DIR}/_deps/ffmpeg-src")
             set(_ffmpeg_download_args
                 GIT_REPOSITORY "${FITLYZERC_FFMPEG_GIT_REPOSITORY}"
-                GIT_TAG "${FITLYZERC_FFMPEG_GIT_TAG}"
+                GIT_TAG "n${FITLYZERC_FFMPEG_VERSION}"
                 GIT_SHALLOW TRUE
             )
             message(STATUS
-                "FFmpeg source tree not found; cloning ${FITLYZERC_FFMPEG_GIT_REPOSITORY} (${FITLYZERC_FFMPEG_GIT_TAG})"
+                "FFmpeg source tree not found; cloning FFmpeg ${FITLYZERC_FFMPEG_VERSION} from ${FITLYZERC_FFMPEG_GIT_REPOSITORY}"
             )
         endif()
 
