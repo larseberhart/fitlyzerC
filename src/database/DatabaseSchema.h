@@ -221,12 +221,12 @@ inline constexpr std::array kStatements = {
         "  type          TEXT,"
         "  duration_sec  REAL,"
         "  target_tss    REAL,"
-        "  notesINDEX IF NOT EXISTS idx_workouts_athlete_date"
-        "  ON planned_workouts(athlete_id, workout_date)"
+        "  notes         TEXT"
+        ")"
     },
     std::string_view{
-        "CREATE          TEXT"
-        ")"
+        "CREATE INDEX IF NOT EXISTS idx_workouts_athlete_date"
+        "  ON planned_workouts(athlete_id, workout_date)"
     },
     std::string_view{
         "CREATE TABLE IF NOT EXISTS daily_metrics ("
