@@ -1,5 +1,22 @@
 cmake_minimum_required(VERSION 3.21)
 
+# -----------------------------------------------------------------------------
+# FitlyzerC Build Configuration
+#
+# This CMake file configures the complete FitlyzerC build and packaging pipeline:
+# - Project/toolchain setup and optimization toggles
+# - Third-party dependencies (Qt, Garmin FIT SDK, optional FFmpeg sourcing)
+# - Application target sources and platform-specific integration
+# - Runtime deployment steps for Windows/macOS/Linux
+# - Installer/package generation through CPack
+#
+# Notes:
+# - Keep this file declarative and deterministic where possible.
+# - Prefer pinned dependency versions for reproducible builds.
+# - Platform-specific blocks are intentionally separated for readability.
+# -----------------------------------------------------------------------------
+
+
 project(
     FitlyzerC
     VERSION 0.5.0
@@ -11,6 +28,7 @@ include(ExternalProject)
 include(CTest)
 include(CheckIPOSupported)
 
+# Core compile settings shared by all targets.
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -36,6 +54,7 @@ option(
     ${FITLYZERC_WARNINGS_AS_ERRORS_DEFAULT}
 )
 
+# Baseline optimization/debug tuning for common build configurations.
 # Build profile tuning:
 # - Debug: prioritize fast compile + clear debugging
 # - Release/RelWithDebInfo: prioritize runtime execution speed
@@ -56,6 +75,7 @@ else()
     )
 endif()
 
+# Release LTO/IPO is opt-in and enabled only when the toolchain supports it.
 if(FITLYZERC_ENABLE_RELEASE_IPO)
     check_ipo_supported(RESULT FITLYZERC_IPO_SUPPORTED OUTPUT FITLYZERC_IPO_ERROR)
     if(FITLYZERC_IPO_SUPPORTED)
@@ -67,6 +87,7 @@ if(FITLYZERC_ENABLE_RELEASE_IPO)
 endif()
 
 
+# Windows convenience: auto-detect local Qt installs when presets do not set paths.
 if(WIN32 AND NOT Qt6_DIR AND NOT CMAKE_PREFIX_PATH)
     # Try common Qt installation locations for MSVC builds.
     file(GLOB QT6_MSVC_CANDIDATES "C:/Qt/*/msvc*/lib/cmake/Qt6")
@@ -83,6 +104,7 @@ if(WIN32 AND NOT Qt6_DIR AND NOT CMAKE_PREFIX_PATH)
     endforeach()
 endif()
 
+# Required Qt modules for GUI, database, networking, and charts.
 find_package(Qt6 REQUIRED COMPONENTS Widgets Sql Network Charts)
 
 qt_standard_project_setup()
@@ -110,6 +132,7 @@ option(
     ON
 )
 
+# Runtime override path embedded in the app when provided.
 set(
     FITLYZER_FFMPEG_PATH
     ""
@@ -165,6 +188,7 @@ set(
     "Pinned FFmpeg version (stable release for reproducible binary behavior)"
 )
 
+# Resolve Garmin FIT SDK location from local path or FetchContent download.
 if(NOT GARMIN_FIT_SDK_DIR)
     if(NOT FITLYZERC_AUTO_DOWNLOAD_FITSDK)
         message(FATAL_ERROR
@@ -206,6 +230,7 @@ if(NOT EXISTS "${GARMIN_FIT_SDK_DIR}/fit_decode.cpp")
     )
 endif()
 
+# Build Garmin FIT SDK as an internal static library.
 file(GLOB FIT_SDK_SOURCES
     "${GARMIN_FIT_SDK_DIR}/*.cpp"
 )
@@ -222,6 +247,7 @@ target_include_directories(FitSDK PUBLIC
 # Main application
 #
 
+# Master source list for the cross-platform application target.
 set(FITLYZERC_SOURCES
     "${CMAKE_SOURCE_DIR}/src/analysis/ClimbDetector.cpp"
     "${CMAKE_SOURCE_DIR}/src/analysis/ClimbDetector.h"
@@ -362,6 +388,7 @@ set(FITLYZERC_PLATFORM_SOURCES
     "${CMAKE_SOURCE_DIR}/src/platform/Platform_windows.cpp"
 )
 
+# Remove platform implementations from the common list and add one per OS below.
 list(REMOVE_ITEM FITLYZERC_SOURCES ${FITLYZERC_PLATFORM_SOURCES})
 
 qt_add_executable(FitlyzerC
@@ -399,6 +426,7 @@ elseif(UNIX)
     )
 endif()
 
+# macOS bundle icon wiring.
 if(APPLE)
     set(MACOS_ICON
         "${CMAKE_SOURCE_DIR}/resources/icons/appicon.icns")
@@ -432,6 +460,7 @@ target_link_libraries(FitlyzerC PRIVATE
     FitSDK
 )
 
+# Optional strict mode for CI or local quality gates.
 if(FITLYZERC_WARNINGS_AS_ERRORS)
     if(MSVC)
         target_compile_options(FitlyzerC PRIVATE /WX)
@@ -445,6 +474,10 @@ if(APPLE)
     find_program(CODESIGN_EXECUTABLE codesign HINTS "/usr/bin")
 endif()
 
+# FFmpeg bundling strategy:
+# 1) Prefer explicit/prebuilt binary when available
+# 2) Otherwise build from source (optionally cloning source)
+# 3) Fallback to system FFmpeg if no bundle candidate is usable
 set(FITLYZERC_BUNDLED_FFMPEG_BINARY "")
 set(FITLYZERC_RUNTIME_FFMPEG_PATH "")
 
@@ -639,6 +672,7 @@ elseif(FITLYZER_FFMPEG_PATH)
     target_compile_definitions(FitlyzerC PRIVATE FITLYZER_FFMPEG_PATH="${FITLYZER_FFMPEG_PATH}")
 endif()
 
+# Windows post-build deploy for Qt runtime dependencies.
 if(WIN32)
     # Deploy Qt runtime DLLs/plugins next to the built executable.
     get_target_property(QT_QMAKE_EXECUTABLE Qt6::qmake IMPORTED_LOCATION)
@@ -680,6 +714,7 @@ if(APPLE)
     endforeach()
 endif()
 
+# Installation layout and optional Linux AppImage packaging toggle.
 include(GNUInstallDirs)
 
 option(
@@ -694,6 +729,7 @@ install(
     RUNTIME DESTINATION .
 )
 
+# Install-time Qt deployment for macOS app bundles.
 if(APPLE)
     if(COMMAND qt_generate_deploy_app_script)
         qt_generate_deploy_app_script(
@@ -711,6 +747,7 @@ if(APPLE)
     endif()
 endif()
 
+# Install-time deep codesign for staged macOS bundles.
 if(APPLE AND CODESIGN_EXECUTABLE)
     install(CODE
         "execute_process(
@@ -764,6 +801,7 @@ if(APPLE AND CODESIGN_EXECUTABLE)
     )
 endif()
 
+# Linux AppImage deployment assets and metadata.
 if(UNIX AND NOT APPLE AND FITLYZERC_ENABLE_APPIMAGE_PACKAGE)
     if(COMMAND qt_generate_deploy_app_script)
         qt_generate_deploy_app_script(
@@ -795,6 +833,7 @@ if(UNIX AND NOT APPLE AND FITLYZERC_ENABLE_APPIMAGE_PACKAGE)
     )
 endif()
 
+# Windows install-time deploy to ensure packaged runtime completeness.
 if(WIN32)
     # Ensure CPack installer contains all Qt/MSVC runtime dependencies.
     if(COMMAND qt_generate_deploy_app_script)
@@ -827,6 +866,7 @@ if(WIN32)
     )
 endif()
 
+# CPack metadata and generator selection per platform.
 set(CPACK_PACKAGE_NAME "FitlyzerC")
 set(CPACK_PACKAGE_VENDOR "Fitlyzer")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
@@ -879,6 +919,7 @@ include(CPack)
 
 
 
+# Convenience packaging aliases for explicit local invocation.
 if(APPLE)
     # Convenience target so macOS packaging is explicit and easy to invoke.
     add_custom_target(dmg DEPENDS package)
