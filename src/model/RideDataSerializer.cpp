@@ -1,5 +1,6 @@
 #include "RideDataSerializer.h"
 #include "database/DatabaseManager.h"
+#include "model/RideDataLoader.h"
 
 #include <QDateTime>
 #include <QFileInfo>
@@ -167,55 +168,6 @@ int RideDataSerializer::saveRideToDatabase(
 RideData RideDataSerializer::loadRideFromDatabase(int activityId,
                                                    DatabaseManager& dbManager)
 {
-    RideData rideData;
     QSqlDatabase db = dbManager.database();
-
-    // Pre-reserve vector to avoid repeated reallocations during large sample loads
-    {
-        QSqlQuery countQ(db);
-        countQ.prepare("SELECT COUNT(*) FROM activity_samples WHERE activity_id=:id");
-        countQ.bindValue(":id", activityId);
-        if (countQ.exec() && countQ.next())
-        {
-            const int sampleCount = countQ.value(0).toInt();
-            if (sampleCount > 0)
-                rideData.records.reserve(sampleCount);
-        }
-    }
-
-    QSqlQuery q(db);
-    q.prepare(
-        "SELECT elapsed_seconds,"
-        "  power_total, heart_rate, cadence, speed,"
-        "  latitude, longitude, altitude,"
-        "  has_gps, has_power, has_heart_rate, has_cadence, has_speed, has_altitude"
-        " FROM activity_samples"
-        " WHERE activity_id=:id"
-        " ORDER BY elapsed_seconds ASC");
-    q.bindValue(":id", activityId);
-    q.setForwardOnly(true);
-    q.exec();
-
-    while (q.next())
-    {
-        RideRecord r;
-        int col = 0;
-        r.elapsedSeconds = q.value(col++).toDouble();
-        r.power          = q.value(col++).toDouble();
-        r.heartRate      = q.value(col++).toDouble();
-        r.cadence        = q.value(col++).toDouble();
-        r.speed          = q.value(col++).toDouble();
-        r.latitude       = q.value(col++).toDouble();
-        r.longitude      = q.value(col++).toDouble();
-        r.altitude       = q.value(col++).toDouble();
-        r.hasGps         = q.value(col++).toBool();
-        r.hasPower       = q.value(col++).toBool();
-        r.hasHeartRate   = q.value(col++).toBool();
-        r.hasCadence     = q.value(col++).toBool();
-        r.hasSpeed       = q.value(col++).toBool();
-        r.hasAltitude    = q.value(col++).toBool();
-        rideData.records.push_back(r);
-    }
-
-    return rideData;
+    return RideDataLoader::loadActivitySamples(activityId, db);
 }
