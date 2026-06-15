@@ -1014,15 +1014,16 @@ void MainWindow::buildUI()
         paramsForm->addRow("Max Dip Distance (m)", m_climbDipDistanceSpin);
         paramsForm->addRow("Elevation Smoothing (m)", m_climbSmoothingSpin);
 
-        m_climbsTable = new QTableWidget(0, 14, climbingTab);
+          m_climbsTable = new QTableWidget(0, 15, climbingTab);
         m_climbsTable->setHorizontalHeaderLabels(
             { "Name", "Length (km)", "Gain (m)", "Avg Gradient %", "Max Gradient %",
-              "Duration", "Avg Power", "NP", "Avg HR", "Avg Cadence", "Avg Speed", "VAM", "Fade %", "Difficulty" });
+              "Duration", "Avg Power", "NP", "Avg HR", "Avg Cadence", "Avg Speed", "VAM", "Fade %", "HR Drift %", "Difficulty" });
         m_climbsTable->horizontalHeader()->setStretchLastSection(true);
         m_climbsTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
         m_climbsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
         m_climbsTable->setSelectionMode(QAbstractItemView::SingleSelection);
         m_climbsTable->setAlternatingRowColors(true);
+          m_climbsTable->setSortingEnabled(true);
 
         m_climbSummaryLabel = new QLabel("Climb summary: select a climb", climbingTab);
         m_climbSummaryLabel->setStyleSheet("color: #334155;");
@@ -3274,12 +3275,30 @@ void MainWindow::detectClimbsAndRefresh()
 
     const int previousRow = m_climbsTable->currentRow();
     QSignalBlocker blocker(m_climbsTable);
+    m_climbsTable->setSortingEnabled(false);
     m_climbsTable->setRowCount(static_cast<int>(m_detectedClimbs.size()));
 
     auto mkItem = [](const QString& text)
     {
         auto* item = new QTableWidgetItem(text);
         item->setTextAlignment(Qt::AlignCenter);
+        return item;
+    };
+
+    auto mkNumericItem = [](double value, int decimals, const QString& fallback = QStringLiteral("—"))
+    {
+        auto* item = new QTableWidgetItem;
+        item->setTextAlignment(Qt::AlignCenter);
+        if (value > 0.0 || fallback == QStringLiteral("0.0"))
+        {
+            item->setData(Qt::EditRole, value);
+            item->setText(QString::number(value, 'f', decimals));
+        }
+        else
+        {
+            item->setText(fallback);
+            item->setData(Qt::EditRole, -1.0);
+        }
         return item;
     };
 
@@ -3291,19 +3310,20 @@ void MainWindow::detectClimbsAndRefresh()
         nameItem->setData(kClimbEndRole, climb.endSeconds);
         nameItem->setBackground(QBrush(QColor(34, 197, 94, 45)));
         m_climbsTable->setItem(row, 0, nameItem);
-        m_climbsTable->setItem(row, 1, mkItem(QString::number(climb.lengthKm, 'f', 2)));
-        m_climbsTable->setItem(row, 2, mkItem(QString::number(climb.elevationGainM, 'f', 0)));
-        m_climbsTable->setItem(row, 3, mkItem(QString::number(climb.averageGradient, 'f', 1)));
-        m_climbsTable->setItem(row, 4, mkItem(QString::number(climb.maximumGradient, 'f', 1)));
+        m_climbsTable->setItem(row, 1, mkNumericItem(climb.lengthKm, 2, QStringLiteral("0.00")));
+        m_climbsTable->setItem(row, 2, mkNumericItem(climb.elevationGainM, 0, QStringLiteral("0")));
+        m_climbsTable->setItem(row, 3, mkNumericItem(climb.averageGradient, 1, QStringLiteral("0.0")));
+        m_climbsTable->setItem(row, 4, mkNumericItem(climb.maximumGradient, 1, QStringLiteral("0.0")));
         m_climbsTable->setItem(row, 5, mkItem(fmtDur(climb.durationSeconds)));
-        m_climbsTable->setItem(row, 6, mkItem(climb.averagePower > 0.0 ? QString::number(climb.averagePower, 'f', 0) : "—"));
-        m_climbsTable->setItem(row, 7, mkItem(climb.normalizedPower > 0.0 ? QString::number(climb.normalizedPower, 'f', 0) : "—"));
-        m_climbsTable->setItem(row, 8, mkItem(climb.averageHeartRate > 0.0 ? QString::number(climb.averageHeartRate, 'f', 0) : "—"));
-        m_climbsTable->setItem(row, 9, mkItem(climb.averageCadence > 0.0 ? QString::number(climb.averageCadence, 'f', 0) : "—"));
-        m_climbsTable->setItem(row, 10, mkItem(climb.averageSpeed > 0.0 ? QString::number(climb.averageSpeed, 'f', 1) : "—"));
-        m_climbsTable->setItem(row, 11, mkItem(climb.vam > 0.0 ? QString::number(climb.vam, 'f', 0) : "—"));
-        m_climbsTable->setItem(row, 12, mkItem(climb.powerFadePct != 0.0 ? QString::number(climb.powerFadePct, 'f', 1) : "0.0"));
-        m_climbsTable->setItem(row, 13, mkItem(QString::number(climb.difficultyScore, 'f', 0)));
+        m_climbsTable->setItem(row, 6, mkNumericItem(climb.averagePower, 0));
+        m_climbsTable->setItem(row, 7, mkNumericItem(climb.normalizedPower, 0));
+        m_climbsTable->setItem(row, 8, mkNumericItem(climb.averageHeartRate, 0));
+        m_climbsTable->setItem(row, 9, mkNumericItem(climb.averageCadence, 0));
+        m_climbsTable->setItem(row, 10, mkNumericItem(climb.averageSpeed, 1));
+        m_climbsTable->setItem(row, 11, mkNumericItem(climb.vam, 0));
+        m_climbsTable->setItem(row, 12, mkNumericItem(climb.powerFadePct, 1, QStringLiteral("0.0")));
+        m_climbsTable->setItem(row, 13, mkNumericItem(climb.hrDriftPct, 1, QStringLiteral("0.0")));
+        m_climbsTable->setItem(row, 14, mkNumericItem(climb.difficultyScore, 0, QStringLiteral("0")));
     }
 
     m_climbsTable->resizeColumnsToContents();
@@ -3314,6 +3334,7 @@ void MainWindow::detectClimbsAndRefresh()
         m_climbsTable->setCurrentCell(target, 0);
     }
 
+    m_climbsTable->setSortingEnabled(true);
     blocker.unblock();
     updateClimbRowStyles();
     onClimbSelectionChanged();
@@ -3346,7 +3367,7 @@ void MainWindow::onClimbSelectionChanged()
         return;
 
     const int row = m_climbsTable->currentRow();
-    if (row < 0 || row >= static_cast<int>(m_detectedClimbs.size()))
+    if (row < 0)
     {
         if (m_climbAltitudeChart)
             m_climbAltitudeChart->setSelectedClimbIndex(-1);
@@ -3356,10 +3377,36 @@ void MainWindow::onClimbSelectionChanged()
         return;
     }
 
-    if (m_climbAltitudeChart)
-        m_climbAltitudeChart->setSelectedClimbIndex(row);
+    auto* firstItem = m_climbsTable->item(row, 0);
+    if (!firstItem)
+        return;
 
-    const Climb& climb = m_detectedClimbs[static_cast<size_t>(row)];
+    const double selectedStart = firstItem->data(kClimbStartRole).toDouble();
+    const double selectedEnd = firstItem->data(kClimbEndRole).toDouble();
+
+    int climbIndex = -1;
+    for (int i = 0; i < static_cast<int>(m_detectedClimbs.size()); ++i)
+    {
+        const Climb& c = m_detectedClimbs[static_cast<size_t>(i)];
+        if (std::abs(c.startSeconds - selectedStart) < 0.75 &&
+            std::abs(c.endSeconds - selectedEnd) < 0.75)
+        {
+            climbIndex = i;
+            break;
+        }
+    }
+
+    if (climbIndex < 0)
+    {
+        if (m_climbAltitudeChart)
+            m_climbAltitudeChart->setSelectedClimbIndex(-1);
+        return;
+    }
+
+    if (m_climbAltitudeChart)
+        m_climbAltitudeChart->setSelectedClimbIndex(climbIndex);
+
+    const Climb& climb = m_detectedClimbs[static_cast<size_t>(climbIndex)];
     const double padding = std::max(5.0, climb.durationSeconds * 0.08);
     const double startSeconds = std::max(0.0, climb.startSeconds - padding);
     const double endSeconds = climb.endSeconds + padding;
@@ -3505,6 +3552,27 @@ void MainWindow::onClimbBoundaryEdited(
             item->setTextAlignment(Qt::AlignCenter);
         };
 
+        auto setNumericCell = [this, idx](int col, double value, int decimals, const QString& fallback = QStringLiteral("—"), bool alwaysNumeric = false)
+        {
+            auto* item = m_climbsTable->item(idx, col);
+            if (!item)
+            {
+                item = new QTableWidgetItem;
+                m_climbsTable->setItem(idx, col, item);
+            }
+            item->setTextAlignment(Qt::AlignCenter);
+            if (alwaysNumeric || value > 0.0)
+            {
+                item->setData(Qt::EditRole, value);
+                item->setText(QString::number(value, 'f', decimals));
+            }
+            else
+            {
+                item->setData(Qt::EditRole, -1.0);
+                item->setText(fallback);
+            }
+        };
+
         auto* nameItem = m_climbsTable->item(idx, 0);
         if (!nameItem)
         {
@@ -3514,19 +3582,20 @@ void MainWindow::onClimbBoundaryEdited(
         nameItem->setData(kClimbStartRole, rebuilt.startSeconds);
         nameItem->setData(kClimbEndRole, rebuilt.endSeconds);
 
-        setCell(1, QString::number(rebuilt.lengthKm, 'f', 2));
-        setCell(2, QString::number(rebuilt.elevationGainM, 'f', 0));
-        setCell(3, QString::number(rebuilt.averageGradient, 'f', 1));
-        setCell(4, QString::number(rebuilt.maximumGradient, 'f', 1));
+        setNumericCell(1, rebuilt.lengthKm, 2, QStringLiteral("0.00"), true);
+        setNumericCell(2, rebuilt.elevationGainM, 0, QStringLiteral("0"), true);
+        setNumericCell(3, rebuilt.averageGradient, 1, QStringLiteral("0.0"), true);
+        setNumericCell(4, rebuilt.maximumGradient, 1, QStringLiteral("0.0"), true);
         setCell(5, fmtDur(rebuilt.durationSeconds));
-        setCell(6, rebuilt.averagePower > 0.0 ? QString::number(rebuilt.averagePower, 'f', 0) : "—");
-        setCell(7, rebuilt.normalizedPower > 0.0 ? QString::number(rebuilt.normalizedPower, 'f', 0) : "—");
-        setCell(8, rebuilt.averageHeartRate > 0.0 ? QString::number(rebuilt.averageHeartRate, 'f', 0) : "—");
-        setCell(9, rebuilt.averageCadence > 0.0 ? QString::number(rebuilt.averageCadence, 'f', 0) : "—");
-        setCell(10, rebuilt.averageSpeed > 0.0 ? QString::number(rebuilt.averageSpeed, 'f', 1) : "—");
-        setCell(11, rebuilt.vam > 0.0 ? QString::number(rebuilt.vam, 'f', 0) : "—");
-        setCell(12, QString::number(rebuilt.powerFadePct, 'f', 1));
-        setCell(13, QString::number(rebuilt.difficultyScore, 'f', 0));
+        setNumericCell(6, rebuilt.averagePower, 0);
+        setNumericCell(7, rebuilt.normalizedPower, 0);
+        setNumericCell(8, rebuilt.averageHeartRate, 0);
+        setNumericCell(9, rebuilt.averageCadence, 0);
+        setNumericCell(10, rebuilt.averageSpeed, 1);
+        setNumericCell(11, rebuilt.vam, 0);
+        setNumericCell(12, rebuilt.powerFadePct, 1, QStringLiteral("0.0"), true);
+        setNumericCell(13, rebuilt.hrDriftPct, 1, QStringLiteral("0.0"), true);
+        setNumericCell(14, rebuilt.difficultyScore, 0, QStringLiteral("0"), true);
     }
 
     onClimbSelectionChanged();
