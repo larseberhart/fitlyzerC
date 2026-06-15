@@ -114,6 +114,16 @@ private:
     bool            m_isRebuilding  = false;
     bool            m_syncing       = false;
     bool            m_hasData       = false;
+
+    // Cache for Y-axis range calculations during zoom to avoid redundant recalculation
+    mutable struct
+    {
+        double cachedMinX = -1.0;
+        double cachedMaxX = -1.0;
+        double cachedAxisMin = 0.0;
+        double cachedAxisMax = 1.0;
+        bool valid = false;
+    } m_yAxisRangeCache;
     double          m_origMaxX      = 1.0;
     double          m_crosshairX    = -1.0;
     double          m_crosshairY    = std::numeric_limits<double>::quiet_NaN();

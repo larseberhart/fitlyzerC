@@ -805,6 +805,9 @@ void RideChartWidget::rebuildChart(bool preserveXRange)
         return;
 
     m_isRebuilding = true;
+    
+    // Invalidate Y-axis range cache since data is changing
+    m_yAxisRangeCache.valid = false;
 
     const bool hadData = m_hasData;
     const double previousMinX = m_axisX->min();
@@ -1259,6 +1262,15 @@ void RideChartWidget::updateYAxisForVisibleRange(double xMinMin, double xMaxMin)
 {
     if (!m_hasData || m_tooltipPoints.empty()) return;
 
+    // Check cache: if same range, reuse calculation
+    if (m_yAxisRangeCache.valid &&
+        xMinMin == m_yAxisRangeCache.cachedMinX &&
+        xMaxMin == m_yAxisRangeCache.cachedMaxX)
+    {
+        m_axisY->setRange(m_yAxisRangeCache.cachedAxisMin, m_yAxisRangeCache.cachedAxisMax);
+        return;
+    }
+
     double visMin = std::numeric_limits<double>::max();
     double visMax = std::numeric_limits<double>::lowest();
 
@@ -1280,6 +1292,14 @@ void RideChartWidget::updateYAxisForVisibleRange(double xMinMin, double xMaxMin)
 
     double axisMin, axisMax;
     niceRange(visMin, visMax, axisMin, axisMax);
+    
+    // Cache this result for rapid zoom operations
+    m_yAxisRangeCache.cachedMinX = xMinMin;
+    m_yAxisRangeCache.cachedMaxX = xMaxMin;
+    m_yAxisRangeCache.cachedAxisMin = axisMin;
+    m_yAxisRangeCache.cachedAxisMax = axisMax;
+    m_yAxisRangeCache.valid = true;
+    
     m_axisY->setRange(axisMin, axisMax);
 
     const int ticks = std::clamp(height() / 40, 4, 15);
@@ -1329,6 +1349,7 @@ void RideChartWidget::clearChart()
     clearBackgroundSeries();
     m_series->clear();
     m_smoothedSeriesCache.clear();
+    m_yAxisRangeCache.valid = false;
     m_tooltipPoints.clear();
     m_tooltipRawValues.clear();
     m_tooltipDisplayValues.clear();
