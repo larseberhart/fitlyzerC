@@ -23,6 +23,14 @@
 
 class DatabaseManager;
 
+enum class ImportResult
+{
+    Success,
+    Duplicate,
+    TimeOverlap,
+    Failed
+};
+
 struct DuplicateActivityInfo
 {
     int existingActivityId = -1;
@@ -50,7 +58,8 @@ public:
                     bool allowTimeOverlap = false,
                     bool runAnalysis = true,
                     const QString& importSource = QString(),
-                    DuplicateActivityInfo* duplicateInfo = nullptr);
+                    DuplicateActivityInfo* duplicateInfo = nullptr,
+                    ImportResult* result = nullptr);
     bool loadActivity(int activityId, QString& errorOut);
 
     /// Re-read climbs from the database (after undo/redo or external edit).

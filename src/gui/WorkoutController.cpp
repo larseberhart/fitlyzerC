@@ -107,16 +107,19 @@ int WorkoutController::importFile(const QString& path, QString& errorOut,
                                    bool allowTimeOverlap,
                                    bool runAnalysis,
                                    const QString& importSource,
-                                   DuplicateActivityInfo* duplicateInfo)
+                                   DuplicateActivityInfo* duplicateInfo,
+                                   ImportResult* result)
 {
     if (!m_dbManager || !m_dbManager->isOpen())
     {
         errorOut = "No database is open.";
+        if (result) *result = ImportResult::Failed;
         return -1;
     }
     if (m_currentAthleteId < 0)
     {
         errorOut = "No athlete selected.";
+        if (result) *result = ImportResult::Failed;
         return -1;
     }
 
@@ -129,6 +132,7 @@ int WorkoutController::importFile(const QString& path, QString& errorOut,
     catch (const std::exception& ex)
     {
         errorOut = QString::fromLocal8Bit(ex.what());
+        if (result) *result = ImportResult::Failed;
         return -1;
     }
 

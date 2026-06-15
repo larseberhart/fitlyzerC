@@ -76,6 +76,8 @@ private:
 
     TileCache m_tileCache;
     RideData  m_rideData;
+    // WARNING: m_gpsRecords contains raw pointers into m_rideData.records.
+    // Any mutation of m_rideData.records requires calling rebuildGpsCache().
     // Pre-filtered, time-ordered GPS-only records. Rebuilt once in setRideData().
     std::vector<const RideRecord*> m_gpsRecords;
     // Per-segment base colors (before map-style adjustment). One per GPS segment.

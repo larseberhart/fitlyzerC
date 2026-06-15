@@ -159,6 +159,7 @@ void MapRenderer::rebuildSegmentColors()
 void MapRenderer::rebuildGpsCache()
 {
     m_gpsRecords.clear();
+    m_gpsRecords.reserve(m_rideData.records.size());
     m_firstGpsRecord = nullptr;
     m_lastGpsRecord  = nullptr;
 
