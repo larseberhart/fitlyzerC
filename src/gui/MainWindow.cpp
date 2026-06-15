@@ -4783,8 +4783,11 @@ void MainWindow::triggerDetectIntervals()
     IntervalDetector::Config cfg;
     cfg.ftp = m_controller->ftp();
     const std::vector<Interval> detected = IntervalDetector::detect(m_controller->rideData(), cfg);
+    
+    // Remove overlapping and duplicate intervals before saving
+    const auto deduplicated = IntervalDetector::removeOverlappingAndDuplicates(detected);
 
-    for (const Interval& iv : detected)
+    for (const Interval& iv : deduplicated)
     {
         IntervalRecord record;
         record.activityId  = m_controller->currentActivityId();
@@ -4803,7 +4806,7 @@ void MainWindow::triggerDetectIntervals()
 
     updateIntervals();
     statusBar()->showMessage(
-        QString("Detected %1 interval(s) and saved to database.").arg(detected.size()),
+        QString("Detected %1 interval(s) (after deduplication) and saved to database.").arg(deduplicated.size()),
         3000);
 }
 

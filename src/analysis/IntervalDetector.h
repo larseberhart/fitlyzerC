@@ -41,6 +41,11 @@ public:
         const RideData& rideData,
         const Config& config = Config{});
 
+    // Removes exact/near duplicates and merges overlapping intervals
+    // (within 1 second tolerance for interval boundaries)
+    static std::vector<Interval> removeOverlappingAndDuplicates(
+        std::vector<Interval> intervals);
+
 private:
     static std::vector<double> smoothPower(
         const RideData& rideData, int window);

@@ -139,3 +139,69 @@ std::vector<Interval> IntervalDetector::detect(
 
     return result;
 }
+
+std::vector<Interval> IntervalDetector::removeOverlappingAndDuplicates(
+    std::vector<Interval> intervals)
+{
+    if (intervals.size() <= 1)
+        return intervals;
+
+    // Sort by start time
+    std::sort(intervals.begin(), intervals.end(),
+        [](const Interval& a, const Interval& b) {
+            return a.startSeconds < b.startSeconds;
+        });
+
+    std::vector<Interval> result;
+    result.reserve(intervals.size());
+
+    // Merge overlapping/adjacent intervals and remove duplicates
+    const double tolerance = 1.0;  // 1 second boundary tolerance for duplicates
+
+    for (const Interval& current : intervals)
+    {
+        // Skip if this interval is a duplicate of the last one
+        // (same start/end within tolerance)
+        if (!result.empty())
+        {
+            const Interval& last = result.back();
+            if (std::abs(last.startSeconds - current.startSeconds) <= tolerance &&
+                std::abs(last.endSeconds - current.endSeconds) <= tolerance)
+            {
+                // Duplicate detected: keep the existing one
+                continue;
+            }
+
+            // Check for overlap: if current starts before last ends, merge them
+            if (current.startSeconds < last.endSeconds + tolerance)
+            {
+                // Merge by extending the end time and averaging metrics
+                Interval& merged = result.back();
+                merged.endSeconds = std::max(merged.endSeconds, current.endSeconds);
+                merged.durationSeconds = merged.endSeconds - merged.startSeconds;
+
+                // Average the metrics proportionally (weighted by interval duration)
+                const double lastDur = last.durationSeconds;
+                const double currDur = current.durationSeconds;
+                const double totalDur = lastDur + currDur;
+
+                if (totalDur > 0.0)
+                {
+                    merged.averagePower     = (last.averagePower * lastDur + current.averagePower * currDur) / totalDur;
+                    merged.maximumPower     = std::max(last.maximumPower, current.maximumPower);
+                    merged.normalizedPower  = (last.normalizedPower * lastDur + current.normalizedPower * currDur) / totalDur;
+                    merged.averageHeartRate = (last.averageHeartRate * lastDur + current.averageHeartRate * currDur) / totalDur;
+                    merged.averageCadence   = (last.averageCadence * lastDur + current.averageCadence * currDur) / totalDur;
+                    merged.averageSpeed     = (last.averageSpeed * lastDur + current.averageSpeed * currDur) / totalDur;
+                }
+                continue;
+            }
+        }
+
+        // No overlap/duplicate: add as new interval
+        result.push_back(current);
+    }
+
+    return result;
+}
+
