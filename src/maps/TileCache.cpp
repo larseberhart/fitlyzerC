@@ -203,7 +203,10 @@ void TileCache::setMapStyle(MapStyle style)
     for (QNetworkReply* reply : activeReplies)
     {
         if (reply)
+        {
+            reply->setProperty("styleChangeAbort", true);
             reply->abort();
+        }
     }
 
     m_mapStyle = style;
@@ -372,19 +375,25 @@ void TileCache::dispatchNextDownloads()
 void TileCache::onReplyFinished(QNetworkReply* reply)
 {
     reply->deleteLater();
-    --m_activeDownloads;
+    
+    // Safely decrement active downloads counter. Aborted replies or any other
+    // completion will trigger this, so guard against going negative.
+    if (m_activeDownloads > 0)
+        --m_activeDownloads;
 
     const int z = reply->property("z").toInt();
     const int x = reply->property("x").toInt();
     const int y = reply->property("y").toInt();
     const QString replyStyle = reply->property("style").toString();
+    const bool wasAbortedForStyleChange = reply->property("styleChangeAbort").toBool();
     const QString k = keyForStyle(replyStyle, z, x, y);
     m_pending.remove(k);
 
     // Always redispatch so queued tiles are sent as slots free up.
     dispatchNextDownloads();
 
-    if (replyStyle != styleKey(m_mapStyle))
+    // Skip processing aborted or stale-style replies
+    if (wasAbortedForStyleChange || replyStyle != styleKey(m_mapStyle))
         return;
 
     if (reply->error() != QNetworkReply::NoError)

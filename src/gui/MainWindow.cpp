@@ -2302,14 +2302,15 @@ void MainWindow::importFilesInternal(const QStringList& filePaths,
     {
         QString err;
         DuplicateActivityInfo duplicateInfo;
-        int activityId = m_controller->importFile(filePath, err, false, true, QString(), &duplicateInfo);
+        ImportResult importResult = ImportResult::Failed;
+        int activityId = m_controller->importFile(filePath, err, false, true, QString(), &duplicateInfo, &importResult);
         if (activityId > 0)
         {
             ++imported;
             continue;
         }
 
-        if (err == "time_overlap")
+        if (importResult == ImportResult::TimeOverlap)
         {
             const QString existingStartText = duplicateInfo.existingStartUtc.isEmpty()
                 ? QStringLiteral("Unknown")
@@ -2331,7 +2332,8 @@ void MainWindow::importFilesInternal(const QStringList& filePaths,
             if (res == QMessageBox::Yes)
             {
                 err.clear();
-                activityId = m_controller->importFile(filePath, err, /*allowTimeOverlap=*/true);
+                importResult = ImportResult::Failed;
+                activityId = m_controller->importFile(filePath, err, /*allowTimeOverlap=*/true, true, QString(), nullptr, &importResult);
                 if (activityId > 0)
                 {
                     ++imported;
@@ -2343,7 +2345,7 @@ void MainWindow::importFilesInternal(const QStringList& filePaths,
         if (err.contains("duplicate", Qt::CaseInsensitive) ||
             err.contains("already", Qt::CaseInsensitive))
             ++duplicates;
-        else if (err != "time_overlap")
+        else if (importResult != ImportResult::TimeOverlap)
             ++failed;
         else
             ++duplicates; // user cancelled overlap import counts as skipped

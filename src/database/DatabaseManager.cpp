@@ -385,18 +385,38 @@ bool DatabaseManager::open(const QString& path, QString* errorOut)
         if (version < DatabaseSchema::kCurrentVersion)
         {
             if (!upgradeSchema(version, errorOut))
+            {
+                cleanupFailedOpen();
                 return false;
+            }
         }
     }
     else
     {
         // schema_info missing: fresh file or legacy — apply schema
         if (!applySchema(errorOut))
+        {
+            cleanupFailedOpen();
             return false;
+        }
     }
 
     m_path = path;
     return true;
+}
+
+void DatabaseManager::cleanupFailedOpen()
+{
+    if (m_db.isOpen())
+        m_db.close();
+
+    if (!m_connectionName.isEmpty())
+    {
+        QString conn = m_connectionName;
+        m_db = QSqlDatabase();
+        QSqlDatabase::removeDatabase(conn);
+        m_connectionName.clear();
+    }
 }
 
 bool DatabaseManager::create(const QString& path, QString* errorOut)

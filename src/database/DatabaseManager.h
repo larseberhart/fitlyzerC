@@ -33,6 +33,7 @@ public:
 private:
     bool applySchema(QString* errorOut);
     bool upgradeSchema(int fromVersion, QString* errorOut);
+    void cleanupFailedOpen();
 
     QString      m_path;
     QString      m_connectionName;

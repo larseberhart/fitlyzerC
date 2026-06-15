@@ -167,8 +167,9 @@ int WorkoutController::importFile(const QString& path, QString& errorOut,
                     ride.records.empty() ? 0.0 : ride.records.back().elapsedSeconds;
             }
 
-            // Keep a concise sentinel for call sites that only branch on overlap.
-            errorOut = QString("time_overlap");
+            // Return TimeOverlap result with descriptive error message
+            errorOut = QString("A duplicate activity with the same start time already exists");
+            if (result) *result = ImportResult::TimeOverlap;
             return -1;
         }
     }
@@ -186,7 +187,10 @@ int WorkoutController::importFile(const QString& path, QString& errorOut,
         np, *m_dbManager, actRepo, impRepo, &errorOut);
 
     if (activityId < 0)
+    {
+        if (result) *result = ImportResult::Failed;
         return -1;
+    }
 
     // Store fingerprint (sport + start_time + rounded duration + rounded distance)
     {
@@ -210,6 +214,7 @@ int WorkoutController::importFile(const QString& path, QString& errorOut,
     else if (m_analysisQueue)
         m_analysisQueue->enqueue(activityId);
 
+    if (result) *result = ImportResult::Success;
     return activityId;
 }
 

@@ -16,6 +16,13 @@ if(NOT DEFINED FITLYZER_PRESET OR FITLYZER_PRESET STREQUAL "")
     endif()
 endif()
 
+# Validate that only packaging presets are used (not build presets)
+set(VALID_PRESETS "windows-nsis" "macos-dmg" "linux-appimage")
+if(NOT FITLYZER_PRESET IN_LIST VALID_PRESETS)
+    message(FATAL_ERROR "Invalid packaging preset: ${FITLYZER_PRESET}. "
+                        "Must be one of: ${VALID_PRESETS}")
+endif()
+
 set(FITLYZER_BUILD_DIR "${FITLYZER_SOURCE_DIR}/build/${FITLYZER_PRESET}")
 set(FITLYZER_CPACK_CONFIG "${FITLYZER_BUILD_DIR}/CPackConfig.cmake")
 
