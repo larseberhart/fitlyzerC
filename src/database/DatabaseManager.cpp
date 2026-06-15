@@ -249,6 +249,87 @@ bool DatabaseManager::upgradeSchema(int fromVersion, QString* errorOut)
         }
     }
 
+    if (fromVersion < 7)
+    {
+        // activities: analysis_version, fingerprint, analysis_flags, import_source
+        struct ColDef7a { const char* name; const char* def; };
+        static const ColDef7a kActivityCols[] = {
+            { "analysis_version", "INTEGER NOT NULL DEFAULT 1"  },
+            { "fingerprint",      "TEXT"                        },
+            { "analysis_flags",   "INTEGER NOT NULL DEFAULT 0"  },
+            { "import_source",    "TEXT"                        },
+        };
+        for (const ColDef7a& col : kActivityCols)
+        {
+            if (columnExists(m_db, "activities", col.name)) continue;
+            QSqlQuery q(m_db);
+            q.exec(QString("ALTER TABLE activities ADD COLUMN %1 %2").arg(col.name).arg(col.def));
+        }
+
+        // intervals: algorithm_version, deleted, uuid
+        struct ColDef7b { const char* name; const char* def; };
+        static const ColDef7b kIntervalCols[] = {
+            { "algorithm_version", "INTEGER NOT NULL DEFAULT 1"  },
+            { "deleted",           "INTEGER NOT NULL DEFAULT 0"  },
+            { "uuid",              "TEXT"                        },
+        };
+        for (const ColDef7b& col : kIntervalCols)
+        {
+            if (columnExists(m_db, "intervals", col.name)) continue;
+            QSqlQuery q(m_db);
+            q.exec(QString("ALTER TABLE intervals ADD COLUMN %1 %2").arg(col.name).arg(col.def));
+        }
+
+        // climbs: algorithm_version, deleted, uuid, original bounds, statistics, notes, favorite, rating
+        struct ColDef7c { const char* name; const char* def; };
+        static const ColDef7c kClimbCols[] = {
+            { "algorithm_version",      "INTEGER NOT NULL DEFAULT 1"  },
+            { "deleted",                "INTEGER NOT NULL DEFAULT 0"  },
+            { "uuid",                   "TEXT"                        },
+            { "original_start_seconds", "REAL"                        },
+            { "original_end_seconds",   "REAL"                        },
+            { "avg_power",              "REAL"                        },
+            { "np",                     "REAL"                        },
+            { "avg_hr",                 "REAL"                        },
+            { "avg_cadence",            "REAL"                        },
+            { "vam",                    "REAL"                        },
+            { "notes",                  "TEXT"                        },
+            { "favorite",               "INTEGER NOT NULL DEFAULT 0"  },
+            { "rating",                 "INTEGER NOT NULL DEFAULT 0"  },
+        };
+        for (const ColDef7c& col : kClimbCols)
+        {
+            if (columnExists(m_db, "climbs", col.name)) continue;
+            QSqlQuery q(m_db);
+            q.exec(QString("ALTER TABLE climbs ADD COLUMN %1 %2").arg(col.name).arg(col.def));
+        }
+
+        // new tables
+        {
+            QSqlQuery q(m_db);
+            q.exec(
+                "CREATE TABLE IF NOT EXISTS activity_analysis_settings ("
+                "  activity_id             INTEGER PRIMARY KEY,"
+                "  climb_min_gain          REAL,"
+                "  climb_min_length        REAL,"
+                "  climb_min_gradient      REAL,"
+                "  interval_work_threshold REAL,"
+                "  interval_rest_threshold REAL,"
+                "  FOREIGN KEY(activity_id) REFERENCES activities(id) ON DELETE CASCADE"
+                ")");
+        }
+        {
+            QSqlQuery q(m_db);
+            q.exec(
+                "CREATE TABLE IF NOT EXISTS activity_analysis_cache ("
+                "  activity_id INTEGER NOT NULL,"
+                "  cache_key   TEXT    NOT NULL,"
+                "  cache_value BLOB,"
+                "  PRIMARY KEY (activity_id, cache_key)"
+                ")");
+        }
+    }
+
     return applySchema(errorOut);
 }
 

@@ -18,8 +18,11 @@ struct IntervalRecord
     double avgHr = 0.0;
     double avgCadence = 0.0;
     QString notes;
-    QString source = QStringLiteral("auto"); // "auto", "manual", "edited"
-    bool locked = false;
+    QString source           = QStringLiteral("auto"); // "auto", "manual", "edited"
+    bool    locked           = false;
+    bool    deleted          = false;
+    int     algorithmVersion = 1;
+    QString uuid;
 };
 
 class IntervalRepository
@@ -27,9 +30,16 @@ class IntervalRepository
 public:
     explicit IntervalRepository(QSqlDatabase& db);
 
-    int insertInterval(const IntervalRecord& interval);
+    int  insertInterval(const IntervalRecord& interval);
+    bool updateInterval(const IntervalRecord& interval);
+
+    /// Soft-delete: marks deleted=1.
+    bool softDeleteInterval(int intervalId);
+    /// Hard-delete (for full reset before re-detect).
     bool deleteInterval(int intervalId);
     bool deleteIntervalsForActivity(int activityId);
+
+    /// Returns non-deleted intervals only.
     QList<IntervalRecord> listIntervalsForActivity(int activityId);
     bool hasLockedIntervals(int activityId);
 

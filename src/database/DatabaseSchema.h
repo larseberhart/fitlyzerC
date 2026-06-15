@@ -5,7 +5,7 @@
 
 namespace DatabaseSchema {
 
-static constexpr int kCurrentVersion = 6;
+static constexpr int kCurrentVersion = 7;
 
 // Each string is one DDL statement (no semicolons needed for exec()).
 inline constexpr std::array kStatements = {
@@ -74,7 +74,11 @@ inline constexpr std::array kStatements = {
         "  weight           REAL,"
         "  bike             TEXT,"
         "  equipment        TEXT,"
-        "  import_time      TEXT    NOT NULL"
+        "  import_time      TEXT    NOT NULL,"
+        "  analysis_version INTEGER NOT NULL DEFAULT 1,"
+        "  fingerprint      TEXT,"
+        "  analysis_flags   INTEGER NOT NULL DEFAULT 0,"
+        "  import_source    TEXT"
         ")"
     },
     std::string_view{
@@ -149,7 +153,10 @@ inline constexpr std::array kStatements = {
         "  notes         TEXT,"
         "  source        TEXT    NOT NULL DEFAULT 'auto',"
         "  locked        INTEGER NOT NULL DEFAULT 0,"
-        "  updated_at    TEXT"
+        "  updated_at    TEXT,"
+        "  algorithm_version INTEGER NOT NULL DEFAULT 1,"
+        "  deleted       INTEGER NOT NULL DEFAULT 0,"
+        "  uuid          TEXT"
         ")"
     },
     std::string_view{
@@ -165,7 +172,20 @@ inline constexpr std::array kStatements = {
         "  source           TEXT    NOT NULL DEFAULT 'auto',"
         "  locked           INTEGER NOT NULL DEFAULT 0,"
         "  created_at       TEXT    DEFAULT CURRENT_TIMESTAMP,"
-        "  updated_at       TEXT    DEFAULT CURRENT_TIMESTAMP"
+        "  updated_at       TEXT    DEFAULT CURRENT_TIMESTAMP,"
+        "  algorithm_version       INTEGER NOT NULL DEFAULT 1,"
+        "  deleted                 INTEGER NOT NULL DEFAULT 0,"
+        "  uuid                    TEXT,"
+        "  original_start_seconds  REAL,"
+        "  original_end_seconds    REAL,"
+        "  avg_power               REAL,"
+        "  np                      REAL,"
+        "  avg_hr                  REAL,"
+        "  avg_cadence             REAL,"
+        "  vam                     REAL,"
+        "  notes                   TEXT,"
+        "  favorite                INTEGER NOT NULL DEFAULT 0,"
+        "  rating                  INTEGER NOT NULL DEFAULT 0"
         ")"
     },
     std::string_view{
@@ -244,6 +264,25 @@ inline constexpr std::array kStatements = {
         "  error_message TEXT"
         ")"
     },
+        std::string_view{
+            "CREATE TABLE IF NOT EXISTS activity_analysis_settings ("
+            "  activity_id              INTEGER PRIMARY KEY,"
+            "  climb_min_gain           REAL,"
+            "  climb_min_length         REAL,"
+            "  climb_min_gradient       REAL,"
+            "  interval_work_threshold  REAL,"
+            "  interval_rest_threshold  REAL,"
+            "  FOREIGN KEY(activity_id) REFERENCES activities(id) ON DELETE CASCADE"
+            ")"
+        },
+        std::string_view{
+            "CREATE TABLE IF NOT EXISTS activity_analysis_cache ("
+            "  activity_id  INTEGER NOT NULL,"
+            "  cache_key    TEXT    NOT NULL,"
+            "  cache_value  BLOB,"
+            "  PRIMARY KEY (activity_id, cache_key)"
+            ")"
+        },
     // Enable foreign-key enforcement (must be per-connection, set here via a dummy table)
     std::string_view{
         "PRAGMA foreign_keys = ON"

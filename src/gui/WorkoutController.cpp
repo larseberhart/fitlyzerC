@@ -8,6 +8,10 @@
 #include <algorithm>
 #include <cmath>
 
+#include "core/ActivityAnalysisFlags.h"
+#include "core/AnalysisVersions.h"
+#include "database/ActivityAnalysisSettingsRepository.h"
+#include "utils/UuidGenerator.h"
 #include "analysis/ClimbDetector.h"
 #include "analysis/ClimbMetrics.h"
 #include "analysis/TrainingLoad.h"
@@ -99,7 +103,10 @@ bool WorkoutController::loadFile(const QString& path, QString& errorOut)
     }
 }
 
-int WorkoutController::importFile(const QString& path, QString& errorOut, bool allowTimeOverlap)
+int WorkoutController::importFile(const QString& path, QString& errorOut,
+                                   bool allowTimeOverlap,
+                                   bool runAnalysis,
+                                   const QString& importSource)
 {
     if (!m_dbManager || !m_dbManager->isOpen())
     {
@@ -174,8 +181,28 @@ int WorkoutController::importFile(const QString& path, QString& errorOut, bool a
     if (activityId < 0)
         return -1;
 
+    // Store fingerprint (sport + start_time + rounded duration + rounded distance)
+    {
+        QCryptographicHash fpHasher(QCryptographicHash::Sha256);
+        fpHasher.addData(QStringLiteral("Cycling").toUtf8());
+        fpHasher.addData(ride.activityStartTimeUtc.toUtf8());
+        fpHasher.addData(QString::number(static_cast<int>(stats.durationSeconds)).toUtf8());
+        fpHasher.addData(QString::number(static_cast<int>(stats.totalDistanceKm * 1000.0)).toUtf8());
+        const QString fingerprint = fpHasher.result().toHex();
+        actRepo.updateFingerprint(activityId, fingerprint);
+    }
+
+    // Store import source
+    if (!importSource.isEmpty())
+        actRepo.setImportSource(activityId, importSource);
+
     emit activityImported(activityId);
-    loadActivity(activityId, errorOut);
+
+    if (runAnalysis)
+        loadActivity(activityId, errorOut);
+    else if (m_analysisQueue)
+        m_analysisQueue->enqueue(activityId);
+
     return activityId;
 }
 
@@ -286,15 +313,36 @@ void WorkoutController::loadOrGenerateIntervals()
         record.activityId = m_currentActivityId;
         record.startSample = static_cast<int>(std::round(iv.startSeconds));
         record.endSample = static_cast<int>(std::round(iv.endSeconds));
-        record.name = QString::fromStdString(iv.label);
-        record.type = QString::fromStdString(iv.label);
-        record.avgPower = iv.averagePower;
-        record.np = iv.normalizedPower;
-        record.avgHr = iv.averageHeartRate;
-        record.avgCadence = iv.averageCadence;
-        record.source = QStringLiteral("auto");
-        record.locked = false;
+        record.name             = QString::fromStdString(iv.label);
+        record.type             = QString::fromStdString(iv.label);
+        record.avgPower         = iv.averagePower;
+        record.np               = iv.normalizedPower;
+        record.avgHr            = iv.averageHeartRate;
+        record.avgCadence       = iv.averageCadence;
+        record.source           = QStringLiteral("auto");
+        record.locked           = false;
+        record.deleted          = false;
+        record.algorithmVersion = AnalysisVersions::IntervalDetection;
+        record.uuid             = UuidGenerator::create();
         repo.insertInterval(record);
+    }
+
+    // Mark HasIntervals flag
+    {
+        auto db2 = m_dbManager->database();
+        ActivityRepository actRepo2(db2);
+        const Activity actForFlags = actRepo2.getActivity(m_currentActivityId);
+        actRepo2.updateAnalysisFlags(m_currentActivityId,
+                                      actForFlags.analysisFlags | ActivityAnalysisFlags::HasIntervals);
+    }
+}
+
+void WorkoutController::reloadClimbsFromDatabase()
+{
+    if (m_dbManager && m_dbManager->isOpen() && m_currentActivityId > 0)
+    {
+        m_climbs.clear();
+        loadOrGenerateClimbs();
     }
 }
 
@@ -305,10 +353,17 @@ void WorkoutController::loadOrGenerateClimbs()
 
     auto db = m_dbManager->database();
     ClimbRepository repo(db);
+    ActivityRepository actRepo(db);
 
-    if (repo.hasClimbs(m_currentActivityId))
+    // Use HasClimbs flag as an authoritative "analysis was ever run" sentinel.
+    // This prevents auto re-detect when the user has deliberately deleted all climbs.
+    const Activity activity = actRepo.getActivity(m_currentActivityId);
+    const bool analysisEverRun = (activity.analysisFlags & ActivityAnalysisFlags::HasClimbs) != 0
+                                  || repo.hasClimbsEver(m_currentActivityId);
+
+    if (analysisEverRun)
     {
-        // Load from DB: rebuild full metrics from ride data using stored boundaries
+        // Load non-deleted climbs from DB; rebuild full metrics from ride data.
         const QList<ClimbRecord> stored = repo.climbsForActivity(m_currentActivityId);
         m_climbs.clear();
         m_climbs.reserve(static_cast<size_t>(stored.size()));
@@ -360,19 +415,47 @@ void WorkoutController::loadOrGenerateClimbs()
         return;
     }
 
-    // No stored climbs yet: m_climbs was populated by reanalyze(). Persist them now.
+    // First time: m_climbs was populated by reanalyze(). Check for resurrection, then persist.
+    const QList<ClimbRecord> deletedClimbs = repo.deletedClimbsForActivity(m_currentActivityId);
+
     for (Climb& c : m_climbs)
     {
+        // Resurrection prevention: skip if overlaps a previously deleted climb
+        bool overlapsDeleted = false;
+        for (const ClimbRecord& d : deletedClimbs)
+        {
+            if (c.startSeconds < d.endSeconds && c.endSeconds > d.startSeconds)
+            {
+                overlapsDeleted = true;
+                break;
+            }
+        }
+        if (overlapsDeleted) continue;
+
         ClimbRecord record;
-        record.activityId     = m_currentActivityId;
-        record.startSeconds   = c.startSeconds;
-        record.endSeconds     = c.endSeconds;
-        record.name           = c.name;
-        record.elevationGainM = c.elevationGainM;
-        record.lengthKm       = c.lengthKm;
-        record.averageGradient = c.averageGradient;
-        record.source         = QStringLiteral("auto");
-        record.locked         = false;
+        record.activityId           = m_currentActivityId;
+        record.uuid                 = UuidGenerator::create();
+        record.startSeconds         = c.startSeconds;
+        record.endSeconds           = c.endSeconds;
+        record.originalStartSeconds = c.startSeconds;
+        record.originalEndSeconds   = c.endSeconds;
+        record.name                 = c.name;
+        record.elevationGainM       = c.elevationGainM;
+        record.lengthKm             = c.lengthKm;
+        record.averageGradient      = c.averageGradient;
+        record.avgPower             = c.averagePower;
+        record.np                   = c.normalizedPower;
+        record.avgHr                = c.averageHeartRate;
+        record.avgCadence           = c.averageCadence;
+        record.vam                  = c.vam;
+        record.source               = QStringLiteral("auto");
+        record.locked               = false;
+        record.algorithmVersion     = AnalysisVersions::ClimbDetection;
         c.id = repo.insertClimb(record);
     }
+
+    // Mark HasClimbs flag
+    if (!m_climbs.empty())
+        actRepo.updateAnalysisFlags(m_currentActivityId,
+                                     activity.analysisFlags | ActivityAnalysisFlags::HasClimbs);
 }

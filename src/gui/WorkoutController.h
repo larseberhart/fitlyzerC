@@ -11,6 +11,9 @@
 #include "analysis/TrainingMetrics.h"
 #include "analysis/WorkoutAnalyzer.h"
 #include "core/zones/ZoneDefinition.h"
+#include "analysis/queue/AnalysisQueue.h"
+#include "core/AnalysisVersions.h"
+#include "core/ActivityAnalysisFlags.h"
 #include "database/ActivityRepository.h"
 #include "database/AthleteRepository.h"
 #include "database/ClimbRepository.h"
@@ -34,8 +37,16 @@ public:
     int  currentAthleteId() const { return m_currentAthleteId; }
 
     bool loadFile(const QString& path, QString& errorOut);
-    int  importFile(const QString& path, QString& errorOut, bool allowTimeOverlap = false);
+    int  importFile(const QString& path, QString& errorOut,
+                    bool allowTimeOverlap = false,
+                    bool runAnalysis = true,
+                    const QString& importSource = QString());
     bool loadActivity(int activityId, QString& errorOut);
+
+    /// Re-read climbs from the database (after undo/redo or external edit).
+    void reloadClimbsFromDatabase();
+
+    void setAnalysisQueue(AnalysisQueue* queue) { m_analysisQueue = queue; }
 
     const RideData&                      rideData()    const { return m_rideData; }
     const WorkoutStatistics&             statistics()  const { return m_statistics; }
@@ -61,6 +72,7 @@ private:
     void reanalyze();
     void loadOrGenerateIntervals();
     void loadOrGenerateClimbs();
+    AnalysisQueue* m_analysisQueue = nullptr;
 
     double m_ftp               = 250.0;
     int    m_currentAthleteId  = -1;

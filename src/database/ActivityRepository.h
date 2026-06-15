@@ -38,6 +38,11 @@ struct Activity
     QString bike;
     QString equipment;
     QString importedAt;
+    // Version 7 additions
+    int     analysisVersion = 1;
+    QString fingerprint;
+    int     analysisFlags   = 0;
+    QString importSource;
 
     bool isValid() const { return id > 0; }
 };
@@ -60,6 +65,11 @@ public:
     bool           updateNotes(int activityId, const QString& notes,
                                const QString& weatherNotes);
     bool           updateActivityProperties(int activityId, const Activity& a);
+    bool           updateAnalysisFlags(int activityId, int flags);
+    bool           updateFingerprint(int activityId, const QString& fingerprint);
+    bool           hasFingerprintMatch(const QString& fingerprint);
+    /// Import source label, e.g. "manual_import", "directory_import", "drag_drop".
+    bool           setImportSource(int activityId, const QString& source);
 
 private:
     QSqlDatabase& m_db;

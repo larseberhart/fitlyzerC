@@ -72,6 +72,7 @@
 #include "charts/PowerCurveWidget.h"
 #include "charts/PowerHistogramWidget.h"
 #include "charts/RideChartWidget.h"
+#include "core/undo/ClimbEditCommand.h"
 #include "analysis/ClimbDetector.h"
 #include "analysis/ClimbMetrics.h"
 #include "analysis/IntervalDetector.h"
@@ -296,6 +297,32 @@ MainWindow::MainWindow(QWidget* parent)
             this, &MainWindow::onWorkoutLoaded);
     connect(m_controller, &WorkoutController::activityImported,
             this, &MainWindow::onActivityImported);
+
+    m_undoManager = new UndoManager(50, this);
+    m_analysisQueue = new AnalysisQueue(this);
+    m_controller->setAnalysisQueue(m_analysisQueue);
+
+    // Status bar feedback from the analysis queue
+    connect(m_analysisQueue, &AnalysisQueue::pendingCountChanged, this, [this](int count)
+    {
+        if (count > 0)
+            statusBar()->showMessage(QString("Analyzing %1 activit%2 in background...")
+                .arg(count).arg(count == 1 ? "y" : "ies"), 0);
+        else
+            statusBar()->clearMessage();
+    });
+    connect(m_analysisQueue, &AnalysisQueue::taskCompleted, this, [this](int activityId)
+    {
+        // If the completed task is the currently loaded activity, refresh climbing/intervals
+        if (m_controller && m_controller->currentActivityId() == activityId)
+        {
+            m_controller->reloadClimbsFromDatabase();
+            m_detectedClimbs = m_controller->climbs();
+            applyWeightMetricsToClimbs(m_detectedClimbs, resolveActiveActivityWeightKg());
+            refreshClimbViews();
+            updateIntervals();
+        }
+    });
 
     if (m_activityBrowser)
     {
@@ -1494,6 +1521,18 @@ void MainWindow::setupShortcuts()
     connect(resetAct, &QAction::triggered, this, &MainWindow::resetAllZoom);
     addAction(resetAct);
 
+    // Ctrl+Z: undo
+    auto* undoAct = new QAction(this);
+    undoAct->setShortcut(QKeySequence::Undo);
+    connect(undoAct, &QAction::triggered, m_undoManager, &UndoManager::undo);
+    addAction(undoAct);
+
+    // Ctrl+Y / Ctrl+Shift+Z: redo
+    auto* redoAct = new QAction(this);
+    redoAct->setShortcut(QKeySequence::Redo);
+    connect(redoAct, &QAction::triggered, m_undoManager, &UndoManager::redo);
+    addAction(redoAct);
+
     if (m_intervalsTable)
     {
         auto* prevIntervalAct = new QAction(m_intervalsTable);
@@ -1886,6 +1925,8 @@ void MainWindow::openDatabasePath(const QString& path)
     settings.setValue("lastDatabase", path);
     addRecentDatabase(path);
     updateRecentDatabaseMenu();
+    if (m_analysisQueue)
+        m_analysisQueue->setDatabasePath(path);
 
     if (m_activityBrowser)
         m_activityBrowser->refresh(m_currentAthleteId);
@@ -1938,6 +1979,8 @@ bool MainWindow::createOrOpenDefaultDatabase()
 
     m_controller->setDatabaseManager(&m_dbManager);
     m_lastOpenDir = info.absolutePath();
+    if (m_analysisQueue)
+        m_analysisQueue->setDatabasePath(path);
 
     QSettings settings("Fitlyzer", "FitlyzerC");
     settings.setValue("lastDatabase", path);
@@ -3999,7 +4042,7 @@ void MainWindow::removeSelectedClimbs()
     if (selected.empty())
         return;
 
-    // Persist deletions to DB
+    // Soft-delete: keep the row in DB with deleted=1 to prevent resurrection on re-detect.
     if (m_dbManager.isOpen() && m_controller->currentActivityId() > 0)
     {
         auto db = m_dbManager.database();
@@ -4010,7 +4053,7 @@ void MainWindow::removeSelectedClimbs()
             {
                 const int climbId = m_detectedClimbs[static_cast<size_t>(idx)].id;
                 if (climbId > 0)
-                    repo.deleteClimb(climbId);
+                    repo.softDeleteClimb(climbId);
             }
         }
     }
@@ -4086,7 +4129,7 @@ void MainWindow::joinSelectedClimbs()
     const Climb keep = m_detectedClimbs[static_cast<size_t>(keepIdx)];
     onClimbBoundaryEdited(keep.startSeconds, keep.endSeconds, newStart, newEnd);
 
-    // Delete the merged-away climbs from DB
+    // Soft-delete the merged-away climbs
     if (m_dbManager.isOpen() && m_controller->currentActivityId() > 0)
     {
         auto db = m_dbManager.database();
@@ -4100,7 +4143,7 @@ void MainWindow::joinSelectedClimbs()
             {
                 const int climbId = m_detectedClimbs[static_cast<size_t>(idx)].id;
                 if (climbId > 0)
-                    repo.deleteClimb(climbId);
+                    repo.softDeleteClimb(climbId);
                 m_detectedClimbs.erase(m_detectedClimbs.begin() + idx);
             }
         }
@@ -4354,6 +4397,43 @@ void MainWindow::onClimbBoundaryEdited(
 
     rebuilt.name = m_detectedClimbs[static_cast<size_t>(idx)].name;
     rebuilt.id   = m_detectedClimbs[static_cast<size_t>(idx)].id;
+
+    // Push undo command BEFORE applying the change
+    if (m_undoManager && m_dbManager.isOpen() && rebuilt.id > 0)
+    {
+        auto db = m_dbManager.database();
+        ClimbRepository repo(db);
+        const ClimbRecord beforeRecord = repo.getClimb(rebuilt.id);
+        auto refresh = [this]() {
+            m_controller->reloadClimbsFromDatabase();
+            m_detectedClimbs = m_controller->climbs();
+            applyWeightMetricsToClimbs(m_detectedClimbs, resolveActiveActivityWeightKg());
+            refreshClimbViews();
+        };
+        // Build the "after" record for the command (will be populated after DB update below)
+        // We push before update so we capture before; redo will replay the update.
+        // The command is created with before = current DB state; after is applied immediately.
+        // On undo: DB restored to beforeRecord, UI refreshed.
+        // The "after" state is what we're about to store — we construct it now from rebuilt.
+        ClimbRecord afterRecord = beforeRecord;
+        afterRecord.startSeconds    = rebuilt.startSeconds;
+        afterRecord.endSeconds      = rebuilt.endSeconds;
+        afterRecord.elevationGainM  = rebuilt.elevationGainM;
+        afterRecord.lengthKm        = rebuilt.lengthKm;
+        afterRecord.averageGradient = rebuilt.averageGradient;
+        afterRecord.avgPower        = rebuilt.averagePower;
+        afterRecord.np              = rebuilt.normalizedPower;
+        afterRecord.avgHr           = rebuilt.averageHeartRate;
+        afterRecord.avgCadence      = rebuilt.averageCadence;
+        afterRecord.vam             = rebuilt.vam;
+        afterRecord.source          = QStringLiteral("edited");
+        afterRecord.locked          = true;
+        m_undoManager->push(std::make_unique<ClimbEditCommand>(
+            beforeRecord, afterRecord,
+            m_dbManager.database().connectionName(),
+            refresh));
+    }
+
     m_detectedClimbs[static_cast<size_t>(idx)] = rebuilt;
 
     // Persist boundary change to DB
@@ -4466,6 +4546,46 @@ void MainWindow::onClimbBoundaryEdited(
     }
 
     onClimbSelectionChanged();
+}
+
+void MainWindow::revertSelectedClimbToAuto()
+{
+    std::vector<int> selected = selectedClimbIndicesFromTable();
+    if (selected.size() != 1)
+        return;
+
+    const int idx = selected.front();
+    if (idx < 0 || idx >= static_cast<int>(m_detectedClimbs.size()))
+        return;
+
+    if (!m_dbManager.isOpen() || m_controller->currentActivityId() <= 0)
+        return;
+
+    const int climbId = m_detectedClimbs[static_cast<size_t>(idx)].id;
+    if (climbId <= 0)
+        return;
+
+    auto db = m_dbManager.database();
+    ClimbRepository repo(db);
+    ClimbRecord record = repo.getClimb(climbId);
+    if (record.id <= 0)
+        return;
+
+    if (record.originalStartSeconds >= 0.0)
+        record.startSeconds = record.originalStartSeconds;
+    if (record.originalEndSeconds >= 0.0)
+        record.endSeconds = record.originalEndSeconds;
+    record.source = QStringLiteral("auto");
+    record.locked = false;
+    record.deleted = false;
+
+    if (!repo.updateClimb(record))
+        return;
+
+    m_controller->reloadClimbsFromDatabase();
+    m_detectedClimbs = m_controller->climbs();
+    applyWeightMetricsToClimbs(m_detectedClimbs, resolveActiveActivityWeightKg());
+    refreshClimbViews(record.startSeconds, record.endSeconds);
 }
 
 void MainWindow::onNewClimbRequested(double startSeconds, double endSeconds)

@@ -20,6 +20,8 @@
 
 #include "WorkoutController.h"
 #include "core/zones/ZoneDefinition.h"
+#include "analysis/queue/AnalysisQueue.h"
+#include "core/undo/UndoManager.h"
 #include "database/DatabaseManager.h"
 #include "database/ActivityRepository.h"
 #include "database/AthleteRepository.h"
@@ -71,6 +73,7 @@ private slots:
     void showAbout();
     void triggerDetectClimbs();
     void triggerDetectIntervals();
+    void revertSelectedClimbToAuto();
 
 private:
     void buildUI();
@@ -150,6 +153,12 @@ private:
     QStringList monitoredDirectories() const;
     void scanWatchDirectories(bool initialScan);
     void onWatchDirectoryChanged(const QString& path);
+
+        // -- Undo/Redo ----------------------------------------------------------
+        UndoManager*   m_undoManager    = nullptr;
+
+        // -- Background analysis queue -----------------------------------------
+        AnalysisQueue* m_analysisQueue  = nullptr;
 
     // -- Controller ---------------------------------------------------------
     WorkoutController* m_controller = nullptr;

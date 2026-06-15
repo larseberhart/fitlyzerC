@@ -4,6 +4,7 @@
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
+#include <QVariant>
 #include <QStringList>
 
 ActivityRepository::ActivityRepository(QSqlDatabase& db)
@@ -45,6 +46,10 @@ static Activity activityFromQuery(QSqlQuery& q)
     a.bike            = q.value(col++).toString();
     a.equipment       = q.value(col++).toString();
     a.importedAt      = q.value(col++).toString();
+    a.analysisVersion = q.value(col++).toInt();
+    a.fingerprint     = q.value(col++).toString();
+    a.analysisFlags   = q.value(col++).toInt();
+    a.importSource    = q.value(col++).toString();
     return a;
 }
 
@@ -53,7 +58,9 @@ static const char* kSelectCols =
     " duration_sec, distance_m, avg_power, max_power, normalized_power,"
     " avg_hr, max_hr, avg_cadence, avg_speed, elevation_gain,"
     " notes, weather_notes, temperature, weather, wind, rpe, fatigue, sleep,"
-    " weight, bike, equipment, import_time";
+    " weight, bike, equipment, import_time,"
+    " COALESCE(analysis_version,1), COALESCE(fingerprint,''),"
+    " COALESCE(analysis_flags,0), COALESCE(import_source,'')";
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -156,6 +163,43 @@ bool ActivityRepository::hasFitHash(const QString& hash)
     q.bindValue(":h", hash);
     q.exec();
     return q.next();
+}
+
+bool ActivityRepository::updateAnalysisFlags(int activityId, int flags)
+{
+    QSqlQuery q(m_db);
+    q.prepare("UPDATE activities SET analysis_flags=:f WHERE id=:id");
+    q.bindValue(":f",  flags);
+    q.bindValue(":id", activityId);
+    return q.exec();
+}
+
+bool ActivityRepository::updateFingerprint(int activityId, const QString& fingerprint)
+{
+    QSqlQuery q(m_db);
+    q.prepare("UPDATE activities SET fingerprint=:fp WHERE id=:id");
+    q.bindValue(":fp", fingerprint);
+    q.bindValue(":id", activityId);
+    return q.exec();
+}
+
+bool ActivityRepository::hasFingerprintMatch(const QString& fingerprint)
+{
+    if (fingerprint.isEmpty()) return false;
+    QSqlQuery q(m_db);
+    q.prepare("SELECT 1 FROM activities WHERE fingerprint=:fp LIMIT 1");
+    q.bindValue(":fp", fingerprint);
+    q.exec();
+    return q.next();
+}
+
+bool ActivityRepository::setImportSource(int activityId, const QString& source)
+{
+    QSqlQuery q(m_db);
+    q.prepare("UPDATE activities SET import_source=:s WHERE id=:id");
+    q.bindValue(":s",  source);
+    q.bindValue(":id", activityId);
+    return q.exec();
 }
 
 bool ActivityRepository::updateNotes(int activityId,
