@@ -273,6 +273,123 @@ std::vector<double> ClimbDetector::computeLocalGradientPct(
     return gradient;
 }
 
+// Phase 2: Scoring-based detection
+double ClimbDetector::computeClimbScore(
+    double gainMeters,
+    double averageGrade,
+    double distanceKm,
+    double continuityRatio,
+    double vam)
+{
+    double score = gainMeters * 0.8 + averageGrade * 8.0 + distanceKm * 15.0 + continuityRatio * 20.0;
+
+    if (vam > 800.0)
+        score += 10.0;
+
+    return score;
+}
+
+// Phase 6: VAM computation
+double ClimbDetector::computeVAM(double elevationGainM, double durationSeconds)
+{
+    if (durationSeconds <= 0.0)
+        return 0.0;
+    
+    const double durationHours = durationSeconds / 3600.0;
+    if (durationHours <= 0.0)
+        return 0.0;
+    
+    return elevationGainM / durationHours;
+}
+
+// Phase 1: Categorization
+ClimbCategory ClimbDetector::categorizeClimb(
+    double gainMeters,
+    double lengthKm,
+    double averageGrade)
+{
+    // Major: > 100m gain, > 2km length, > 3% avg grade
+    if (gainMeters > 100.0 && lengthKm > 2.0 && averageGrade > 3.0)
+        return ClimbCategory::Major;
+    
+    // Medium: > 40m gain, > 500m length, > 3% avg grade
+    if (gainMeters > 40.0 && lengthKm > 0.5 && averageGrade > 3.0)
+        return ClimbCategory::Medium;
+    
+    // Punchy: > 10m gain, > 100m length, > 5% avg grade (short steep)
+    if (gainMeters > 10.0 && lengthKm > 0.1 && averageGrade > 5.0)
+        return ClimbCategory::Punchy;
+    
+    return ClimbCategory::FalsePositive;
+}
+
+// Phase 7: Merge fragmented climbs
+std::vector<Climb> ClimbDetector::mergeFragmentedClimbs(
+    std::vector<Climb>& candidates,
+    const Config& config)
+{
+    if (!config.enableClimbMerging || candidates.size() < 2)
+        return candidates;
+    
+    std::vector<Climb> merged;
+    std::vector<bool> processed(candidates.size(), false);
+    
+    for (size_t i = 0; i < candidates.size(); ++i)
+    {
+        if (processed[i])
+            continue;
+        
+        Climb combined = candidates[i];
+        processed[i] = true;
+        
+        // Try to merge nearby climbs
+        size_t nextIdx = i + 1;
+        while (nextIdx < candidates.size())
+        {
+            if (processed[nextIdx])
+            {
+                ++nextIdx;
+                continue;
+            }
+            
+            const Climb& next = candidates[nextIdx];
+
+            const double gapMeters = next.startDistanceKm * 1000.0 - combined.endDistanceKm * 1000.0;
+            const double elevationGapM = std::abs(next.startElevationM - combined.endElevationM);
+                        const bool overlaps = gapMeters <= 0.0;
+
+                        if (overlaps ||
+                            gapMeters <= config.mergeMaxGapMeters ||
+                            elevationGapM <= config.mergeMaxGapElevationM)
+            {
+                const double bridgingGainM = std::max(0.0, next.startElevationM - combined.endElevationM);
+                            combined.endSeconds = std::max(combined.endSeconds, next.endSeconds);
+                            combined.endDistanceKm = std::max(combined.endDistanceKm, next.endDistanceKm);
+                combined.durationSeconds = combined.endSeconds - combined.startSeconds;
+                combined.lengthKm = combined.endDistanceKm - combined.startDistanceKm;
+                            if (next.endDistanceKm >= combined.endDistanceKm)
+                                combined.endElevationM = next.endElevationM;
+
+                            combined.elevationGainM += overlaps ? next.elevationGainM : bridgingGainM + next.elevationGainM;
+
+                if (combined.lengthKm > 0.0)
+                    combined.averageGradient = (combined.elevationGainM / (combined.lengthKm * 1000.0)) * 100.0;
+
+                processed[nextIdx] = true;
+                ++nextIdx;
+            }
+            else
+            {
+                break;
+            }
+        }
+        
+        merged.push_back(combined);
+    }
+    
+    return merged;
+}
+
 std::vector<Climb> ClimbDetector::detect(const RideData& rideData, const Config& config)
 {
     const int n = static_cast<int>(rideData.records.size());
@@ -302,10 +419,38 @@ std::vector<Climb> ClimbDetector::detect(const RideData& rideData, const Config&
         config.elevationSmoothingMeters,
         adaptiveSmoothingWindows,
         config.altitudeSpikeVerticalSpeedMps);
-    const std::vector<double> localGradientPct = computeLocalGradientPct(
+    const std::vector<double> gradient50mPct = computeLocalGradientPct(
         smoothedAltitudeMeters,
         cumulativeDistanceMeters,
-        config.gradientWindowHalfMeters);
+        25.0);
+    const std::vector<double> gradient100mPct = computeLocalGradientPct(
+        smoothedAltitudeMeters,
+        cumulativeDistanceMeters,
+        50.0);
+    const std::vector<double> gradient250mPct = computeLocalGradientPct(
+        smoothedAltitudeMeters,
+        cumulativeDistanceMeters,
+        125.0);
+
+    auto isUphillSignal = [&](int idx)
+    {
+        const double g50 = gradient50mPct[static_cast<size_t>(idx)];
+        const double g100 = gradient100mPct[static_cast<size_t>(idx)];
+        const double g250 = gradient250mPct[static_cast<size_t>(idx)];
+        return (isFinite(g100) && g100 >= config.startGradient) ||
+            (isFinite(g250) && g250 >= config.startGradient) ||
+            (isFinite(g50) && g50 >= config.startGradient + 1.5);
+    };
+
+    auto isContinuationSignal = [&](int idx)
+    {
+        const double g50 = gradient50mPct[static_cast<size_t>(idx)];
+        const double g100 = gradient100mPct[static_cast<size_t>(idx)];
+        const double g250 = gradient250mPct[static_cast<size_t>(idx)];
+        return (isFinite(g100) && g100 >= config.continueGradient) ||
+            (isFinite(g250) && g250 >= config.startGradient) ||
+            (isFinite(g50) && g50 >= config.startGradient + 2.0);
+    };
 
     std::vector<Climb> climbs;
     int i = 0;
@@ -315,8 +460,7 @@ std::vector<Climb> ClimbDetector::detect(const RideData& rideData, const Config&
         int triggerIdx = -1;
         for (; i < n; ++i)
         {
-            const double gradient = localGradientPct[static_cast<size_t>(i)];
-            if (isFinite(gradient) && gradient >= config.startGradient)
+            if (isUphillSignal(i))
             {
                 triggerIdx = i;
                 break;
@@ -354,14 +498,19 @@ std::vector<Climb> ClimbDetector::detect(const RideData& rideData, const Config&
 
         double sustainedDistance = 0.0;
         double interruptionDistance = 0.0;
+        double candidateGainM = 0.0;
         int confirmedIdx = -1;
         for (int j = std::max(triggerIdx, climbStart + 1); j < n; ++j)
         {
             const double segmentDist =
                 cumulativeDistanceMeters[static_cast<size_t>(j)] - cumulativeDistanceMeters[static_cast<size_t>(j - 1)];
-            const double gradient = localGradientPct[static_cast<size_t>(j)];
+            const double prevAlt = smoothedAltitudeMeters[static_cast<size_t>(j - 1)];
+            const double alt = smoothedAltitudeMeters[static_cast<size_t>(j)];
 
-            if (isFinite(gradient) && gradient >= config.continueGradient)
+            if (isFinite(prevAlt) && isFinite(alt))
+                candidateGainM += std::max(0.0, alt - prevAlt);
+
+            if (isContinuationSignal(j))
             {
                 sustainedDistance += std::max(0.0, segmentDist);
                 interruptionDistance = 0.0;
@@ -374,7 +523,8 @@ std::vector<Climb> ClimbDetector::detect(const RideData& rideData, const Config&
             if (interruptionDistance > config.maxStartInterruptionMeters)
                 break;
 
-            if (sustainedDistance >= config.minStartContinuousDistanceMeters)
+            if (sustainedDistance >= config.minStartContinuousDistanceMeters &&
+                candidateGainM >= std::min(config.minElevationGainM, 5.0))
             {
                 confirmedIdx = j;
                 break;
@@ -390,6 +540,8 @@ std::vector<Climb> ClimbDetector::detect(const RideData& rideData, const Config&
         int peakIdx = climbStart;
         double peakAlt = localMinAlt;
         double plateauDistance = 0.0;
+        int smallDipsCount = 0;  // Phase 3: Track small dips
+        double cumulativeGainM = 0.0;
 
         int k = confirmedIdx;
         for (; k < n; ++k)
@@ -398,16 +550,23 @@ std::vector<Climb> ClimbDetector::detect(const RideData& rideData, const Config&
             if (!isFinite(alt))
                 continue;
 
-            const double gradient = localGradientPct[static_cast<size_t>(k)];
+            const double gradient = gradient100mPct[static_cast<size_t>(k)];
             const double segmentDist = (k > 0)
                 ? std::max(0.0, cumulativeDistanceMeters[static_cast<size_t>(k)] - cumulativeDistanceMeters[static_cast<size_t>(k - 1)])
                 : 0.0;
+            if (k > 0)
+            {
+                const double prevAlt = smoothedAltitudeMeters[static_cast<size_t>(k - 1)];
+                if (isFinite(prevAlt) && isFinite(alt))
+                    cumulativeGainM += std::max(0.0, alt - prevAlt);
+            }
 
             if (alt >= peakAlt)
             {
                 peakAlt = alt;
                 peakIdx = k;
                 plateauDistance = 0.0;
+                smallDipsCount = 0;  // Reset dip counter on new peak
                 continue;
             }
 
@@ -418,11 +577,16 @@ std::vector<Climb> ClimbDetector::detect(const RideData& rideData, const Config&
             const double gainSoFar = std::max(0.0, peakAlt - localMinAlt);
             const double allowedDipMeters = std::max(
                 config.maxDipMeters,
-                gainSoFar * (config.maxDipPctOfGain / 100.0));
+                std::max(gainSoFar, cumulativeGainM) * (config.maxDipPctOfGain / 100.0));
 
-            if (isFinite(gradient) && gradient >= config.continueGradient)
+            // Phase 3: Count small dips (< 5m) separately
+            if (dipMeters <= config.smallDipThresholdMeters)
+                smallDipsCount++;
+
+            if (isContinuationSignal(k))
             {
                 plateauDistance = 0.0;
+                smallDipsCount = 0;  // Reset on uphill gradient
                 continue;
             }
 
@@ -431,8 +595,11 @@ std::vector<Climb> ClimbDetector::detect(const RideData& rideData, const Config&
             else
                 plateauDistance = config.maxPlateauDistanceMeters + 1.0;
 
+            // Phase 3: Allow multiple small dips before terminating
             const bool exceededDip =
-                dipMeters > allowedDipMeters && dipDistance > config.maxDipDistanceMeters;
+                dipMeters > allowedDipMeters && 
+                dipDistance > config.maxDipDistanceMeters &&
+                smallDipsCount > config.maxSmallDipsCount;
             const bool plateauExpired =
                 plateauDistance > config.maxPlateauDistanceMeters &&
                 (!isFinite(gradient) || gradient < config.endGradient);
@@ -451,19 +618,65 @@ std::vector<Climb> ClimbDetector::detect(const RideData& rideData, const Config&
             rideData,
             cumulativeDistanceMeters,
             smoothedAltitudeMeters,
-            localGradientPct,
+            gradient100mPct,
             climbStart,
             climbEnd,
             static_cast<int>(climbs.size()) + 1);
 
-        if (climb.lengthKm < config.minLengthKm)
-            continue;
-        if (climb.elevationGainM < config.minElevationGainM)
-            continue;
-        if (climb.averageGradient < config.minAverageGradient)
-            continue;
+        // Phase 2: Compute composite climb score
+        climb.climbScore = computeClimbScore(
+            climb.elevationGainM,
+            climb.averageGradient,
+            climb.lengthKm,
+            climb.gradePercentile / 100.0,
+            climb.vam);
+
+        // Phase 1: Categorize the climb
+        climb.climbCategory = categorizeClimb(
+            climb.elevationGainM,
+            climb.lengthKm,
+            climb.averageGradient);
+
+        // Phase 2: Use scoring-based detection if enabled
+        if (config.useScoringDetection)
+        {
+            const bool isPunchyClimb =
+                climb.elevationGainM >= 10.0 &&
+                climb.lengthKm >= 0.1 &&
+                climb.maximumGradient >= 5.0;
+            const bool isRegularClimb =
+                climb.elevationGainM >= 25.0 &&
+                climb.lengthKm >= 0.5 &&
+                climb.averageGradient >= 3.0;
+            const bool isLongShallowClimb =
+                climb.elevationGainM >= 40.0 &&
+                climb.lengthKm >= 1.0 &&
+                climb.averageGradient >= 1.5;
+
+            if (climb.climbScore < config.minClimbScore &&
+                !isPunchyClimb &&
+                !isRegularClimb &&
+                !isLongShallowClimb)
+                continue;
+        }
+        else
+        {
+            // Fallback to legacy threshold-based detection
+            if (climb.lengthKm < config.minLengthKm)
+                continue;
+            if (climb.elevationGainM < config.minElevationGainM)
+                continue;
+            if (climb.averageGradient < config.minAverageGradient)
+                continue;
+        }
 
         climbs.push_back(climb);
+    }
+
+    // Phase 7: Merge fragmented climbs if enabled
+    if (config.enableClimbMerging)
+    {
+        climbs = mergeFragmentedClimbs(climbs, config);
     }
 
     return climbs;

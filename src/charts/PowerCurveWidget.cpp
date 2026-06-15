@@ -159,8 +159,6 @@ void PowerCurveWidget::setRideDataWithComparisons(const RideData& rideData,
         axisX->append(formatDurLabel(pdcPts[i].durationSeconds), i);
     axisX->setRange(-0.5, idx - 0.5);
     chart()->addAxis(axisX, Qt::AlignBottom);
-    lineSeries->attachAxis(axisX);
-    dotSeries->attachAxis(axisX);
     for (QAbstractSeries* series : chart()->series())
         series->attachAxis(axisX);
 
@@ -171,8 +169,6 @@ void PowerCurveWidget::setRideDataWithComparisons(const RideData& rideData,
     axisY->setGridLineVisible(true);
     axisY->setRange(0, maxPower * 1.1);
     chart()->addAxis(axisY, Qt::AlignLeft);
-    lineSeries->attachAxis(axisY);
-    dotSeries->attachAxis(axisY);
     for (QAbstractSeries* series : chart()->series())
         series->attachAxis(axisY);
 

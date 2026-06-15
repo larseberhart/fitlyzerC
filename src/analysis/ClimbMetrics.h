@@ -7,6 +7,14 @@
 
 #include "fit/RideData.h"
 
+enum class ClimbCategory
+{
+    Major,       // >100m gain, >2km length, >3% avg grade
+    Medium,      // >40m gain, >500m length, >3% avg grade
+    Punchy,      // >10m gain, >100m length, >5% avg grade (short steep)
+    FalsePositive // failed quality checks
+};
+
 struct ClimbQuarterMetrics
 {
     double averagePower = 0.0;
@@ -28,9 +36,15 @@ struct Climb
 
     double lengthKm = 0.0;
     double elevationGainM = 0.0;
+    double startElevationM = 0.0;
+    double endElevationM = 0.0;
 
     double averageGradient = 0.0;
     double maximumGradient = 0.0;
+
+    double climbScore = 0.0;       // composite scoring (gain + grade + duration + consistency)
+    double gradePercentile = 0.0;  // percentage of climb with grade > threshold
+    ClimbCategory climbCategory = ClimbCategory::FalsePositive;
 
     double averagePower = 0.0;
     double averageWattsPerKg = 0.0;

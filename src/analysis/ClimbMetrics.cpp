@@ -246,22 +246,45 @@ Climb ClimbMetrics::build(
     if (isFinite(smoothedAltitudeMeters[static_cast<size_t>(endIdx)]))
         endAlt = smoothedAltitudeMeters[static_cast<size_t>(endIdx)];
 
-    climb.elevationGainM = (isFinite(startAlt) && isFinite(endAlt))
-        ? std::max(0.0, endAlt - startAlt)
-        : 0.0;
+    climb.startElevationM = isFinite(startAlt) ? startAlt : 0.0;
+    climb.endElevationM = isFinite(endAlt) ? endAlt : climb.startElevationM;
+
+    double cumulativeGainM = 0.0;
+    for (int i = startIdx + 1; i <= endIdx; ++i)
+    {
+        const double prevAlt = smoothedAltitudeMeters[static_cast<size_t>(i - 1)];
+        const double currAlt = smoothedAltitudeMeters[static_cast<size_t>(i)];
+        if (!isFinite(prevAlt) || !isFinite(currAlt))
+            continue;
+
+        cumulativeGainM += std::max(0.0, currAlt - prevAlt);
+    }
+    climb.elevationGainM = cumulativeGainM;
 
     const double lengthMeters = climb.lengthKm * 1000.0;
     if (lengthMeters > 0.0)
         climb.averageGradient = (climb.elevationGainM / lengthMeters) * 100.0;
 
     double maxGradient = 0.0;
+    int validGradientCount = 0;
+    int climbingGradientCount = 0;
     for (int i = startIdx; i <= endIdx; ++i)
     {
         const double g = localGradientPct[static_cast<size_t>(i)];
         if (isFinite(g))
+        {
             maxGradient = std::max(maxGradient, g);
+            ++validGradientCount;
+            if (g >= 1.5)
+                ++climbingGradientCount;
+        }
     }
     climb.maximumGradient = maxGradient;
+    if (validGradientCount > 0)
+    {
+        climb.gradePercentile =
+            (static_cast<double>(climbingGradientCount) / static_cast<double>(validGradientCount)) * 100.0;
+    }
 
     std::vector<double> powerSeries;
     powerSeries.reserve(static_cast<size_t>(endIdx - startIdx + 1));

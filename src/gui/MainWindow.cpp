@@ -1199,25 +1199,25 @@ void MainWindow::buildUI()
         m_climbMinLengthSpin->setRange(0.1, 20.0);
         m_climbMinLengthSpin->setDecimals(2);
         m_climbMinLengthSpin->setSingleStep(0.1);
-        m_climbMinLengthSpin->setValue(0.5);
+        m_climbMinLengthSpin->setValue(0.15);
 
         m_climbMinGainSpin = new QDoubleSpinBox(climbingTab);
         m_climbMinGainSpin->setRange(1.0, 2000.0);
         m_climbMinGainSpin->setDecimals(0);
         m_climbMinGainSpin->setSingleStep(5.0);
-        m_climbMinGainSpin->setValue(30.0);
+        m_climbMinGainSpin->setValue(10.0);
 
         m_climbMinGradientSpin = new QDoubleSpinBox(climbingTab);
         m_climbMinGradientSpin->setRange(0.5, 20.0);
         m_climbMinGradientSpin->setDecimals(1);
         m_climbMinGradientSpin->setSingleStep(0.5);
-        m_climbMinGradientSpin->setValue(3.0);
+        m_climbMinGradientSpin->setValue(4.0);
 
         m_climbStartGradientSpin = new QDoubleSpinBox(climbingTab);
         m_climbStartGradientSpin->setRange(0.5, 20.0);
         m_climbStartGradientSpin->setDecimals(1);
         m_climbStartGradientSpin->setSingleStep(0.5);
-        m_climbStartGradientSpin->setValue(3.5);
+        m_climbStartGradientSpin->setValue(1.5);
 
         m_climbDipMetersSpin = new QDoubleSpinBox(climbingTab);
         m_climbDipMetersSpin->setRange(0.0, 200.0);
@@ -2925,10 +2925,10 @@ void MainWindow::updateStatsLabel()
         m_useEstimatedFtpButton->setEnabled(m_currentAthleteId > 0 && estimatedFtpRounded > 0);
 
     const QString ftpSummary = estimatedFtpRounded > 0
-        ? QString("FTP %1  Est %2  \u0394%+3")
+        ? QString("FTP %1  Est %2  \u0394%3")
               .arg(ftpWatts)
               .arg(estimatedFtpRounded)
-              .arg(ftpDelta)
+              .arg(ftpDelta >= 0 ? QString("+%1").arg(ftpDelta) : QString::number(ftpDelta))
         : QString();
 
     const QString rideText = QString("NP %1 W   IF %2   TSS %3   VI %4   EF %5%6")
@@ -3881,10 +3881,10 @@ void MainWindow::detectClimbsAndRefresh()
     }
 
     ClimbDetector::Config cfg;
-    cfg.minLengthKm = m_climbMinLengthSpin ? m_climbMinLengthSpin->value() : 0.5;
-    cfg.minElevationGainM = m_climbMinGainSpin ? m_climbMinGainSpin->value() : 30.0;
-    cfg.minAverageGradient = m_climbMinGradientSpin ? m_climbMinGradientSpin->value() : 3.0;
-    cfg.startGradient = m_climbStartGradientSpin ? m_climbStartGradientSpin->value() : 3.5;
+    cfg.minLengthKm = m_climbMinLengthSpin ? m_climbMinLengthSpin->value() : 0.15;
+    cfg.minElevationGainM = m_climbMinGainSpin ? m_climbMinGainSpin->value() : 10.0;
+    cfg.minAverageGradient = m_climbMinGradientSpin ? m_climbMinGradientSpin->value() : 4.0;
+    cfg.startGradient = m_climbStartGradientSpin ? m_climbStartGradientSpin->value() : 1.5;
     cfg.maxDipMeters = m_climbDipMetersSpin ? m_climbDipMetersSpin->value() : 10.0;
     cfg.maxDipDistanceMeters = m_climbDipDistanceSpin ? m_climbDipDistanceSpin->value() : 200.0;
     cfg.elevationSmoothingMeters = m_climbSmoothingSpin ? m_climbSmoothingSpin->value() : 50.0;
@@ -4715,10 +4715,10 @@ void MainWindow::triggerDetectClimbs()
 
     // Run detection with current spin box params
     ClimbDetector::Config cfg;
-    cfg.minLengthKm          = m_climbMinLengthSpin    ? m_climbMinLengthSpin->value()    : 0.5;
-    cfg.minElevationGainM    = m_climbMinGainSpin      ? m_climbMinGainSpin->value()      : 30.0;
-    cfg.minAverageGradient   = m_climbMinGradientSpin  ? m_climbMinGradientSpin->value()  : 3.0;
-    cfg.startGradient        = m_climbStartGradientSpin? m_climbStartGradientSpin->value(): 3.5;
+    cfg.minLengthKm          = m_climbMinLengthSpin    ? m_climbMinLengthSpin->value()    : 0.15;
+    cfg.minElevationGainM    = m_climbMinGainSpin      ? m_climbMinGainSpin->value()      : 10.0;
+    cfg.minAverageGradient   = m_climbMinGradientSpin  ? m_climbMinGradientSpin->value()  : 4.0;
+    cfg.startGradient        = m_climbStartGradientSpin? m_climbStartGradientSpin->value(): 1.5;
     cfg.maxDipMeters         = m_climbDipMetersSpin    ? m_climbDipMetersSpin->value()    : 10.0;
     cfg.maxDipDistanceMeters = m_climbDipDistanceSpin  ? m_climbDipDistanceSpin->value()  : 200.0;
     cfg.elevationSmoothingMeters = m_climbSmoothingSpin? m_climbSmoothingSpin->value()    : 50.0;
