@@ -5,7 +5,7 @@
 
 namespace DatabaseSchema {
 
-static constexpr int kCurrentVersion = 7;
+static constexpr int kCurrentVersion = 8;
 
 // Each string is one DDL statement (no semicolons needed for exec()).
 inline constexpr std::array kStatements = {
@@ -114,6 +114,10 @@ inline constexpr std::array kStatements = {
         "  ON activity_samples(activity_id)"
     },
     std::string_view{
+        "CREATE INDEX IF NOT EXISTS idx_activity_samples_time"
+        "  ON activity_samples(activity_id, elapsed_seconds)"
+    },
+    std::string_view{
         "CREATE TABLE IF NOT EXISTS laps ("
         "  id           INTEGER PRIMARY KEY AUTOINCREMENT,"
         "  activity_id  INTEGER NOT NULL REFERENCES activities(id) ON DELETE CASCADE,"
@@ -217,7 +221,11 @@ inline constexpr std::array kStatements = {
         "  type          TEXT,"
         "  duration_sec  REAL,"
         "  target_tss    REAL,"
-        "  notes         TEXT"
+        "  notesINDEX IF NOT EXISTS idx_workouts_athlete_date"
+        "  ON planned_workouts(athlete_id, workout_date)"
+    },
+    std::string_view{
+        "CREATE          TEXT"
         ")"
     },
     std::string_view{
@@ -263,6 +271,10 @@ inline constexpr std::array kStatements = {
         "  activity_id   INTEGER,"
         "  error_message TEXT"
         ")"
+    },
+    std::string_view{
+        "CREATE INDEX IF NOT EXISTS idx_imports_date"
+        "  ON imports(imported_at)"
     },
         std::string_view{
             "CREATE TABLE IF NOT EXISTS activity_analysis_settings ("

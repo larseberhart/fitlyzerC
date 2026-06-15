@@ -332,6 +332,26 @@ bool DatabaseManager::upgradeSchema(int fromVersion, QString* errorOut)
         }
     }
 
+    if (fromVersion < 8)
+    {
+        // Version 8: Add performance-critical indexes
+        {
+            QSqlQuery q(m_db);
+            q.exec("CREATE INDEX IF NOT EXISTS idx_activity_samples_time"
+                   " ON activity_samples(activity_id, elapsed_seconds)");
+        }
+        {
+            QSqlQuery q(m_db);
+            q.exec("CREATE INDEX IF NOT EXISTS idx_imports_date"
+                   " ON imports(imported_at)");
+        }
+        {
+            QSqlQuery q(m_db);
+            q.exec("CREATE INDEX IF NOT EXISTS idx_workouts_athlete_date"
+                   " ON planned_workouts(athlete_id, workout_date)");
+        }
+    }
+
     return applySchema(errorOut);
 }
 
