@@ -1,4 +1,4 @@
-name: Build
+name: Build Packages
 
 on:
   push:
@@ -10,10 +10,122 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-linux:
-    runs-on: ubuntu-latest
+
+  linux:
+    name: Linux AppImage
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v4
 
-      - run: echo "Hello from GitHub Actions"
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            build-essential \
+            qt6-base-dev \
+            qt6-charts-dev \
+            qt6-tools-dev \
+            libqt6sql6-sqlite \
+            patchelf
+
+      - name: Install AppImage tools
+        run: |
+          wget -O appimagetool \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+
+          chmod +x appimagetool
+
+          sudo mv appimagetool /usr/local/bin/
+
+      - name: Configure
+        run: |
+          cmake \
+            --preset linux-appimage
+
+      - name: Build
+        run: |
+          cmake --build --preset linux-appimage
+
+      - name: Package
+        run: |
+          cpack \
+            --config build/linux-appimage/CPackConfig.cmake
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: FitlyzerC-AppImage
+          path: |
+            *.AppImage
+            build/**/*.AppImage
+
+  windows:
+    name: Windows NSIS
+    runs-on: windows-2025
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: 6.9.0
+
+      - name: Configure
+        run: |
+          cmake --preset windows-nsis
+
+      - name: Build
+        run: |
+          cmake --build build/windows-nsis --config Release
+
+      - name: Package
+        run: |
+          cpack `
+            --config build/windows-nsis/CPackConfig.cmake `
+            -C Release
+
+      - name: Upload Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: FitlyzerC-Windows-Installer
+          path: |
+            *Setup*.exe
+            build/**/*.exe
+
+  macos:
+    name: macOS DMG
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: 6.9.0
+
+      - name: Configure
+        run: |
+          cmake --preset macos-dmg
+
+      - name: Build
+        run: |
+          cmake --build --preset macos-dmg
+
+      - name: Package
+        run: |
+          cpack \
+            --config build/macos-dmg/CPackConfig.cmake
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: FitlyzerC-macOS-DMG
+          path: |
+            *.dmg
+            build/**/*.dmg
