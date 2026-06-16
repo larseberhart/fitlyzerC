@@ -79,7 +79,7 @@ jobs:
           host: "windows"
           target: "desktop"
           arch: "win64_mingw"
-          version: "6.9.0"
+          version: "6.8.3"
           modules: "qtcharts"
 
       - name: Configure
@@ -117,8 +117,16 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
-          version: "6.9.0"
+          host: "mac"
+          target: "desktop"
+          arch: "clang_64"
+          version: "6.8.3"
           modules: "qtcharts"
+
+      - name: Verify Qt Charts
+        run: |
+          echo "QT_ROOT_DIR=${QT_ROOT_DIR}"
+          test -f "${QT_ROOT_DIR}/lib/cmake/Qt6Charts/Qt6ChartsConfig.cmake"
 
       - name: Show compiler
         run: |
