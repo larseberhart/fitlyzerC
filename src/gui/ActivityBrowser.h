@@ -1,16 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file ActivityBrowser.h
- * @brief User interface component for ActivityBrowser.
- *
- * Defines dialogs, widgets, controllers, and UI workflows used by the FitlyzerC desktop application.
- *
- * Responsibilities:
- * - Provide interactive user interface behavior and presentation
- *
- * @author Lars EBERHART
- */
 
 #pragma once
 
@@ -36,42 +25,25 @@ class ActivityBrowser : public QWidget
 {
     Q_OBJECT
 public:
-    /**
-     * @brief Constructs activity browser.
-     * @param dbManager Database manager.
-     * @param parent Parent widget.
-     */
     explicit ActivityBrowser(DatabaseManager* dbManager, QWidget* parent = nullptr);
 
-    /**
-     * @brief Refreshes activity list.
-     * @param athleteId Athlete to show (-1 for all).
-     */
     void refresh(int athleteId = -1);
 
-    /**
-     * @brief Focuses search field.
-     */
     void focusSearch();
 
 signals:
-    /// \signal Emitted when activity is selected in table.
-    /// \param activityId Selected activity ID.
+    // Emitted when an activity is selected in the table.
     void activitySelected(int activityId);
 
-    /// \signal Emitted when activity is deleted.
-    /// \param activityId Deleted activity ID.
+    // Emitted when an activity is deleted.
     void activityDeleted(int activityId);
 
-    /// \signal Emitted when FIT files are dropped onto widget.
-    /// \param filePaths List of dropped file paths.
+    // Emitted when FIT files are dropped onto the widget.
     void fitFilesDropped(const QStringList& filePaths);
 
 protected:
-    /// @brief Handles drag-enter for file drop validation.
     void dragEnterEvent(QDragEnterEvent* event) override;
 
-    /// @brief Handles drop event for FIT file import.
     void dropEvent(QDropEvent* event) override;
 
 private:

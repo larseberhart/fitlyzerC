@@ -1,16 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file ActivityAnalysisFlags.h
- * @brief Core support component for ActivityAnalysisFlags.
- *
- * Provides core constants, types, or shared definitions used throughout the FitlyzerC codebase.
- *
- * Responsibilities:
- * - Provide shared core definitions for application modules
- *
- * @author Lars EBERHART
- */
 
 #pragma once
 

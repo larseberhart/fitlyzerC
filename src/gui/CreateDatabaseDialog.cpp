@@ -1,16 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file CreateDatabaseDialog.cpp
- * @brief User interface component for CreateDatabaseDialog.
- *
- * Defines dialogs, widgets, controllers, and UI workflows used by the FitlyzerC desktop application.
- *
- * Responsibilities:
- * - Provide interactive user interface behavior and presentation
- *
- * @author Lars EBERHART
- */
 
 #include "CreateDatabaseDialog.h"
 

@@ -1,16 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file AppSettings.h
- * @brief Application settings support for AppSettings.
- *
- * Defines settings and formatting helpers used to configure application behavior and presentation.
- *
- * Responsibilities:
- * - Provide settings persistence or settings-related utilities
- *
- * @author Lars EBERHART
- */
 
 #pragma once
 

@@ -1,16 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file MapFitMath.h
- * @brief Map rendering support for MapFitMath.
- *
- * Implements map math, tile caching, and rendering logic used for geographic visualization of activities.
- *
- * Responsibilities:
- * - Provide map computation, tile handling, or rendering functionality
- *
- * @author Lars EBERHART
- */
 
 #pragma once
 

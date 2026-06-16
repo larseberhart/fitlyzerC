@@ -1,14 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file ZoneDefinition.cpp
- * @brief Zone and metric display definitions.
- *
- * Provides metric names, units, and supporting
- * definitions used by zone-based visualizations.
- *
- * @author Lars EBERHART
- */
 
 #include "ZoneDefinition.h"
 

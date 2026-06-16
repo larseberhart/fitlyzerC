@@ -1,16 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file CalendarWidget.h
- * @brief User interface component for CalendarWidget.
- *
- * Defines dialogs, widgets, controllers, and UI workflows used by the FitlyzerC desktop application.
- *
- * Responsibilities:
- * - Provide interactive user interface behavior and presentation
- *
- * @author Lars EBERHART
- */
 
 #pragma once
 
@@ -35,27 +24,12 @@ class CalendarWidget : public QWidget
     Q_OBJECT
 
 public:
-    /**
-     * @brief Constructs calendar widget.
-     * @param parent Parent widget.
-     */
     explicit CalendarWidget(QWidget* parent = nullptr);
 
-    /**
-     * @brief Sets database manager for data access.
-     * @param dbManager Database manager.
-     */
     void setDatabaseManager(DatabaseManager* dbManager);
 
-    /**
-     * @brief Sets athlete to display.
-     * @param athleteId Athlete ID.
-     */
     void setAthleteId(int athleteId);
 
-    /**
-     * @brief Refreshes calendar display.
-     */
     void refresh();
 
 private slots:

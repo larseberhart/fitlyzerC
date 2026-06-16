@@ -1,16 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file UndoCommand.h
- * @brief Undo/redo infrastructure for UndoCommand.
- *
- * Defines undo command abstractions and managers used to support reversible edits in the application.
- *
- * Responsibilities:
- * - Provide undo/redo command and management functionality
- *
- * @author Lars EBERHART
- */
 
 #pragma once
 

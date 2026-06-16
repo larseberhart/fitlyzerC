@@ -1,16 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file PowerHistogramWidget.cpp
- * @brief Chart widget and visualization support for PowerHistogramWidget.
- *
- * Provides chart rendering or chart-related data types used to visualize ride and fitness metrics in the UI.
- *
- * Responsibilities:
- * - Provide chart visualization behavior or chart support types
- *
- * @author Lars EBERHART
- */
 
 #include "PowerHistogramWidget.h"
 

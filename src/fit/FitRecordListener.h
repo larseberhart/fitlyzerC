@@ -1,16 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file FitRecordListener.h
- * @brief FIT data processing component for FitRecordListener.
- *
- * Provides FIT parsing, listener behavior, or FIT-related data structures used during activity import.
- *
- * Responsibilities:
- * - Parse or represent FIT activity data for downstream processing
- *
- * @author Lars EBERHART
- */
 
 #pragma once
 

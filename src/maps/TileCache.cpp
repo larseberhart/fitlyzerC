@@ -1,16 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file TileCache.cpp
- * @brief Map rendering support for TileCache.
- *
- * Implements map math, tile caching, and rendering logic used for geographic visualization of activities.
- *
- * Responsibilities:
- * - Provide map computation, tile handling, or rendering functionality
- *
- * @author Lars EBERHART
- */
 
 #include "TileCache.h"
 

@@ -1,14 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file RideData.h
- * @brief Activity data model.
- *
- * Defines the in-memory representation of a recorded
- * activity and its samples.
- *
- * @author Lars EBERHART
- */
 
 #pragma once
 

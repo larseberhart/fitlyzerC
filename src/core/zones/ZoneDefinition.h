@@ -1,16 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file ZoneDefinition.h
- * @brief Training zone support for ZoneDefinition.
- *
- * Implements training-zone definitions, calculations, and related visual behavior for zone-based analysis.
- *
- * Responsibilities:
- * - Provide zone definitions, calculations, or zone-related utilities
- *
- * @author Lars EBERHART
- */
 
 #pragma once
 

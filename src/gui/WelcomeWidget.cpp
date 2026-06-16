@@ -1,16 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file WelcomeWidget.cpp
- * @brief User interface component for WelcomeWidget.
- *
- * Defines dialogs, widgets, controllers, and UI workflows used by the FitlyzerC desktop application.
- *
- * Responsibilities:
- * - Provide interactive user interface behavior and presentation
- *
- * @author Lars EBERHART
- */
 
 #include "WelcomeWidget.h"
 

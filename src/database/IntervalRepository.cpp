@@ -1,14 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file IntervalRepository.cpp
- * @brief Interval database persistence.
- *
- * Implements CRUD operations and queries for interval
- * records stored in the SQLite database.
- *
- * @author Lars EBERHART
- */
 
 #include "IntervalRepository.h"
 #include "SqlQueryHelper.h"

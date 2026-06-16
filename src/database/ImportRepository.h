@@ -1,16 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file ImportRepository.h
- * @brief Database access component for ImportRepository.
- *
- * Implements database schema handling, repository operations, or SQL utility behavior for persistent storage.
- *
- * Responsibilities:
- * - Provide database schema, query, or repository functionality
- *
- * @author Lars EBERHART
- */
 
 #pragma once
 

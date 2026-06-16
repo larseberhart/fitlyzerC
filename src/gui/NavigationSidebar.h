@@ -1,16 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file NavigationSidebar.h
- * @brief User interface component for NavigationSidebar.
- *
- * Defines dialogs, widgets, controllers, and UI workflows used by the FitlyzerC desktop application.
- *
- * Responsibilities:
- * - Provide interactive user interface behavior and presentation
- *
- * @author Lars EBERHART
- */
 
 #pragma once
 
@@ -27,9 +16,6 @@ class NavigationSidebar : public QWidget
     Q_OBJECT
 
 public:
-    /**
-     * @brief Application page enumeration.
-     */
     enum class Page
     {
         Dashboard = 0,
@@ -40,27 +26,14 @@ public:
         Settings
     };
 
-    /**
-     * @brief Constructs navigation sidebar.
-     * @param parent Parent widget.
-     */
     explicit NavigationSidebar(QWidget* parent = nullptr);
 
-    /**
-     * @brief Sets the current page.
-     * @param page Page to select.
-     */
     void setCurrentPage(Page page);
 
-    /**
-     * @brief Gets the current page.
-     * @return Currently selected page.
-     */
     Page currentPage() const;
 
 signals:
-    /// \signal Emitted when navigation page selection changes.
-    /// \param page Selected page.
+    // Emitted when navigation page selection changes.
     void pageSelected(NavigationSidebar::Page page);
 
 private:

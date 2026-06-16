@@ -1,16 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file VideoExportSettings.h
- * @brief Video export and rendering component for VideoExportSettings.
- *
- * Implements video rendering, tile provision, and export settings used for activity video generation.
- *
- * Responsibilities:
- * - Provide video rendering or export-related functionality
- *
- * @author Lars EBERHART
- */
 
 #pragma once
 

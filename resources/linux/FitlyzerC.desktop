@@ -4,6 +4,6 @@ Name=FitlyzerC
 Comment=Analyze Garmin FIT activity files
 Exec=FitlyzerC %F
 TryExec=FitlyzerC
-Icon=appicon
+Icon=FitlyzerC
 Terminal=false
 Categories=Utility;Sports;X-Fitness;

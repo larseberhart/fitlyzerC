@@ -1,16 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file DateFormatter.cpp
- * @brief Application settings support for DateFormatter.
- *
- * Defines settings and formatting helpers used to configure application behavior and presentation.
- *
- * Responsibilities:
- * - Provide settings persistence or settings-related utilities
- *
- * @author Lars EBERHART
- */
 
 #include "DateFormatter.h"
 

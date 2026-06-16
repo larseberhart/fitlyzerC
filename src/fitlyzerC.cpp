@@ -1,16 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file fitlyzerC.cpp
- * @brief Application entry point and UI bootstrap.
- *
- * Initializes the Qt application, configures style and metadata, and launches the main window event loop.
- *
- * Responsibilities:
- * - Initialize the application and start the main UI event loop
- *
- * @author Lars EBERHART
- */
 
 #include <QApplication>
 #include <QIcon>

@@ -1,16 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file TrainingLoad.cpp
- * @brief Analysis component for TrainingLoad.
- *
- * Implements analysis logic used to compute cycling metrics, detect patterns, and derive activity insights.
- *
- * Responsibilities:
- * - Provide analysis-specific functionality for activity processing
- *
- * @author Lars EBERHART
- */
 
 #include "TrainingLoad.h"
 

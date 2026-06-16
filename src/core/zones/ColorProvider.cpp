@@ -1,15 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file ColorProvider.cpp
- * @brief Metric-based color generation for charts and maps.
- *
- * Converts activity metrics such as power, heart rate,
- * cadence, speed, altitude, and gradient into display
- * colors for visualization components.
- *
- * @author Lars EBERHART
- */
 
 #include "ColorProvider.h"
 

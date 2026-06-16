@@ -1,16 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-/**
- * @file UuidGenerator.h
- * @brief Utility support component for UuidGenerator.
- *
- * Provides shared utility helpers used by multiple application subsystems.
- *
- * Responsibilities:
- * - Provide reusable utility behavior for common tasks
- *
- * @author Lars EBERHART
- */
 
 #pragma once
 
