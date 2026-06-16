@@ -76,6 +76,9 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
+          host: "windows"
+          target: "desktop"
+          arch: "win64_mingw"
           version: "6.9.0"
           modules: "qtcharts"
 
