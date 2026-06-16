@@ -156,5 +156,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: FitlyzerC-macOS-DMG
-          path: |
-            **/*.dmg
+          path: build/github-macos-dmg/FitlyzerC.dmg
+          compression-level: 0
+          
