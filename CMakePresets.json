@@ -1,6 +1,5 @@
 {
   "version": 6,
-
   "configurePresets": [
     {
       "name": "base",
@@ -11,7 +10,6 @@
         "CMAKE_BUILD_TYPE": "Debug"
       }
     },
-
     {
       "name": "macos-debug",
       "displayName": "macOS Debug",
@@ -54,7 +52,6 @@
       "description": "Configure a macOS release build intended for DMG packaging",
       "inherits": "macos-release"
     },
-
     {
       "name": "linux-debug",
       "displayName": "Linux Debug",
@@ -89,7 +86,6 @@
         "FITLYZERC_ENABLE_APPIMAGE_PACKAGE": "ON"
       }
     },
-
     {
       "name": "windows-debug",
       "displayName": "Windows Debug",
@@ -131,9 +127,42 @@
         "FITLYZERC_FFMPEG_SOURCE_DIR": "${sourceDir}/third_party/ffmpeg",
         "FITLYZERC_FFMPEG_BINARY_PATH": "${sourceDir}/resources/ffmpeg/windows/ffmpeg.exe"
       }
+    },
+    {
+      "name": "github-macos-dmg",
+      "displayName": "GitHub macOS DMG",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "FITLYZERC_BUNDLE_FFMPEG": "ON",
+        "FITLYZERC_AUTO_DOWNLOAD_FFMPEG": "OFF",
+        "FITLYZERC_FFMPEG_SOURCE_DIR": "",
+        "FITLYZERC_FFMPEG_BINARY_PATH": "${sourceDir}/resources/ffmpeg/macos/ffmpeg"
+      }
+    },
+    {
+      "name": "github-linux-release",
+      "displayName": "GitHub Linux Release",
+      "inherits": "linux-release"
+    },
+    {
+      "name": "github-linux-appimage",
+      "displayName": "GitHub Linux AppImage",
+      "inherits": "linux-appimage"
+    },
+    {
+      "name": "github-windows-nsis",
+      "displayName": "GitHub Windows NSIS",
+      "inherits": "base",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "FITLYZERC_BUNDLE_FFMPEG": "ON",
+        "FITLYZERC_FFMPEG_SOURCE_DIR": "",
+        "FITLYZERC_FFMPEG_BINARY_PATH": "${sourceDir}/resources/ffmpeg/windows/ffmpeg.exe"
+      }
     }
   ],
-
   "buildPresets": [
     {
       "name": "macos-debug",
@@ -193,6 +222,31 @@
       "displayName": "Windows NSIS",
       "configurePreset": "windows-nsis",
       "configuration": "Release",
+      "targets": [
+        "PACKAGE"
+      ]
+    },
+    {
+      "name": "github-macos-dmg",
+      "configurePreset": "github-macos-dmg",
+      "targets": [
+        "dmg"
+      ]
+    },
+    {
+      "name": "github-linux-release",
+      "configurePreset": "github-linux-release"
+    },
+    {
+      "name": "github-linux-appimage",
+      "configurePreset": "github-linux-appimage",
+      "targets": [
+        "appimage"
+      ]
+    },
+    {
+      "name": "github-windows-nsis",
+      "configurePreset": "github-windows-nsis",
       "targets": [
         "PACKAGE"
       ]
