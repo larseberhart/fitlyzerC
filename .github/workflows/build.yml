@@ -1,18 +1,29 @@
 name: Build Packages
-env:
-FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
 push:
-branches: [ main ]
-pull_request:
-workflow_dispatch:
-jobs:
-linux-appimage:
-runs-on: ubuntu-24.04
-steps:
-  - uses: actions/checkout@v5
+branches:
+- main
 
-  - name: Install Dependencies
+pull_request:
+
+workflow_dispatch:
+
+env:
+FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+
+linux-appimage:
+name: Linux AppImage
+runs-on: ubuntu-24.04
+
+```
+steps:
+  - name: Checkout
+    uses: actions/checkout@v5
+
+  - name: Install dependencies
     run: |
       sudo apt-get update
 
@@ -20,11 +31,13 @@ steps:
         cmake \
         ninja-build \
         build-essential \
+        clang \
         qt6-base-dev \
         qt6-charts-dev \
         qt6-tools-dev \
         libqt6sql6-sqlite \
-        patchelf
+        patchelf \
+        wget
 
   - name: Install AppImageTool
     run: |
@@ -32,18 +45,24 @@ steps:
         https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
 
       chmod +x appimagetool
-      sudo mv appimagetool /usr/local/bin/
+      sudo mv appimagetool /usr/local/bin/appimagetool
 
   - name: Configure
-    run: cmake --preset github-linux-appimage
+    run: |
+      cmake --preset github-linux-appimage
 
   - name: Build
-    run: cmake --build --preset github-linux-appimage
+    run: |
+      cmake --build --preset github-linux-appimage
 
   - name: Package
     run: |
       cd build/github-linux-appimage
       cpack
+
+  - name: List generated files
+    run: |
+      find . -type f | grep AppImage || true
 
   - name: Upload AppImage
     uses: actions/upload-artifact@v4
@@ -51,25 +70,39 @@ steps:
       name: FitlyzerC-AppImage
       path: |
         **/*.AppImage
-windows-nsis:
-runs-on: windows-2025
-steps:
-  - uses: actions/checkout@v5
+```
 
-  - uses: jurplel/install-qt-action@v4
+windows-nsis:
+name: Windows NSIS
+runs-on: windows-2025
+
+```
+steps:
+  - name: Checkout
+    uses: actions/checkout@v5
+
+  - name: Install Qt
+    uses: jurplel/install-qt-action@v4
     with:
-      version: '6.9.0'
+      version: "6.9.0"
 
   - name: Configure
-    run: cmake --preset github-windows-nsis
+    run: |
+      cmake --preset github-windows-nsis
 
   - name: Build
-    run: cmake --build --preset github-windows-nsis
+    run: |
+      cmake --build --preset github-windows-nsis
 
   - name: Package
     run: |
       cd build/github-windows-nsis
       cpack -C Release
+
+  - name: List generated files
+    shell: pwsh
+    run: |
+      Get-ChildItem -Recurse
 
   - name: Upload Installer
     uses: actions/upload-artifact@v4
@@ -77,25 +110,45 @@ steps:
       name: FitlyzerC-Windows-Installer
       path: |
         **/*Setup*.exe
-macos-dmg:
-runs-on: macos-15
-steps:
-  - uses: actions/checkout@v5
+```
 
-  - uses: jurplel/install-qt-action@v4
+macos-dmg:
+name: macOS DMG
+runs-on: macos-15
+
+```
+steps:
+  - name: Checkout
+    uses: actions/checkout@v5
+
+  - name: Install Qt
+    uses: jurplel/install-qt-action@v4
     with:
-      version: '6.9.0'
+      version: "6.9.0"
+
+  - name: Show compiler
+    run: |
+      which clang
+      which clang++
+      clang --version
+      clang++ --version
 
   - name: Configure
-    run: cmake --preset github-macos-dmg
+    run: |
+      cmake --preset github-macos-dmg
 
   - name: Build
-    run: cmake --build --preset github-macos-dmg
+    run: |
+      cmake --build --preset github-macos-dmg
 
   - name: Package
     run: |
       cd build/github-macos-dmg
       cpack
+
+  - name: List generated files
+    run: |
+      find . -type f | grep dmg || true
 
   - name: Upload DMG
     uses: actions/upload-artifact@v4
@@ -103,3 +156,4 @@ steps:
       name: FitlyzerC-macOS-DMG
       path: |
         **/*.dmg
+```
