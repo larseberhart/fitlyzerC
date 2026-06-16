@@ -16,6 +16,8 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSet>
+#include <QHash>
+#include <QStringList>
 #include <QTabWidget>
 #include <QTableWidget>
 #include <QTextEdit>
@@ -24,6 +26,7 @@
 #include "WorkoutController.h"
 #include "core/zones/ZoneDefinition.h"
 #include "analysis/queue/AnalysisQueue.h"
+#include "import/ImportQueue.h"
 #include "core/undo/UndoManager.h"
 #include "database/DatabaseManager.h"
 #include "database/ActivityRepository.h"
@@ -40,6 +43,8 @@ class ActivityBrowser;
 class AthleteHeaderWidget;
 class CalendarWidget;
 class WelcomeWidget;
+class ImportStatusWidget;
+class ImportProgressModel;
 class QCloseEvent;
 class QFileSystemWatcher;
 class QMimeData;
@@ -71,10 +76,10 @@ protected:
     /// @brief Filters events for custom handling.
     bool eventFilter(QObject* watched, QEvent* event) override;
 
-    /// @brief Handles drag-enter for file drop validation.
+    /// @brief Accepts drag-enter when the payload contains local `.fit` files.
     void dragEnterEvent(QDragEnterEvent* event) override;
 
-    /// @brief Handles drop event for FIT file import.
+    /// @brief Extracts dropped `.fit` files and forwards them to the import queue.
     void dropEvent(QDropEvent* event) override;
 
 private slots:
@@ -105,10 +110,24 @@ private:
     void addRecentDatabase(const QString& path);
     void updateRecentDatabaseMenu();
     void openDatabasePath(const QString& path);
+
+    /// @brief Returns whether importing is currently allowed.
+    ///
+    /// Requires an open database and a selected athlete.
     bool canImportActivities() const;
+
+    /// @brief Enables/disables import actions based on current readiness.
     void updateImportAvailability();
+
+    /// @brief Queues a batch of file paths for background import.
     void importFiles(const QStringList& filePaths);
+
+    /// @brief Returns deduplicated local `.fit` files from MIME drop/paste data.
     QStringList fitFilesFromMimeData(const QMimeData* mimeData) const;
+    void scheduleActivityBrowserRefresh();
+
+    /// @brief Shows a per-batch import result summary when queue work completes.
+    void finalizeImportBatches();
     void refreshAthleteSelector();
     void resetAllZoom();
     void increaseChartHeight();
@@ -149,6 +168,8 @@ private:
     void clearIntervalSummary();
     bool ensureDatabase();
     bool ensureAthlete();
+
+    /// @brief Ensures database path, athlete selection, and queue state are import-ready.
     bool ensureImportReady();
     bool createOrOpenDefaultDatabase();
     QString defaultDatabasePathForAutoCreate() const;
@@ -166,6 +187,11 @@ private:
     void editCurrentActivityProperties();
     double estimatedFtpFromCurrentRide() const;
     void applyEstimatedFtpForCurrentAthlete();
+
+    /// @brief Internal import entry point shared by menu action and drag-drop.
+    /// @param filePaths Candidate files to import (only `.fit` files are queued).
+    /// @param showResultDialog Whether to display completion summary dialogs.
+    /// @param sourceLabel Source tag stored in import metadata (e.g. "manual", "drop").
     void importFilesInternal(const QStringList& filePaths,
                              bool showResultDialog,
                              const QString& sourceLabel);
@@ -179,6 +205,10 @@ private:
 
         // -- Background analysis queue -----------------------------------------
         AnalysisQueue* m_analysisQueue  = nullptr;
+
+        // -- Background import queue -------------------------------------------
+        ImportQueue* m_importQueue = nullptr;
+        ImportProgressModel* m_importProgressModel = nullptr;
 
     // -- Controller ---------------------------------------------------------
     WorkoutController* m_controller = nullptr;
@@ -205,6 +235,7 @@ private:
     // -- Folder monitoring --------------------------------------------------
     QFileSystemWatcher* m_watcher = nullptr;
     QTimer* m_watchRescanTimer = nullptr;
+    QTimer* m_importRefreshTimer = nullptr;
     bool m_watchFolderEnabled = true;
     QString m_watchFolderPath;
     QSet<QString> m_knownWatchedFitFiles;
@@ -215,6 +246,7 @@ private:
     QComboBox* m_chartPresetCombo = nullptr;
     QComboBox* m_powerSmoothingCombo = nullptr;
     QCheckBox* m_autoSmoothingCheck = nullptr;
+    ImportStatusWidget* m_importStatusWidget = nullptr;
 
     // -- Status bar ---------------------------------------------------------
     QLabel* m_dbStatusLabel       = nullptr;
@@ -327,4 +359,17 @@ private:
 
     // Activities tab
     ActivityBrowser* m_activityBrowser = nullptr;
+
+    struct ImportBatchSummary
+    {
+        int queued = 0;
+        int imported = 0;
+        int duplicates = 0;
+        int failed = 0;
+        bool showResultDialog = false;
+        QString sourceLabel;
+        QStringList errors;
+    };
+
+    QHash<QString, ImportBatchSummary> m_importBatchSummaries;
 };

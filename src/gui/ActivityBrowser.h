@@ -18,8 +18,10 @@ class QLabel;
 /**
  * @brief Browse and manage activities.
  *
- * Displays activities in a filterable table, supports drag-drop import,
- * and provides context menu for activity management.
+ * Displays activities in a filterable table and provides context-menu actions.
+ *
+ * The widget accepts local `.fit` drops and emits `fitFilesDropped()` so the
+ * main window can enqueue background imports.
  */
 class ActivityBrowser : public QWidget
 {
@@ -38,7 +40,7 @@ signals:
     // Emitted when an activity is deleted.
     void activityDeleted(int activityId);
 
-    // Emitted when FIT files are dropped onto the widget.
+    // Emitted when one or more local .fit files are dropped onto the widget.
     void fitFilesDropped(const QStringList& filePaths);
 
 protected:

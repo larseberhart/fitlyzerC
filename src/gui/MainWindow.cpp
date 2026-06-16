@@ -48,6 +48,7 @@
 #include <QToolButton>
 #include <QTimer>
 #include <QUrl>
+#include <QUuid>
 #include <QVBoxLayout>
 #include <QWidget>
 #include <QPainter>
@@ -68,6 +69,7 @@
 #include "CalendarWidget.h"
 #include "CreateDatabaseDialog.h"
 #include "EditActivityDialog.h"
+#include "ImportStatusWidget.h"
 #include "IntervalEditorDialog.h"
 #include "WelcomeWidget.h"
 #include "charts/FitnessChartWidget.h"
@@ -87,6 +89,7 @@
 #include "maps/MapRenderer.h"
 #include "model/RideDataSerializer.h"
 #include "platform/Platform.h"
+#include "import/ImportProgressModel.h"
 #include "video/VideoExportDialog.h"
 #include "video/VideoExportSettings.h"
 #include "utils/FfmpegPath.h"
@@ -377,6 +380,21 @@ MainWindow::MainWindow(QWidget* parent)
     m_undoManager = new UndoManager(50, this);
     m_analysisQueue = new AnalysisQueue(this);
     m_controller->setAnalysisQueue(m_analysisQueue);
+    m_importQueue = new ImportQueue(this);
+    m_importProgressModel = new ImportProgressModel(this);
+    m_importProgressModel->attachQueue(m_importQueue);
+
+    m_importRefreshTimer = new QTimer(this);
+    m_importRefreshTimer->setSingleShot(true);
+    m_importRefreshTimer->setInterval(500);
+    connect(m_importRefreshTimer, &QTimer::timeout, this, [this]()
+    {
+        if (m_activityBrowser)
+            m_activityBrowser->refresh(m_currentAthleteId);
+        updateStatsLabel();
+        updateStatusBarInfo();
+        updateWelcomeScreenVisibility();
+    });
 
     // Status bar feedback from the analysis queue
     connect(m_analysisQueue, &AnalysisQueue::pendingCountChanged, this, [this](int count)
@@ -398,6 +416,43 @@ MainWindow::MainWindow(QWidget* parent)
             refreshClimbViews();
             updateIntervals();
         }
+    });
+
+    connect(m_importQueue, &ImportQueue::jobFinished, this,
+            [this](const QString&, const QString& batchId, const QString&, int activityId, int)
+    {
+        if (activityId > 0 && m_analysisQueue)
+            m_analysisQueue->enqueue(activityId);
+
+        auto it = m_importBatchSummaries.find(batchId);
+        if (it != m_importBatchSummaries.end())
+            ++it->imported;
+
+        scheduleActivityBrowserRefresh();
+        hideWelcomeScreen();
+    });
+
+    connect(m_importQueue, &ImportQueue::jobFailed, this,
+            [this](const QString&, const QString& batchId, const QString& filePath,
+                   const QString& reason, const QString& errorMessage, int)
+    {
+        auto it = m_importBatchSummaries.find(batchId);
+        if (it != m_importBatchSummaries.end())
+        {
+            if (reason == QStringLiteral("duplicate") || reason == QStringLiteral("time_overlap"))
+                ++it->duplicates;
+            else
+                ++it->failed;
+
+            if (!errorMessage.isEmpty())
+                it->errors << QString("%1: %2").arg(QFileInfo(filePath).fileName(), errorMessage);
+        }
+    });
+
+    connect(m_importQueue, &ImportQueue::queueIdle, this, [this]()
+    {
+        scheduleActivityBrowserRefresh();
+        finalizeImportBatches();
     });
 
     if (m_activityBrowser)
@@ -429,6 +484,10 @@ MainWindow::MainWindow(QWidget* parent)
         else
         {
             m_controller->setDatabaseManager(&m_dbManager);
+            if (m_analysisQueue)
+                m_analysisQueue->setDatabasePath(lastDb);
+            if (m_importQueue)
+                m_importQueue->setDatabasePath(lastDb);
             const int aid = s.value("currentAthleteId", -1).toInt();
             if (aid > 0)
             {
@@ -1566,6 +1625,14 @@ void MainWindow::buildToolbar()
     connect(m_athleteCombo, &QComboBox::currentIndexChanged,
             this, &MainWindow::onAthleteSelectionChanged);
     tb->addWidget(m_athleteCombo);
+
+    tb->addSeparator();
+    tb->addWidget(new QLabel(" "));
+
+    m_importStatusWidget = new ImportStatusWidget(tb);
+    if (m_importProgressModel)
+        m_importStatusWidget->setModel(m_importProgressModel);
+    tb->addWidget(m_importStatusWidget);
 }
 
 void MainWindow::buildStatusBar()
@@ -2003,6 +2070,8 @@ void MainWindow::openDatabasePath(const QString& path)
     updateRecentDatabaseMenu();
     if (m_analysisQueue)
         m_analysisQueue->setDatabasePath(path);
+    if (m_importQueue)
+        m_importQueue->setDatabasePath(path);
 
     if (m_activityBrowser)
         m_activityBrowser->refresh(m_currentAthleteId);
@@ -2057,6 +2126,8 @@ bool MainWindow::createOrOpenDefaultDatabase()
     m_lastOpenDir = info.absolutePath();
     if (m_analysisQueue)
         m_analysisQueue->setDatabasePath(path);
+    if (m_importQueue)
+        m_importQueue->setDatabasePath(path);
 
     QSettings settings("Fitlyzer", "FitlyzerC");
     settings.setValue("lastDatabase", path);
@@ -2362,7 +2433,9 @@ void MainWindow::importFilesInternal(const QStringList& filePaths,
                                      bool showResultDialog,
                                      const QString& sourceLabel)
 {
-    if (filePaths.isEmpty())
+    QStringList deduped = filePaths;
+    deduped.removeDuplicates();
+    if (deduped.isEmpty())
         return;
 
     if (!ensureImportReady())
@@ -2371,90 +2444,78 @@ void MainWindow::importFilesInternal(const QStringList& filePaths,
         return;
     }
 
-    int imported = 0;
-    int duplicates = 0;
-    int failed = 0;
+    if (!m_importQueue)
+        return;
 
-    for (const QString& filePath : filePaths)
+    const QString batchId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    ImportBatchSummary summary;
+    summary.queued = deduped.size();
+    summary.showResultDialog = showResultDialog;
+    summary.sourceLabel = sourceLabel;
+    m_importBatchSummaries.insert(batchId, summary);
+
+    const QString importSource = showResultDialog
+        ? QStringLiteral("manual_import")
+        : QStringLiteral("directory_import");
+
+    for (const QString& filePath : deduped)
     {
-        QString err;
-        DuplicateActivityInfo duplicateInfo;
-        ImportResult importResult = ImportResult::Failed;
-        int activityId = m_controller->importFile(filePath, err, false, true, QString(), &duplicateInfo, &importResult);
-        if (activityId > 0)
+        m_importQueue->enqueue(filePath,
+                               QString::number(m_currentAthleteId),
+                               batchId,
+                               importSource);
+    }
+
+    const QString submitMessage = QString("Queued %1 FIT file%2 for background import.")
+        .arg(deduped.size())
+        .arg(deduped.size() == 1 ? QString() : QStringLiteral("s"));
+    statusBar()->showMessage(submitMessage, 2500);
+}
+
+void MainWindow::scheduleActivityBrowserRefresh()
+{
+    if (m_importRefreshTimer)
+        m_importRefreshTimer->start();
+}
+
+void MainWindow::finalizeImportBatches()
+{
+    if (m_importBatchSummaries.isEmpty())
+        return;
+
+    for (auto it = m_importBatchSummaries.begin(); it != m_importBatchSummaries.end(); ++it)
+    {
+        const ImportBatchSummary& summary = it.value();
+        const QString label = summary.sourceLabel.isEmpty()
+            ? QStringLiteral("Import")
+            : summary.sourceLabel;
+
+        if (summary.showResultDialog)
         {
-            ++imported;
-            continue;
+            QString text = QString("%1 files selected\n\nImported: %2\nDuplicates: %3\nFailed: %4")
+                .arg(summary.queued)
+                .arg(summary.imported)
+                .arg(summary.duplicates)
+                .arg(summary.failed);
+
+            if (!summary.errors.isEmpty())
+                text += QString("\n\nErrors:\n%1").arg(summary.errors.join('\n'));
+
+            QMessageBox::information(this, "Import Results", text);
         }
-
-        if (importResult == ImportResult::TimeOverlap)
-        {
-            const QString existingStartText = duplicateInfo.existingStartUtc.isEmpty()
-                ? QStringLiteral("Unknown")
-                : DateFormatter::formatDateTime(
-                    QDateTime::fromString(duplicateInfo.existingStartUtc, Qt::ISODate).toLocalTime());
-
-            const int res = QMessageBox::warning(
-                this,
-                "Potential Duplicate Activity",
-                QString("A potential duplicate was detected for:\n%1\n\n"
-                        "An activity with the same start time already exists in the database.\n"
-                        "Existing start: %2\n\n"
-                        "Import anyway?")
-                    .arg(QFileInfo(filePath).fileName())
-                    .arg(existingStartText),
-                QMessageBox::Cancel | QMessageBox::Yes,
-                QMessageBox::Cancel);
-
-            if (res == QMessageBox::Yes)
-            {
-                err.clear();
-                importResult = ImportResult::Failed;
-                activityId = m_controller->importFile(filePath, err, /*allowTimeOverlap=*/true, true, QString(), nullptr, &importResult);
-                if (activityId > 0)
-                {
-                    ++imported;
-                    continue;
-                }
-            }
-        }
-
-        if (err.contains("duplicate", Qt::CaseInsensitive) ||
-            err.contains("already", Qt::CaseInsensitive))
-            ++duplicates;
-        else if (importResult != ImportResult::TimeOverlap)
-            ++failed;
         else
-            ++duplicates; // user cancelled overlap import counts as skipped
+        {
+            statusBar()->showMessage(
+                QString("%1: imported %2, duplicates %3, failed %4")
+                    .arg(label)
+                    .arg(summary.imported)
+                    .arg(summary.duplicates)
+                    .arg(summary.failed),
+                5000);
+        }
     }
 
-    if (m_activityBrowser)
-        m_activityBrowser->refresh(m_currentAthleteId);
-    updateStatsLabel();
-    updateStatusBarInfo();
-    updateWelcomeScreenVisibility();
-
-    if (showResultDialog)
-    {
-        QMessageBox::information(
-            this,
-            "Import Results",
-            QString("%1 files selected\n\nImported: %2\nDuplicates: %3\nFailed: %4")
-                .arg(filePaths.size())
-                .arg(imported)
-                .arg(duplicates)
-                .arg(failed));
-    }
-    else
-    {
-        statusBar()->showMessage(
-            QString("%1: imported %2, duplicates %3, failed %4")
-                .arg(sourceLabel.isEmpty() ? "Auto import" : sourceLabel)
-                .arg(imported)
-                .arg(duplicates)
-                .arg(failed),
-            4000);
-    }
+    m_importBatchSummaries.clear();
 }
 
 QStringList MainWindow::fitFilesFromMimeData(const QMimeData* mimeData) const
