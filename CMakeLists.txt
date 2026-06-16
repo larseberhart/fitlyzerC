@@ -481,7 +481,10 @@ endif()
 set(FITLYZERC_BUNDLED_FFMPEG_BINARY "")
 set(FITLYZERC_RUNTIME_FFMPEG_PATH "")
 
-if(FITLYZERC_BUNDLE_FFMPEG)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(FITLYZERC_RUNTIME_FFMPEG_PATH "ffmpeg")
+    message(STATUS "Linux build: assuming system ffmpeg is installed; skipping FFmpeg bundling/source build")
+elseif(FITLYZERC_BUNDLE_FFMPEG)
     message(STATUS "Bundling FFmpeg ${FITLYZERC_FFMPEG_VERSION} (pinned version for reproducible builds)")
     
     set(_ffmpeg_suffix "")
@@ -544,6 +547,7 @@ if(FITLYZERC_BUNDLE_FFMPEG)
                     "--disable-shared"
                     "--enable-static"
                     "--disable-debug"
+                    "--disable-stripping"
                     "--disable-doc"
                     "--enable-ffmpeg"
                     "--disable-ffplay"
@@ -555,7 +559,7 @@ if(FITLYZERC_BUNDLE_FFMPEG)
                     BINARY_DIR "${FITLYZERC_FFMPEG_BUILD_DIR}"
                     ${_ffmpeg_download_args}
                     CONFIGURE_COMMAND ${_ffmpeg_configure}
-                    BUILD_COMMAND "${FITLYZERC_MAKE_EXECUTABLE}" -j
+                    BUILD_COMMAND "${FITLYZERC_MAKE_EXECUTABLE}" -j1
                     INSTALL_COMMAND "${FITLYZERC_MAKE_EXECUTABLE}" install
                     BUILD_BYPRODUCTS "${FITLYZERC_FFMPEG_INSTALL_DIR}/bin/ffmpeg${_ffmpeg_suffix}"
                     LOG_DOWNLOAD ON
@@ -823,13 +827,14 @@ if(UNIX AND NOT APPLE AND FITLYZERC_ENABLE_APPIMAGE_PACKAGE)
     install(FILES
         "${CMAKE_SOURCE_DIR}/resources/appicon.png"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps"
-        RENAME "appicon.png"
+        RENAME "FitlyzerC.png"
     )
 
+    # AppImage requires the icon at the AppDir root with a basename that matches Icon= in the desktop file.
     install(FILES
         "${CMAKE_SOURCE_DIR}/resources/appicon.png"
         DESTINATION "."
-        RENAME "appicon.png"
+        RENAME "FitlyzerC.png"
     )
 endif()
 
@@ -906,7 +911,7 @@ elseif(UNIX AND FITLYZERC_ENABLE_APPIMAGE_PACKAGE)
         message(FATAL_ERROR "patchelf was not found in PATH. Install patchelf to build AppImages.")
     endif()
 
-    set(CPACK_PACKAGE_ICON "appicon")
+    set(CPACK_PACKAGE_ICON "${CMAKE_SOURCE_DIR}/resources/appicon.png")
     set(CPACK_GENERATOR AppImage)
     set(CPACK_APPIMAGE_DESKTOP_FILE "FitlyzerC.desktop")
     set(CPACK_APPIMAGE_NO_APPSTREAM ON)
