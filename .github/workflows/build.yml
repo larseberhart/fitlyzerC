@@ -1,22 +1,14 @@
 name: Build Packages
-
 env:
 FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 on:
 push:
 branches: [ main ]
-
 pull_request:
-
 workflow_dispatch:
-
 jobs:
-
 linux-appimage:
 runs-on: ubuntu-24.04
-
-```
 steps:
   - uses: actions/checkout@v5
 
@@ -59,12 +51,8 @@ steps:
       name: FitlyzerC-AppImage
       path: |
         **/*.AppImage
-```
-
 windows-nsis:
 runs-on: windows-2025
-
-```
 steps:
   - uses: actions/checkout@v5
 
@@ -89,12 +77,8 @@ steps:
       name: FitlyzerC-Windows-Installer
       path: |
         **/*Setup*.exe
-```
-
 macos-dmg:
 runs-on: macos-15
-
-```
 steps:
   - uses: actions/checkout@v5
 
@@ -119,4 +103,3 @@ steps:
       name: FitlyzerC-macOS-DMG
       path: |
         **/*.dmg
-```
