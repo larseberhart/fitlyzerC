@@ -3,11 +3,11 @@
 
 #include "DatabaseManager.h"
 #include "DatabaseSchema.h"
+#include "database/connection/DatabaseConnectionFactory.h"
 
 #include <QDateTime>
 #include <QSqlError>
 #include <QSqlQuery>
-#include <QUuid>
 
 DatabaseManager::DatabaseManager() = default;
 
@@ -17,16 +17,6 @@ DatabaseManager::~DatabaseManager()
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────
-
-static void applySqlitePragmas(QSqlDatabase& db)
-{
-    QSqlQuery q(db);
-    q.exec("PRAGMA journal_mode=WAL");
-    q.exec("PRAGMA synchronous=NORMAL");
-    q.exec("PRAGMA temp_store=MEMORY");
-    q.exec("PRAGMA foreign_keys=ON");
-    q.exec("PRAGMA cache_size=-20000");
-}
 
 static bool columnExists(QSqlDatabase& db, const QString& tableName, const QString& columnName)
 {
@@ -364,20 +354,14 @@ bool DatabaseManager::open(const QString& path, QString* errorOut)
 {
     close();
 
-    m_connectionName = QUuid::createUuid().toString(QUuid::WithoutBraces);
-    m_db = QSqlDatabase::addDatabase("QSQLITE", m_connectionName);
-    m_db.setDatabaseName(path);
-
-    if (!m_db.open())
+    m_connectionName = DatabaseConnectionFactory::createConnectionName();
+    if (!DatabaseConnectionFactory::openSqlite(m_db, path, m_connectionName, errorOut))
     {
-        if (errorOut)
-            *errorOut = m_db.lastError().text();
-        QSqlDatabase::removeDatabase(m_connectionName);
         m_connectionName.clear();
         return false;
     }
 
-    applySqlitePragmas(m_db);
+    DatabaseConnectionFactory::applySqlitePragmas(m_db);
 
     // Check schema version
     QSqlQuery q(m_db);

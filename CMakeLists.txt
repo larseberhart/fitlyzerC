@@ -315,6 +315,8 @@ set(FITLYZERC_SOURCES
     "${CMAKE_SOURCE_DIR}/src/database/AthleteRepository.h"
     "${CMAKE_SOURCE_DIR}/src/database/ClimbRepository.cpp"
     "${CMAKE_SOURCE_DIR}/src/database/ClimbRepository.h"
+    "${CMAKE_SOURCE_DIR}/src/database/connection/DatabaseConnectionFactory.cpp"
+    "${CMAKE_SOURCE_DIR}/src/database/connection/DatabaseConnectionFactory.h"
     "${CMAKE_SOURCE_DIR}/src/database/DatabaseConnectionGuard.cpp"
     "${CMAKE_SOURCE_DIR}/src/database/DatabaseConnectionGuard.h"
     "${CMAKE_SOURCE_DIR}/src/database/DatabaseManager.cpp"
