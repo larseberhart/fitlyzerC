@@ -11,10 +11,13 @@
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QGroupBox>
+#include <QLabel>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QSettings>
 #include <QSqlQuery>
+#include <QTabWidget>
 #include <QVBoxLayout>
 
 #include "ActivityBrowser.h"
@@ -69,98 +72,161 @@ void MainWindow::manageAthletes()
 
 void MainWindow::openSettingsDialog()
 {
+    // ── Dialog frame ──────────────────────────────────────────────────────
     QDialog dialog(this);
     dialog.setWindowTitle("Settings");
     dialog.setModal(true);
+    dialog.resize(540, 480);
 
-    auto* layout = new QVBoxLayout(&dialog);
-    auto* generalGroup = new QGroupBox("General", &dialog);
-    auto* form = new QFormLayout(generalGroup);
+    auto* dlgLayout = new QVBoxLayout(&dialog);
+    dlgLayout->setContentsMargins(12, 12, 12, 12);
+    dlgLayout->setSpacing(8);
 
-    auto* dateFormatCombo = new QComboBox(generalGroup);
-    dateFormatCombo->addItem("DD-MM-YYYY (14-06-2026)", static_cast<int>(DateFormat::DD_MM_YYYY));
-    dateFormatCombo->addItem("YYYY-MM-DD (2026-06-14)", static_cast<int>(DateFormat::YYYY_MM_DD));
-    dateFormatCombo->addItem("DD.MM.YYYY (14.06.2026)", static_cast<int>(DateFormat::DD_DOT_MM_DOT_YYYY));
-    dateFormatCombo->addItem("MM/DD/YYYY (06/14/2026)", static_cast<int>(DateFormat::MM_DD_YYYY));
+    auto* tabs = new QTabWidget(&dialog);
 
-    const DateFormat currentFormat = AppSettings::instance().dateFormat();
-    const int currentIndex = dateFormatCombo->findData(static_cast<int>(currentFormat));
-    dateFormatCombo->setCurrentIndex(currentIndex >= 0 ? currentIndex : 0);
-
-    form->addRow("Date Format:", dateFormatCombo);
-    layout->addWidget(generalGroup);
-
-    // Maps group
-    auto* mapsGroup = new QGroupBox("Maps", &dialog);
-    auto* mapsForm = new QFormLayout(mapsGroup);
-    auto* tileCacheCombo = new QComboBox(mapsGroup);
-    tileCacheCombo->addItem("128 tiles (~32 MB)",  128);
-    tileCacheCombo->addItem("256 tiles (~64 MB)",  256);
-    tileCacheCombo->addItem("512 tiles (~128 MB)", 512);
-    tileCacheCombo->addItem("1024 tiles (~256 MB)", 1024);
-    tileCacheCombo->addItem("2048 tiles (~512 MB)", 2048);
-    const int currentCacheSize = AppSettings::instance().tileCacheSize();
-    const int cacheSizeIndex = tileCacheCombo->findData(currentCacheSize);
-    tileCacheCombo->setCurrentIndex(cacheSizeIndex >= 0 ? cacheSizeIndex : 2);
-    mapsForm->addRow("Tile Memory Cache:", tileCacheCombo);
-    layout->addWidget(mapsGroup);
-
-    // Climb Detection group
-    // Parameters are persisted in QSettings and also reflected in the live
-    // spinboxes on ClimbsPage.
-    auto* climbGroup = new QGroupBox("Climb Detection", &dialog);
-    auto* climbForm  = new QFormLayout(climbGroup);
-
-    QSettings climbSettings("Fitlyzer", "FitlyzerC");
-    auto makeSpin = [&climbSettings, &climbGroup](
-        const QString& key, double defaultVal, double min, double max, int decimals) -> QDoubleSpinBox*
+    // ── Tab: General ─────────────────────────────────────────────────────
     {
-        auto* spin = new QDoubleSpinBox(climbGroup);
-        spin->setRange(min, max);
-        spin->setDecimals(decimals);
-        spin->setValue(climbSettings.value(key, defaultVal).toDouble());
-        return spin;
-    };
+        auto* page = new QWidget(tabs);
+        auto* vl   = new QVBoxLayout(page);
+        vl->setContentsMargins(12, 12, 12, 12);
 
-    auto* csMinLen  = makeSpin("climb/minLength",   ClimbDefaults::kMinLength,    0.1, 20.0,   2);
-    auto* csMinGain = makeSpin("climb/minGain",     ClimbDefaults::kMinGain,      1.0, 2000.0, 0);
-    auto* csMinGrad = makeSpin("climb/minGradient", ClimbDefaults::kMinGradient,  0.5, 20.0,   1);
-    auto* csStGrad  = makeSpin("climb/startGrad",   ClimbDefaults::kStartGrad,    0.5, 20.0,   1);
-    auto* csDipM    = makeSpin("climb/dipMeters",   ClimbDefaults::kDipMeters,    0.0, 200.0,  1);
-    auto* csDipD    = makeSpin("climb/dipDistance", ClimbDefaults::kDipDistance,  10.0,2000.0, 0);
-    auto* csSmooth  = makeSpin("climb/smoothing",   ClimbDefaults::kSmoothing,    1.0, 500.0,  0);
+        auto* generalGroup = new QGroupBox("General", page);
+        auto* form = new QFormLayout(generalGroup);
 
-    csMinLen->setSuffix(" km");
-    csMinGain->setSuffix(" m");
-    csMinGrad->setSuffix(" %");
-    csStGrad->setSuffix(" %");
-    csDipM->setSuffix(" m");
-    csDipD->setSuffix(" m");
+        auto* dateFormatCombo = new QComboBox(generalGroup);
+        dateFormatCombo->addItem("DD-MM-YYYY (14-06-2026)", static_cast<int>(DateFormat::DD_MM_YYYY));
+        dateFormatCombo->addItem("YYYY-MM-DD (2026-06-14)", static_cast<int>(DateFormat::YYYY_MM_DD));
+        dateFormatCombo->addItem("DD.MM.YYYY (14.06.2026)", static_cast<int>(DateFormat::DD_DOT_MM_DOT_YYYY));
+        dateFormatCombo->addItem("MM/DD/YYYY (06/14/2026)", static_cast<int>(DateFormat::MM_DD_YYYY));
+        const DateFormat currentFormat = AppSettings::instance().dateFormat();
+        dateFormatCombo->setCurrentIndex(
+            dateFormatCombo->findData(static_cast<int>(currentFormat)));
+        form->addRow("Date Format:", dateFormatCombo);
 
-    climbForm->addRow("Minimum Length:",    csMinLen);
-    climbForm->addRow("Minimum Gain:",      csMinGain);
-    climbForm->addRow("Average Gradient:",  csMinGrad);
-    climbForm->addRow("Start Gradient:",    csStGrad);
-    climbForm->addRow("Dip Elevation:",     csDipM);
-    climbForm->addRow("Dip Distance:",      csDipD);
-    climbForm->addRow("Smoothing:",         csSmooth);
+        vl->addWidget(generalGroup);
+        vl->addStretch(1);
+        tabs->addTab(page, "General");
 
-    auto* restoreDefaultsBtn = new QPushButton("Restore Defaults", climbGroup);
-    climbForm->addRow("", restoreDefaultsBtn);
-    connect(restoreDefaultsBtn, &QPushButton::clicked, this, [=]() {
-        csMinLen->setValue(ClimbDefaults::kMinLength);
-        csMinGain->setValue(ClimbDefaults::kMinGain);
-        csMinGrad->setValue(ClimbDefaults::kMinGradient);
-        csStGrad->setValue(ClimbDefaults::kStartGrad);
-        csDipM->setValue(ClimbDefaults::kDipMeters);
-        csDipD->setValue(ClimbDefaults::kDipDistance);
-        csSmooth->setValue(ClimbDefaults::kSmoothing);
-    });
+        // Store pointer for accept handler
+        dialog.setProperty("dateFormatCombo", QVariant::fromValue(static_cast<QObject*>(dateFormatCombo)));
+    }
 
-    layout->addWidget(climbGroup);
+    // ── Tab: Maps ────────────────────────────────────────────────────────
+    {
+        auto* page = new QWidget(tabs);
+        auto* vl   = new QVBoxLayout(page);
+        vl->setContentsMargins(12, 12, 12, 12);
 
-    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
-    layout->addWidget(buttons);
+        auto* mapsGroup = new QGroupBox("Maps", page);
+        auto* mapsForm  = new QFormLayout(mapsGroup);
+
+        auto* tileCacheCombo = new QComboBox(mapsGroup);
+        tileCacheCombo->addItem("128 tiles (~32 MB)",   128);
+        tileCacheCombo->addItem("256 tiles (~64 MB)",   256);
+        tileCacheCombo->addItem("512 tiles (~128 MB)",  512);
+        tileCacheCombo->addItem("1024 tiles (~256 MB)", 1024);
+        tileCacheCombo->addItem("2048 tiles (~512 MB)", 2048);
+        const int currentCacheSize = AppSettings::instance().tileCacheSize();
+        tileCacheCombo->setCurrentIndex(
+            tileCacheCombo->findData(currentCacheSize) >= 0
+            ? tileCacheCombo->findData(currentCacheSize) : 2);
+        mapsForm->addRow("Tile Memory Cache:", tileCacheCombo);
+
+        vl->addWidget(mapsGroup);
+        vl->addStretch(1);
+        tabs->addTab(page, "Maps");
+
+        dialog.setProperty("tileCacheCombo", QVariant::fromValue(static_cast<QObject*>(tileCacheCombo)));
+    }
+
+    // ── Tab: Climb Detection ─────────────────────────────────────────────
+    QDoubleSpinBox *csMinLen, *csMinGain, *csMinGrad, *csStGrad,
+                   *csDipM, *csDipD, *csSmooth;
+    {
+        auto* page = new QWidget(tabs);
+        auto* vl   = new QVBoxLayout(page);
+        vl->setContentsMargins(12, 12, 12, 12);
+
+        auto* climbGroup = new QGroupBox("Climb Detection Parameters", page);
+        auto* climbForm  = new QFormLayout(climbGroup);
+
+        QSettings cs("Fitlyzer", "FitlyzerC");
+        auto makeSpin = [&cs, climbGroup](
+            const QString& key, double defaultVal, double min, double max, int decimals,
+            const QString& suffix) -> QDoubleSpinBox*
+        {
+            auto* spin = new QDoubleSpinBox(climbGroup);
+            spin->setRange(min, max);
+            spin->setDecimals(decimals);
+            spin->setValue(cs.value(key, defaultVal).toDouble());
+            if (!suffix.isEmpty()) spin->setSuffix(suffix);
+            return spin;
+        };
+
+        csMinLen  = makeSpin("climb/minLength",   ClimbDefaults::kMinLength,   0.1,  20.0,   2, " km");
+        csMinGain = makeSpin("climb/minGain",     ClimbDefaults::kMinGain,     1.0,  2000.0, 0, " m");
+        csMinGrad = makeSpin("climb/minGradient", ClimbDefaults::kMinGradient, 0.5,  20.0,   1, " %");
+        csStGrad  = makeSpin("climb/startGrad",   ClimbDefaults::kStartGrad,   0.5,  20.0,   1, " %");
+        csDipM    = makeSpin("climb/dipMeters",   ClimbDefaults::kDipMeters,   0.0,  200.0,  1, " m");
+        csDipD    = makeSpin("climb/dipDistance", ClimbDefaults::kDipDistance, 10.0, 2000.0, 0, " m");
+        csSmooth  = makeSpin("climb/smoothing",   ClimbDefaults::kSmoothing,   1.0,  500.0,  0, "");
+
+        climbForm->addRow("Minimum Length:",   csMinLen);
+        climbForm->addRow("Minimum Gain:",     csMinGain);
+        climbForm->addRow("Avg Gradient:",     csMinGrad);
+        climbForm->addRow("Start Gradient:",   csStGrad);
+        climbForm->addRow("Dip Elevation:",    csDipM);
+        climbForm->addRow("Dip Distance:",     csDipD);
+        climbForm->addRow("Smoothing:",        csSmooth);
+
+        auto* restoreBtn = new QPushButton("Restore Defaults", climbGroup);
+        climbForm->addRow("", restoreBtn);
+        connect(restoreBtn, &QPushButton::clicked, this, [=]() {
+            csMinLen->setValue(ClimbDefaults::kMinLength);
+            csMinGain->setValue(ClimbDefaults::kMinGain);
+            csMinGrad->setValue(ClimbDefaults::kMinGradient);
+            csStGrad->setValue(ClimbDefaults::kStartGrad);
+            csDipM->setValue(ClimbDefaults::kDipMeters);
+            csDipD->setValue(ClimbDefaults::kDipDistance);
+            csSmooth->setValue(ClimbDefaults::kSmoothing);
+        });
+
+        vl->addWidget(climbGroup);
+        vl->addStretch(1);
+        tabs->addTab(page, "Climb Detection");
+    }
+
+    // ── Tab: Analysis (stub) ─────────────────────────────────────────────
+    {
+        auto* page  = new QWidget(tabs);
+        auto* vl    = new QVBoxLayout(page);
+        vl->setContentsMargins(12, 12, 12, 12);
+        auto* lbl   = new QLabel("Additional analysis preferences — coming soon.", page);
+        lbl->setStyleSheet("color: #64748b;");
+        lbl->setWordWrap(true);
+        vl->addWidget(lbl);
+        vl->addStretch(1);
+        tabs->addTab(page, "Analysis");
+    }
+
+    // ── Tab: Video (stub) ────────────────────────────────────────────────
+    {
+        auto* page = new QWidget(tabs);
+        auto* vl   = new QVBoxLayout(page);
+        vl->setContentsMargins(12, 12, 12, 12);
+        auto* lbl  = new QLabel("Video export defaults — coming soon.", page);
+        lbl->setStyleSheet("color: #64748b;");
+        lbl->setWordWrap(true);
+        vl->addWidget(lbl);
+        vl->addStretch(1);
+        tabs->addTab(page, "Video");
+    }
+
+    dlgLayout->addWidget(tabs, 1);
+
+    auto* buttons = new QDialogButtonBox(
+        QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    dlgLayout->addWidget(buttons);
 
     connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
@@ -168,21 +234,41 @@ void MainWindow::openSettingsDialog()
     if (dialog.exec() != QDialog::Accepted)
         return;
 
-    const DateFormat selectedFormat = static_cast<DateFormat>(dateFormatCombo->currentData().toInt());
-    if (selectedFormat == currentFormat)
-        return;
+    // Retrieve current values before we possibly changed them via combo boxes.
+    auto* dfCombo = qobject_cast<QComboBox*>(
+        dialog.property("dateFormatCombo").value<QObject*>());
+    auto* tcCombo = qobject_cast<QComboBox*>(
+        dialog.property("tileCacheCombo").value<QObject*>());
 
-    AppSettings::instance().setDateFormat(selectedFormat);
-
-    const int selectedCacheSize = tileCacheCombo->currentData().toInt();
-    if (selectedCacheSize != currentCacheSize)
+    // General: date format
+    const DateFormat previousFormat = AppSettings::instance().dateFormat();
+    if (dfCombo)
     {
-        AppSettings::instance().setTileCacheSize(selectedCacheSize);
-        if (m_mapRenderer)
-            m_mapRenderer->setTileCacheSize(selectedCacheSize);
+        const DateFormat selectedFormat =
+            static_cast<DateFormat>(dfCombo->currentData().toInt());
+        if (selectedFormat != previousFormat)
+        {
+            AppSettings::instance().setDateFormat(selectedFormat);
+            if (m_activityBrowser)
+                m_activityBrowser->refresh(m_currentAthleteId);
+            updateStatsLabel();
+        }
     }
 
-    // Apply climb detection settings and update the live spinboxes on ClimbsPage.
+    // Maps: tile cache size
+    if (tcCombo)
+    {
+        const int selectedCacheSize = tcCombo->currentData().toInt();
+        const int prevCacheSize = AppSettings::instance().tileCacheSize();
+        if (selectedCacheSize != prevCacheSize)
+        {
+            AppSettings::instance().setTileCacheSize(selectedCacheSize);
+            if (m_mapRenderer)
+                m_mapRenderer->setTileCacheSize(selectedCacheSize);
+        }
+    }
+
+    // Climb detection: persist and sync live spinboxes.
     QSettings cs("Fitlyzer", "FitlyzerC");
     cs.setValue("climb/minLength",   csMinLen->value());
     cs.setValue("climb/minGain",     csMinGain->value());
@@ -192,27 +278,18 @@ void MainWindow::openSettingsDialog()
     cs.setValue("climb/dipDistance", csDipD->value());
     cs.setValue("climb/smoothing",   csSmooth->value());
 
-    // Sync the live ClimbsPage spinboxes (they auto-trigger detection on change).
     auto applyIfChanged = [](QDoubleSpinBox* spin, double newVal)
     {
         if (spin && !qFuzzyCompare(spin->value(), newVal))
             spin->setValue(newVal);
     };
-    applyIfChanged(m_climbMinLengthSpin,    csMinLen->value());
-    applyIfChanged(m_climbMinGainSpin,      csMinGain->value());
-    applyIfChanged(m_climbMinGradientSpin,  csMinGrad->value());
+    applyIfChanged(m_climbMinLengthSpin,     csMinLen->value());
+    applyIfChanged(m_climbMinGainSpin,       csMinGain->value());
+    applyIfChanged(m_climbMinGradientSpin,   csMinGrad->value());
     applyIfChanged(m_climbStartGradientSpin, csStGrad->value());
-    applyIfChanged(m_climbDipMetersSpin,    csDipM->value());
-    applyIfChanged(m_climbDipDistanceSpin,  csDipD->value());
-    applyIfChanged(m_climbSmoothingSpin,    csSmooth->value());
-
-    if (selectedFormat == currentFormat)
-        return;
-
-    if (m_activityBrowser)
-        m_activityBrowser->refresh(m_currentAthleteId);
-
-    updateStatsLabel();
+    applyIfChanged(m_climbDipMetersSpin,     csDipM->value());
+    applyIfChanged(m_climbDipDistanceSpin,   csDipD->value());
+    applyIfChanged(m_climbSmoothingSpin,     csSmooth->value());
 }
 
 void MainWindow::backupDatabase()
