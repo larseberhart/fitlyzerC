@@ -110,7 +110,6 @@ void ChartController::setChartWidgets(
  */
 void ChartController::setAnalysisTabWidgets(
     QTabWidget* analysisTabWidget,
-    ColorLegendWidget* colorLegend,
     QStackedLayout* activityTabStack,
     QStackedLayout* zonesTabStack,
     QStackedLayout* histogramTabStack,
@@ -119,7 +118,6 @@ void ChartController::setAnalysisTabWidgets(
     QStackedLayout* fitnessTabStack)
 {
     m_analysisTabWidget = analysisTabWidget;
-    m_colorLegend = colorLegend;
     m_activityTabStack = activityTabStack;
     m_zonesTabStack = zonesTabStack;
     m_histogramTabStack = histogramTabStack;

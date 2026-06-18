@@ -15,7 +15,6 @@ class RideChartWidget;
 class PowerCurveWidget;
 class PowerHistogramWidget;
 class FitnessChartWidget;
-class ColorLegendWidget;
 class QTabWidget;
 class QStackedLayout;
 class QTableWidget;
@@ -58,7 +57,6 @@ public:
      */
     void setAnalysisTabWidgets(
         QTabWidget* analysisTabWidget,
-        ColorLegendWidget* colorLegend,
         QStackedLayout* activityTabStack,
         QStackedLayout* zonesTabStack,
         QStackedLayout* histogramTabStack,
@@ -232,7 +230,6 @@ private:
 
     // Analysis tab widgets
     QTabWidget* m_analysisTabWidget = nullptr;
-    ColorLegendWidget* m_colorLegend = nullptr;
     QStackedLayout* m_activityTabStack = nullptr;
     QStackedLayout* m_zonesTabStack = nullptr;
     QStackedLayout* m_histogramTabStack = nullptr;

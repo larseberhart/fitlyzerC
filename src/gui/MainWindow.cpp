@@ -375,7 +375,7 @@ MainWindow::MainWindow(QWidget* parent)
         m_powerChart, m_hrChart, m_cadenceChart, m_speedChart, m_altitudeChart,
         m_histogram, m_pdcWidget, m_fitnessChart);
     m_chartController->setAnalysisTabWidgets(
-        m_analysisTabWidget, nullptr,
+        m_analysisTabWidget,
         m_activityTabStack, m_zonesTabStack, m_histogramTabStack,
         m_powerCurveTabStack, m_calendarTabStack, m_fitnessTabStack);
     m_chartController->setZonesTable(m_zonesTable);
@@ -2592,7 +2592,6 @@ void MainWindow::syncChartContextToController(bool includeLegendLayout)
         includeLegendLayout ? m_colorLegendLayout : nullptr);
     m_chartController->setAnalysisTabWidgets(
         m_analysisTabWidget,
-        nullptr,
         m_activityTabStack,
         m_zonesTabStack,
         m_histogramTabStack,
