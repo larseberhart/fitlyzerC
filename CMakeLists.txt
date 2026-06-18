@@ -282,6 +282,8 @@ set(FITLYZERC_SOURCES
     "${CMAKE_SOURCE_DIR}/src/charts/RideChartWidget.h"
     "${CMAKE_SOURCE_DIR}/src/charts/data/RideChartDataBuilder.cpp"
     "${CMAKE_SOURCE_DIR}/src/charts/data/RideChartDataBuilder.h"
+    "${CMAKE_SOURCE_DIR}/src/charts/selection/RideChartSelectionManager.cpp"
+    "${CMAKE_SOURCE_DIR}/src/charts/selection/RideChartSelectionManager.h"
     "${CMAKE_SOURCE_DIR}/src/core/ActivityAnalysisFlags.h"
     "${CMAKE_SOURCE_DIR}/src/core/AnalysisVersions.h"
     "${CMAKE_SOURCE_DIR}/src/core/settings/AppSettings.cpp"
