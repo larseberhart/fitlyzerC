@@ -1689,25 +1689,6 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
 
 // ── Slots ─────────────────────────────────────────────────────────────────────
 
-void MainWindow::onActivityImported(int activityId)
-{
-    QSettings("Fitlyzer", "FitlyzerC").setValue("lastActivityId", activityId);
-    if (!m_firstLaunchCompleted)
-    {
-        m_firstLaunchCompleted = true;
-        QSettings("Fitlyzer", "FitlyzerC").setValue("firstLaunchCompleted", true);
-    }
-
-    if (m_activityBrowser)
-    {
-        m_activityBrowser->refresh(m_currentAthleteId);
-        m_tabWidget->setCurrentIndex(kTabActivities);
-    }
-
-    updateStatusBarInfo();
-    hideWelcomeScreen();
-}
-
 // athlete/settings shell methods moved to MainWindowAthlete.cpp
 
 // ── Update helpers ────────────────────────────────────────────────────────────

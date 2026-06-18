@@ -2,6 +2,7 @@
 
 #include "MainWindow.h"
 
+#include <QSettings>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QMessageBox>
@@ -10,6 +11,8 @@
 #include <QTimer>
 #include <QUrl>
 #include <QUuid>
+
+#include "ActivityBrowser.h"
 
 void MainWindow::importFiles(const QStringList& filePaths)
 {
@@ -171,4 +174,23 @@ void MainWindow::previewFitFile()
     QString err;
     if (!m_controller->loadFile(fileName, err))
         QMessageBox::critical(this, "Preview Failed", err);
+}
+
+void MainWindow::onActivityImported(int activityId)
+{
+    QSettings("Fitlyzer", "FitlyzerC").setValue("lastActivityId", activityId);
+    if (!m_firstLaunchCompleted)
+    {
+        m_firstLaunchCompleted = true;
+        QSettings("Fitlyzer", "FitlyzerC").setValue("firstLaunchCompleted", true);
+    }
+
+    if (m_activityBrowser)
+    {
+        m_activityBrowser->refresh(m_currentAthleteId);
+        m_tabWidget->setCurrentIndex(kTabActivities);
+    }
+
+    updateStatusBarInfo();
+    hideWelcomeScreen();
 }
