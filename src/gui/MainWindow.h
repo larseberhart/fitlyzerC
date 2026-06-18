@@ -134,7 +134,6 @@ private:
     void decreaseChartHeight();
     void applyChartHeight();
     void updateStatsLabel();
-    void applyChartSmoothing();
     void updateAnalysisEmptyStates();
     void updateIntervals();
     void updateClimbingTab();

@@ -829,7 +829,10 @@ void MainWindow::buildUI()
         {
             if (!m_powerSmoothingCombo)
                 return;
-            applyChartSmoothing();
+            if (!m_chartController)
+                return;
+            syncChartContextToController(false);
+            m_chartController->applyChartSmoothing();
         });
 
         connect(m_autoSmoothingCheck, &QCheckBox::toggled,
@@ -838,7 +841,10 @@ void MainWindow::buildUI()
             if (!m_powerSmoothingCombo)
                 return;
             m_powerSmoothingCombo->setEnabled(!checked);
-            applyChartSmoothing();
+            if (!m_chartController)
+                return;
+            syncChartContextToController(false);
+            m_chartController->applyChartSmoothing();
         });
 
         connect(m_chartPresetCombo,
@@ -3141,14 +3147,6 @@ void MainWindow::applyChartPreset(int presetId)
     m_chartController->updateZonesTab();
     if (m_mapRenderer)
         m_mapRenderer->setRideData(m_controller->rideData(), currentColorMetric(), buildColorContext());
-}
-
-void MainWindow::applyChartSmoothing()
-{
-    if (!m_chartController)
-        return;
-
-    m_chartController->applyChartSmoothing();
 }
 
 double MainWindow::estimatedFtpFromCurrentRide() const
