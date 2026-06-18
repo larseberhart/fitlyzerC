@@ -323,6 +323,8 @@ set(FITLYZERC_SOURCES
     "${CMAKE_SOURCE_DIR}/src/database/DatabaseConnectionGuard.h"
     "${CMAKE_SOURCE_DIR}/src/database/DatabaseManager.cpp"
     "${CMAKE_SOURCE_DIR}/src/database/DatabaseManager.h"
+    "${CMAKE_SOURCE_DIR}/src/database/migrations/DatabaseMigrationManager.cpp"
+    "${CMAKE_SOURCE_DIR}/src/database/migrations/DatabaseMigrationManager.h"
     "${CMAKE_SOURCE_DIR}/src/database/DatabaseSchema.cpp"
     "${CMAKE_SOURCE_DIR}/src/database/DatabaseSchema.h"
     "${CMAKE_SOURCE_DIR}/src/database/ImportRepository.cpp"
