@@ -15,6 +15,7 @@
 #include <algorithm>
 
 #include "maps/cache/DiskTileCache.h"
+#include "maps/network/TileDownloader.h"
 #include "maps/providers/TileProviderRegistry.h"
 
 namespace
@@ -215,13 +216,8 @@ QPixmap TileCache::tileBlocking(int z, int x, int y, bool allowNetwork)
     if (!allowNetwork)
         return {};
 
-    QString urlStr = m_provider.urlTemplate;
-    urlStr.replace("{z}", QString::number(z));
-    urlStr.replace("{x}", QString::number(x));
-    urlStr.replace("{y}", QString::number(y));
-
     QNetworkAccessManager nam;
-    QNetworkRequest req{ QUrl(urlStr) };
+    QNetworkRequest req = TileDownloader::buildRequest(m_provider.urlTemplate, z, x, y);
     req.setHeader(QNetworkRequest::UserAgentHeader, "FitlyzerC/1.0");
     req.setAttribute(
         QNetworkRequest::RedirectPolicyAttribute,
@@ -255,12 +251,7 @@ void TileCache::dispatchNextDownloads()
     {
         const TileRequest req = m_downloadQueue.dequeue();
 
-        QString urlStr = m_provider.urlTemplate;
-        urlStr.replace("{z}", QString::number(req.z));
-        urlStr.replace("{x}", QString::number(req.x));
-        urlStr.replace("{y}", QString::number(req.y));
-
-        QNetworkRequest netReq{QUrl(urlStr)};
+        QNetworkRequest netReq = TileDownloader::buildRequest(m_provider.urlTemplate, req.z, req.x, req.y);
         netReq.setHeader(QNetworkRequest::UserAgentHeader, "FitlyzerC/1.0");
         netReq.setAttribute(
             QNetworkRequest::RedirectPolicyAttribute,
