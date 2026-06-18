@@ -1605,8 +1605,7 @@ void MainWindow::buildUI()
             [this](int)
     {
         if (m_chartController)
-            applyChartControlDrivenUpdates(true, false);
-        refreshMapRideDataFromCurrentState();
+            applyChartAndMapUpdates(true, false);
     });
 
     resize(1050, 860);
@@ -2631,6 +2630,12 @@ void MainWindow::applyChartControlDrivenUpdates(bool includeLegendLayout, bool a
     m_chartController->updateZonesTab();
 }
 
+void MainWindow::applyChartAndMapUpdates(bool includeLegendLayout, bool applySmoothing)
+{
+    applyChartControlDrivenUpdates(includeLegendLayout, applySmoothing);
+    refreshMapRideDataFromCurrentState();
+}
+
 void MainWindow::updateChartAnalysisEmptyStates()
 {
     if (!m_chartController)
@@ -3153,8 +3158,7 @@ void MainWindow::applyChartPreset(int presetId)
     }
 
     m_powerSmoothingCombo->setEnabled(!m_autoSmoothingCheck->isChecked());
-    applyChartControlDrivenUpdates(true, true);
-    refreshMapRideDataFromCurrentState();
+    applyChartAndMapUpdates(true, true);
 }
 
 double MainWindow::estimatedFtpFromCurrentRide() const
