@@ -51,6 +51,7 @@ class QMimeData;
 class QPoint;
 class QTimer;
 class QChartView;
+class NavigationSidebar;
 
 /**
  * @brief Main application window.
@@ -231,6 +232,7 @@ private:
     class MapController* m_mapController = nullptr;
     class ImportController* m_importController = nullptr;
     class NavigationController* m_navigationController = nullptr;
+    NavigationSidebar* m_navigationSidebar = nullptr;
     class MainWindowActions* m_actionsManager = nullptr;
 
     // -- Database -----------------------------------------------------------

@@ -71,6 +71,7 @@
 #include "EditActivityDialog.h"
 #include "ImportStatusWidget.h"
 #include "IntervalEditorDialog.h"
+#include "NavigationSidebar.h"
 #include "WelcomeWidget.h"
 #include "controllers/ActivityViewController.h"
 #include "controllers/ChartController.h"
@@ -362,7 +363,8 @@ MainWindow::MainWindow(QWidget* parent)
     m_navigationController = new NavigationController(this);
     m_navigationController->setMainTabWidget(m_tabWidget);
     m_navigationController->setAnalysisTabWidget(m_analysisTabWidget);
-    m_navigationController->setNavigationSidebar(nullptr); // TODO: wire sidebar when available
+    m_navigationSidebar = new NavigationSidebar(this);
+    m_navigationController->setNavigationSidebar(m_navigationSidebar);
 
     m_activityViewController = new ActivityViewController(m_controller, &m_dbManager, this);
     m_activityViewController->setAthleteHeaderWidget(m_athleteHeader);
