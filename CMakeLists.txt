@@ -427,6 +427,8 @@ set(FITLYZERC_SOURCES
         "${CMAKE_SOURCE_DIR}/src/video/encoding/VideoEncoder.h"
     "${CMAKE_SOURCE_DIR}/src/video/overlay/OverlayRenderer.cpp"
     "${CMAKE_SOURCE_DIR}/src/video/overlay/OverlayRenderer.h"
+    "${CMAKE_SOURCE_DIR}/src/video/rendering/VideoRenderer.cpp"
+    "${CMAKE_SOURCE_DIR}/src/video/rendering/VideoRenderer.h"
     "${CMAKE_SOURCE_DIR}/src/video/VideoTileProvider.cpp"
     "${CMAKE_SOURCE_DIR}/src/video/VideoTileProvider.h"
 )
