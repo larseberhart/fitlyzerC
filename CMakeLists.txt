@@ -371,6 +371,7 @@ set(FITLYZERC_SOURCES
     "${CMAKE_SOURCE_DIR}/src/gui/MainWindowChartActions.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/MainWindowClimbInteractions.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/MainWindowDatabase.cpp"
+        "${CMAKE_SOURCE_DIR}/src/gui/MainWindowContext.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/MainWindowDetection.cpp"
         "${CMAKE_SOURCE_DIR}/src/gui/MainWindowImport.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/MainWindowIntervals.cpp"
