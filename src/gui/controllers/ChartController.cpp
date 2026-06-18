@@ -383,7 +383,22 @@ void ChartController::updateAnalysisEmptyStates()
  */
 void ChartController::syncChartZoom()
 {
-    // TODO: Extract chart zoom sync from MainWindow
+    const std::initializer_list<RideChartWidget*> all =
+        { m_powerChart, m_hrChart, m_cadenceChart, m_speedChart, m_altitudeChart };
+
+    for (auto* src : all)
+    {
+        if (!src)
+            continue;
+        for (auto* dst : all)
+        {
+            if (!dst || src == dst)
+                continue;
+            connect(src, &RideChartWidget::xRangeChanged,
+                    dst, &RideChartWidget::setXRange,
+                    Qt::UniqueConnection);
+        }
+    }
 }
 
 /**
@@ -391,7 +406,22 @@ void ChartController::syncChartZoom()
  */
 void ChartController::syncChartCrosshair()
 {
-    // TODO: Extract crosshair sync from MainWindow
+    const std::initializer_list<RideChartWidget*> all =
+        { m_powerChart, m_hrChart, m_cadenceChart, m_speedChart, m_altitudeChart };
+
+    for (auto* src : all)
+    {
+        if (!src)
+            continue;
+        for (auto* dst : all)
+        {
+            if (!dst || src == dst)
+                continue;
+            connect(src, &RideChartWidget::crosshairMoved,
+                    dst, &RideChartWidget::setCrosshair,
+                    Qt::UniqueConnection);
+        }
+    }
 }
 
 /**
@@ -399,7 +429,8 @@ void ChartController::syncChartCrosshair()
  */
 void ChartController::connectChartSignals()
 {
-    // TODO: Extract signal connections from MainWindow buildUI
+    syncChartZoom();
+    syncChartCrosshair();
 }
 
 /**

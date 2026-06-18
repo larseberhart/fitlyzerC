@@ -1059,21 +1059,8 @@ void MainWindow::buildUI()
         makeVisToggle(m_showSpeed,    m_speedChart);
         makeVisToggle(m_showAltitude, m_altitudeChart);
 
-        // X-zoom sync
         const std::initializer_list<RideChartWidget*> all =
             { m_powerChart, m_hrChart, m_cadenceChart, m_speedChart, m_altitudeChart };
-        for (auto* src : all)
-            for (auto* dst : all)
-                if (src != dst)
-                    connect(src, &RideChartWidget::xRangeChanged,
-                            dst, &RideChartWidget::setXRange);
-
-        // Crosshair sync
-        for (auto* src : all)
-            for (auto* dst : all)
-                if (src != dst)
-                    connect(src, &RideChartWidget::crosshairMoved,
-                            dst, &RideChartWidget::setCrosshair);
 
         for (auto* src : all)
         {
