@@ -159,6 +159,8 @@ private:
     void updateIntervalRowStyles();
     void updateIntervalSummary(double startSeconds, double endSeconds);
     void clearIntervalSummary();
+    void updateLapsSummaryFromCurrentActivity();
+    void updateActivityNotesFromCurrentActivity();
     bool ensureDatabase();
     bool ensureAthlete();
 

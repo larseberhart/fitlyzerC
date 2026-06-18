@@ -3513,43 +3513,52 @@ void MainWindow::updateIntervals()
     else
         clearIntervalSummary();
 
-    if (m_lapsTable)
-    {
-        m_lapsTable->setRowCount(1);
-        m_lapsTable->setItem(0, 0, new QTableWidgetItem("1"));
-        m_lapsTable->setItem(0, 1, new QTableWidgetItem("0:00"));
-        m_lapsTable->setItem(0, 2, new QTableWidgetItem(fmtDur(m_controller->statistics().durationSeconds)));
-        m_lapsTable->resizeColumnsToContents();
-    }
+    updateLapsSummaryFromCurrentActivity();
+    updateActivityNotesFromCurrentActivity();
+}
 
-    if (m_activityNotesView && m_dbManager.isOpen() && m_controller->currentActivityId() > 0)
-    {
-        auto db = m_dbManager.database();
-        ActivityRepository repo(db);
-        const Activity activity = repo.getActivity(m_controller->currentActivityId());
+void MainWindow::updateLapsSummaryFromCurrentActivity()
+{
+    if (!m_lapsTable)
+        return;
 
-        const QDateTime activityDateUtc = QDateTime::fromString(activity.startTime, Qt::ISODate);
-        const QDateTime importDateUtc = QDateTime::fromString(activity.importedAt, Qt::ISODate);
-        const QString activityDateText = activityDateUtc.isValid()
-            ? DateFormatter::formatDateTime(activityDateUtc.toLocalTime())
-            : QStringLiteral("-");
-        const QString importDateText = importDateUtc.isValid()
-            ? DateFormatter::formatDateTime(importDateUtc.toLocalTime())
-            : QStringLiteral("-");
+    m_lapsTable->setRowCount(1);
+    m_lapsTable->setItem(0, 0, new QTableWidgetItem("1"));
+    m_lapsTable->setItem(0, 1, new QTableWidgetItem("0:00"));
+    m_lapsTable->setItem(0, 2, new QTableWidgetItem(fmtDur(m_controller->statistics().durationSeconds)));
+    m_lapsTable->resizeColumnsToContents();
+}
 
-        m_activityNotesView->setPlainText(
-            QString("Activity Date: %1\nImported: %2\n\nNotes:\n%3\n\nWeather: %4\nTemperature: %5 C\nRPE: %6\nFatigue: %7\nSleep: %8 h\nBike: %9\nEquipment: %10")
-                .arg(activityDateText)
-                .arg(importDateText)
-                .arg(activity.notes)
-                .arg(activity.weather)
-                .arg(activity.temperature, 0, 'f', 1)
-                .arg(activity.rpe)
-                .arg(activity.fatigue)
-                .arg(activity.sleepHours, 0, 'f', 1)
-                .arg(activity.bike)
-                .arg(activity.equipment));
-    }
+void MainWindow::updateActivityNotesFromCurrentActivity()
+{
+    if (!m_activityNotesView || !m_dbManager.isOpen() || m_controller->currentActivityId() <= 0)
+        return;
+
+    auto db = m_dbManager.database();
+    ActivityRepository repo(db);
+    const Activity activity = repo.getActivity(m_controller->currentActivityId());
+
+    const QDateTime activityDateUtc = QDateTime::fromString(activity.startTime, Qt::ISODate);
+    const QDateTime importDateUtc = QDateTime::fromString(activity.importedAt, Qt::ISODate);
+    const QString activityDateText = activityDateUtc.isValid()
+        ? DateFormatter::formatDateTime(activityDateUtc.toLocalTime())
+        : QStringLiteral("-");
+    const QString importDateText = importDateUtc.isValid()
+        ? DateFormatter::formatDateTime(importDateUtc.toLocalTime())
+        : QStringLiteral("-");
+
+    m_activityNotesView->setPlainText(
+        QString("Activity Date: %1\nImported: %2\n\nNotes:\n%3\n\nWeather: %4\nTemperature: %5 C\nRPE: %6\nFatigue: %7\nSleep: %8 h\nBike: %9\nEquipment: %10")
+            .arg(activityDateText)
+            .arg(importDateText)
+            .arg(activity.notes)
+            .arg(activity.weather)
+            .arg(activity.temperature, 0, 'f', 1)
+            .arg(activity.rpe)
+            .arg(activity.fatigue)
+            .arg(activity.sleepHours, 0, 'f', 1)
+            .arg(activity.bike)
+            .arg(activity.equipment));
 }
 
 void MainWindow::updateClimbingTab()
