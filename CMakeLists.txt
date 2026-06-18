@@ -354,6 +354,8 @@ set(FITLYZERC_SOURCES
     "${CMAKE_SOURCE_DIR}/src/gui/controllers/ChartController.h"
     "${CMAKE_SOURCE_DIR}/src/gui/controllers/ImportController.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/controllers/ImportController.h"
+    "${CMAKE_SOURCE_DIR}/src/gui/controllers/MainWindowActions.cpp"
+    "${CMAKE_SOURCE_DIR}/src/gui/controllers/MainWindowActions.h"
     "${CMAKE_SOURCE_DIR}/src/gui/controllers/MapController.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/controllers/MapController.h"
     "${CMAKE_SOURCE_DIR}/src/gui/controllers/NavigationController.cpp"
