@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3
 
-
 #pragma once
 
 #include <QWidget>
@@ -9,10 +8,17 @@ class QLabel;
 class QPushButton;
 
 /**
- * @brief Welcome screen for first-time users.
+ * @brief Dashboard welcome screen shown when no database is open or no
+ *        activities exist.
  *
- * Provides quick action buttons for creating database, opening existing,
- * or importing activities.
+ * Layout:
+ *   - App title and subtitle
+ *   - Two-column row:
+ *       Left:  Quick Actions (Import / Open / Create)
+ *       Right: Recent Activities (placeholder — populated in a future update)
+ *   - Sync Status section (Garmin Connect / Strava — coming in a future update)
+ *
+ * The widget is hidden once the user has a database open with activities.
  */
 class WelcomeWidget : public QWidget
 {
@@ -20,30 +26,30 @@ class WelcomeWidget : public QWidget
 
 public:
     /**
-     * @brief Constructs welcome widget.
+     * @brief Constructs the welcome dashboard.
      * @param parent Parent widget.
      */
     explicit WelcomeWidget(QWidget* parent = nullptr);
 
     /**
-     * @brief Sets first launch mode.
-     * @param firstLaunch True to show first-launch UI.
+     * @brief Switches the subtitle between first-launch and empty-database messages.
+     * @param firstLaunch True = first-launch text; false = empty-database text.
      */
     void setFirstLaunch(bool firstLaunch);
 
 signals:
-    /// \signal Emitted when user requests activity import.
+    /// @brief Emitted when the user clicks Import FIT Files.
     void importRequested();
 
-    /// \signal Emitted when user requests to open existing database.
+    /// @brief Emitted when the user clicks Open Database.
     void openDatabaseRequested();
 
-    /// \signal Emitted when user requests to create new database.
+    /// @brief Emitted when the user clicks Create Database.
     void createDatabaseRequested();
 
 private:
-    QLabel* m_subtitleLabel = nullptr;
-    QPushButton* m_importButton = nullptr;
-    QPushButton* m_openDbButton = nullptr;
+    QLabel*      m_subtitleLabel  = nullptr;
+    QPushButton* m_importButton   = nullptr;
+    QPushButton* m_openDbButton   = nullptr;
     QPushButton* m_createDbButton = nullptr;
 };
