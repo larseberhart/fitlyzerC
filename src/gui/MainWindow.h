@@ -291,6 +291,17 @@ private:
     // The sidebar and NavigationController keep them in sync.
     QStackedWidget* m_pageStack = nullptr;
 
+    // Intermediate content widgets assembled in buildUI() and handed off to
+    // the page widgets that are added to m_pageStack.
+    QWidget* m_chartsPageContent    = nullptr; ///< Charts+map+intervals content
+    QWidget* m_zonesPageContent     = nullptr; ///< Zones (Power page sub-tab)
+    QWidget* m_histogramPageContent = nullptr; ///< Histogram (Power page sub-tab)
+    QWidget* m_pdcPageContent       = nullptr; ///< Power Curve (Power page sub-tab)
+    QWidget* m_calendarPageContent  = nullptr; ///< Calendar content
+    QWidget* m_fitnessPageContent   = nullptr; ///< Fitness chart content
+    QWidget* m_climbsPageContent    = nullptr; ///< Climb charts + table content
+    QWidget* m_climbParamsBar       = nullptr; ///< Climb detection params bar (ClimbsPage)
+
     // -- Legacy tab widgets (kept during incremental migration) ------------
     // TODO(phase2): Remove once all page content has been moved into
     //               dedicated page widgets under m_pageStack.

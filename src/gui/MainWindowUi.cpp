@@ -40,9 +40,6 @@ void MainWindow::buildToolbar()
     {
         if (m_navigationSidebar)
             m_navigationSidebar->setCurrentPage(NavigationSidebar::Page::Calendar);
-        // Bridge: also switch the underlying tabs during the Phase 1 transition.
-        if (m_tabWidget) m_tabWidget->setCurrentIndex(kTabAnalysis);
-        if (m_analysisTabWidget) m_analysisTabWidget->setCurrentIndex(kAnalysisTabCalendar);
     });
     tb->addAction(calendarAct);
 
@@ -52,9 +49,6 @@ void MainWindow::buildToolbar()
     {
         if (m_navigationSidebar)
             m_navigationSidebar->setCurrentPage(NavigationSidebar::Page::Activities);
-        // Bridge: also switch the underlying tab during the Phase 1 transition.
-        if (m_tabWidget)
-            m_tabWidget->setCurrentIndex(kTabActivities);
         if (m_activityBrowser)
             m_activityBrowser->focusSearch();
     });

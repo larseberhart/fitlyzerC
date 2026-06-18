@@ -47,6 +47,13 @@
 #include "IntervalEditorDialog.h"
 #include "NavigationSidebar.h"
 #include "WelcomeWidget.h"
+#include "pages/ActivitiesPage.h"
+#include "pages/CalendarPage.h"
+#include "pages/ChartsPage.h"
+#include "pages/ClimbsPage.h"
+#include "pages/FitnessPage.h"
+#include "pages/PlaceholderPage.h"
+#include "pages/PowerPage.h"
 #include "analysis/IntervalDetector.h"
 #include "charts/FitnessChartWidget.h"
 #include "charts/PowerCurveWidget.h"
@@ -188,14 +195,7 @@ void MainWindow::buildUI()
     connect(m_welcomeWidget, &WelcomeWidget::openDatabaseRequested, this, &MainWindow::openDatabase);
     connect(m_welcomeWidget, &WelcomeWidget::createDatabaseRequested, this, &MainWindow::createDatabase);
 
-    m_tabWidget = new QTabWidget;
-    m_analysisTabWidget = new QTabWidget;
-
-    auto* analysisContainer = new QWidget(this);
-    auto* analysisLayout = new QVBoxLayout(analysisContainer);
-    analysisLayout->setContentsMargins(0, 0, 0, 0);
-    analysisLayout->setSpacing(6);
-
+    // Color-by metric control bar — placed at the top of ChartsPage.
     auto* colorBar = new QHBoxLayout;
     colorBar->setContentsMargins(0, 0, 0, 0);
     colorBar->addWidget(new QLabel("Color By:"));
@@ -215,11 +215,9 @@ void MainWindow::buildUI()
         m_colorMetricCombo->findData(static_cast<int>(ColorMetric::Power)));
     colorBar->addWidget(m_colorMetricCombo);
     colorBar->addStretch(1);
-    analysisLayout->addLayout(colorBar);
 
     {
         m_activityBrowser = new ActivityBrowser(&m_dbManager, this);
-        m_tabWidget->addTab(m_activityBrowser, "Activities");
 
         connect(m_activityBrowser, &ActivityBrowser::activitySelected,
                 this, [this](int activityId)
@@ -230,13 +228,10 @@ void MainWindow::buildUI()
             else
             {
                 QSettings("Fitlyzer", "FitlyzerC").setValue("lastActivityId", activityId);
-                // Navigate to the Charts page via the sidebar (keeps sidebar in sync).
+                // Navigate to Charts page — the sidebar and NavigationController
+                // keep the page stack in sync.
                 if (m_navigationSidebar)
                     m_navigationSidebar->setCurrentPage(NavigationSidebar::Page::Charts);
-                // Bridge: also switch the underlying tabs during the Phase 1 transition.
-                if (m_tabWidget) m_tabWidget->setCurrentIndex(kTabAnalysis);
-                if (m_analysisTabWidget)
-                    m_analysisTabWidget->setCurrentIndex(kAnalysisTabCharts);
             }
         });
 
@@ -410,11 +405,12 @@ void MainWindow::buildUI()
         chartsVL->setSpacing(4);
         chartsVL->addLayout(ctrlBar);
 
-        m_colorLegendWidget = new QWidget(chartsTab);
+        // m_colorLegendWidget is placed in the Charts page header bar (colorBarWidget),
+        // not inline in chartsTab, so it must not be reparented here.
+        m_colorLegendWidget = new QWidget(this);
         m_colorLegendLayout = new QHBoxLayout(m_colorLegendWidget);
         m_colorLegendLayout->setContentsMargins(0, 0, 0, 0);
         m_colorLegendLayout->setSpacing(8);
-        chartsVL->addWidget(m_colorLegendWidget);
         m_mapRenderer = new MapRenderer;
 
         auto* mapPanel = new QWidget(chartsTab);
@@ -563,9 +559,9 @@ void MainWindow::buildUI()
 
         chartsVL->addWidget(activitySplit, 1);
 
-        m_analysisTabWidget->addTab(
-            wrapWithNoActivityState(chartsTab, &m_activityTabStack),
-            "Activity");
+        // Wrap the charts/map/intervals content in an empty-state guard.
+        // The resulting widget becomes the content area of ChartsPage.
+        m_chartsPageContent = wrapWithNoActivityState(chartsTab, &m_activityTabStack);
 
         auto makeVisToggle = [this](QCheckBox* cb, RideChartWidget* chart)
         {
@@ -767,39 +763,34 @@ void MainWindow::buildUI()
         auto* w = new QWidget;
         auto* vl = new QVBoxLayout(w);
         vl->addWidget(m_zonesTable);
-        m_analysisTabWidget->addTab(
-            wrapWithNoActivityState(w, &m_zonesTabStack),
-            "Zones");
+        // Store wrapped zones widget for the Power page.
+        m_zonesPageContent = wrapWithNoActivityState(w, &m_zonesTabStack);
     }
 
     {
         m_histogram = new PowerHistogramWidget;
-        m_analysisTabWidget->addTab(
-            wrapWithNoActivityState(m_histogram, &m_histogramTabStack),
-            "Histogram");
+        // Store wrapped histogram widget for the Power page.
+        m_histogramPageContent = wrapWithNoActivityState(m_histogram, &m_histogramTabStack);
     }
 
     {
         m_pdcWidget = new PowerCurveWidget;
-        m_analysisTabWidget->addTab(
-            wrapWithNoActivityState(m_pdcWidget, &m_powerCurveTabStack),
-            "Power Curve");
+        // Store wrapped power-curve widget for the Power page.
+        m_pdcPageContent = wrapWithNoActivityState(m_pdcWidget, &m_powerCurveTabStack);
     }
 
     {
         m_calendarWidget = new CalendarWidget(this);
         m_calendarWidget->setDatabaseManager(&m_dbManager);
         m_calendarWidget->setAthleteId(m_currentAthleteId);
-        m_analysisTabWidget->addTab(
-            wrapWithNoActivityState(m_calendarWidget, &m_calendarTabStack),
-            "Calendar");
+        // Store wrapped calendar widget for CalendarPage.
+        m_calendarPageContent = wrapWithNoActivityState(m_calendarWidget, &m_calendarTabStack);
     }
 
     {
         m_fitnessChart = new FitnessChartWidget(this);
-        m_analysisTabWidget->addTab(
-            wrapWithNoActivityState(m_fitnessChart, &m_fitnessTabStack),
-            "Fitness");
+        // Store wrapped fitness chart for FitnessPage.
+        m_fitnessPageContent = wrapWithNoActivityState(m_fitnessChart, &m_fitnessTabStack);
     }
 
     {
@@ -930,8 +921,10 @@ void MainWindow::buildUI()
         m_climbOverlayMetricCombo->setCurrentIndex(0);
         m_climbOverlayMetricCombo->setEnabled(false);
 
-        auto* climbParamsInline = new QWidget(analysisContainer);
-        auto* climbParamsHL = new QHBoxLayout(climbParamsInline);
+        // Climb detection parameters bar — belongs to ClimbsPage, not the
+        // Charts color bar.  Will move to Settings in Phase 11.
+        m_climbParamsBar = new QWidget(this);
+        auto* climbParamsHL = new QHBoxLayout(m_climbParamsBar);
         climbParamsHL->setContentsMargins(0, 0, 0, 0);
         climbParamsHL->setSpacing(4);
 
@@ -953,9 +946,6 @@ void MainWindow::buildUI()
         addParam("DipM", m_climbDipMetersSpin);
         addParam("DipDist", m_climbDipDistanceSpin);
         addParam("Smooth", m_climbSmoothingSpin);
-
-        colorBar->insertSpacing(2, 12);
-        colorBar->insertWidget(3, climbParamsInline);
 
         m_climbsTable = new QTableWidget(0, 19, climbingTab);
         m_climbsTable->setHorizontalHeaderLabels(
@@ -1088,28 +1078,59 @@ void MainWindow::buildUI()
 
         updateClimbQuarterCharts(nullptr);
 
-        m_analysisTabWidget->addTab(
-            wrapWithNoActivityState(climbingTab, &m_climbingTabStack),
-            "Climbing");
+        // Wrap the climbing content in an empty-state guard for ClimbsPage.
+        m_climbsPageContent = wrapWithNoActivityState(climbingTab, &m_climbingTabStack);
     }
 
     updateChartAnalysisEmptyStates();
 
-    analysisLayout->addWidget(m_analysisTabWidget, 1);
-    m_tabWidget->addTab(analysisContainer, "Analysis");
-
-    // ── Navigation sidebar + page stack ─────────────────────────────────────
-    // The sidebar drives top-level navigation.  During the Phase 1 → Phase 2
-    // transition the old QTabWidget is wrapped as a single "page" in the stack.
-    // Each navigation item drives tab-switching via a bridge connection wired
-    // in the MainWindow constructor.  The stack will be expanded to one widget
-    // per page once content is migrated in Phase 2.
+    // ── Assemble the page stack ──────────────────────────────────────────────
+    // Each entry at index N matches NavigationSidebar::Page enum value N.
+    // Pages that are not yet fully migrated use PlaceholderPage.
 
     m_navigationSidebar = new NavigationSidebar(central);
-
     m_pageStack = new QStackedWidget(central);
-    m_pageStack->addWidget(m_tabWidget);   // temporary single page during migration
 
+    // [0] Activities
+    m_pageStack->addWidget(new ActivitiesPage(m_activityBrowser, m_pageStack));
+
+    // [1] Charts — ride charts, map, intervals, laps, and notes
+    {
+        // Assemble a header widget containing the Color By control and the
+        // color-legend strip.  This becomes ChartsPage's top bar.
+        auto* chartsColorBar = new QWidget;
+        auto* chartsColorBarHL = new QHBoxLayout(chartsColorBar);
+        chartsColorBarHL->setContentsMargins(0, 0, 0, 0);
+        chartsColorBarHL->addLayout(colorBar);
+        chartsColorBarHL->addWidget(m_colorLegendWidget);
+        m_pageStack->addWidget(new ChartsPage(chartsColorBar, m_chartsPageContent, m_pageStack));
+    }
+
+    // [2] Power — Zones, Histogram, Power Curve (sub-tabbed)
+    {
+        m_analysisTabWidget = new QTabWidget(m_pageStack);
+        m_analysisTabWidget->addTab(m_zonesPageContent,     "Zones");
+        m_analysisTabWidget->addTab(m_histogramPageContent, "Histogram");
+        m_analysisTabWidget->addTab(m_pdcPageContent,       "Power Curve");
+        m_pageStack->addWidget(new PowerPage(m_analysisTabWidget, m_pageStack));
+    }
+
+    // [3] Intervals — placeholder (Phase 6)
+    m_pageStack->addWidget(new PlaceholderPage("Intervals — coming in Phase 6", m_pageStack));
+
+    // [4] Climbs — climb charts + climbs table + detection params bar
+    m_pageStack->addWidget(new ClimbsPage(m_climbParamsBar, m_climbsPageContent, m_pageStack));
+
+    // [5] Fitness — CTL/ATL/TSB and FTP history
+    m_pageStack->addWidget(new FitnessPage(m_fitnessChart, m_pageStack));
+
+    // [6] Calendar — activity and workout planning
+    m_pageStack->addWidget(new CalendarPage(m_calendarWidget, m_pageStack));
+
+    // [7] Video — placeholder (Phase 10)
+    m_pageStack->addWidget(new PlaceholderPage("Video — coming in Phase 10", m_pageStack));
+
+    // Sidebar (fixed width, left) | page stack (stretching, right)
     auto* contentRow = new QHBoxLayout;
     contentRow->setContentsMargins(0, 0, 0, 0);
     contentRow->setSpacing(0);

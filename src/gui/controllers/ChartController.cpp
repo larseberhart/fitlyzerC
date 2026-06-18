@@ -522,7 +522,11 @@ void ChartController::setColorContext(const ColorContext& colorContext)
 }
 
 /**
- * @brief Updates zone availability display.
+ * @brief Updates zone/power sub-tab availability based on loaded activity data.
+ *
+ * m_analysisTabWidget is now the Power page's sub-tab widget with three tabs:
+ *   [0] Zones, [1] Histogram, [2] Power Curve.
+ * Calendar and Fitness are top-level pages and are always accessible.
  */
 void ChartController::updateZoneAvailability()
 {
@@ -534,12 +538,11 @@ void ChartController::updateZoneAvailability()
     const bool hasSelectedMetric = m_controller
         && ZoneCalculator::hasMetricSamples(m_controller->rideData(), metric);
 
-    m_analysisTabWidget->setTabEnabled(1,
+    // Power page sub-tabs: [0] Zones, [1] Histogram, [2] Power Curve
+    m_analysisTabWidget->setTabEnabled(0,
         metric != ColorMetric::None && hasSelectedMetric);
+    m_analysisTabWidget->setTabEnabled(1, hasPower);
     m_analysisTabWidget->setTabEnabled(2, hasPower);
-    m_analysisTabWidget->setTabEnabled(3, hasPower);
-    m_analysisTabWidget->setTabEnabled(4, true);
-    m_analysisTabWidget->setTabEnabled(5, true);
 }
 
 /**
