@@ -200,6 +200,9 @@ private:
     /// @brief Applies controller chart updates based on current UI control state.
     void applyChartControlDrivenUpdates(bool includeLegendLayout, bool applySmoothing = false);
 
+    /// @brief Updates analysis tab empty-state visibility through ChartController.
+    void updateChartAnalysisEmptyStates();
+
     /// @brief Refreshes map route coloring based on current ride data and metric.
     void refreshMapRideDataFromCurrentState();
 

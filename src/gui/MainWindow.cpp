@@ -1588,11 +1588,7 @@ void MainWindow::buildUI()
             "Climbing");
     }
 
-    if (m_chartController)
-    {
-        syncChartContextToController(false);
-        m_chartController->updateAnalysisEmptyStates();
-    }
+    updateChartAnalysisEmptyStates();
 
     analysisLayout->addWidget(m_analysisTabWidget, 1);
     m_tabWidget->addTab(analysisContainer, "Analysis");
@@ -2635,6 +2631,15 @@ void MainWindow::applyChartControlDrivenUpdates(bool includeLegendLayout, bool a
     m_chartController->updateZonesTab();
 }
 
+void MainWindow::updateChartAnalysisEmptyStates()
+{
+    if (!m_chartController)
+        return;
+
+    syncChartContextToController(false);
+    m_chartController->updateAnalysisEmptyStates();
+}
+
 void MainWindow::refreshMapRideDataFromCurrentState()
 {
     if (!m_mapRenderer)
@@ -3011,11 +3016,7 @@ void MainWindow::onAthleteSelectionChanged(int index)
         m_activityBrowser->refresh(m_currentAthleteId);
     if (m_calendarWidget)
         m_calendarWidget->setAthleteId(m_currentAthleteId);
-    if (m_chartController)
-    {
-        syncChartContextToController(false);
-        m_chartController->updateAnalysisEmptyStates();
-    }
+    updateChartAnalysisEmptyStates();
     updateImportAvailability();
     updateStatsLabel();
     updateStatusBarInfo();
@@ -3025,11 +3026,7 @@ void MainWindow::onAthleteSelectionChanged(int index)
 void MainWindow::onWorkoutLoaded()
 {
     updateStatsLabel();
-    if (m_chartController)
-    {
-        syncChartContextToController(false);
-        m_chartController->updateAnalysisEmptyStates();
-    }
+    updateChartAnalysisEmptyStates();
 
     const bool hasPower = m_controller->statistics().maximumPower > 0.0;
     if (m_chartController)
