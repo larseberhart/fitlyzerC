@@ -263,8 +263,9 @@ void ChartController::updateCharts()
  */
 void ChartController::refreshCharts()
 {
-    // TODO: Extract chart refresh logic from MainWindow
-    emit chartsUpdated();
+    updateCharts();
+    updateColorLegend();
+    updateZoneAvailability();
 }
 
 /**
@@ -438,7 +439,48 @@ void ChartController::connectChartSignals()
  */
 void ChartController::updateColorLegendDisplay()
 {
-    // TODO: Extract color legend update from MainWindow
+    if (!m_colorLegendLayout)
+        return;
+
+    QWidget* legendHost = m_colorLegendLayout->parentWidget();
+
+    while (QLayoutItem* item = m_colorLegendLayout->takeAt(0))
+    {
+        if (QWidget* widget = item->widget())
+            widget->deleteLater();
+        delete item;
+    }
+
+    const ColorMetric metric = static_cast<ColorMetric>(m_colorMetric);
+    if (metric == ColorMetric::None)
+    {
+        auto* label = new QLabel(QStringLiteral("Coloring disabled"), legendHost);
+        label->setStyleSheet(QStringLiteral("color: #64748b;"));
+        m_colorLegendLayout->addWidget(label);
+        m_colorLegendLayout->addItem(new QSpacerItem(0, 0, QSizePolicy::Expanding, QSizePolicy::Minimum));
+        return;
+    }
+
+    const std::vector<Zone> zones = ZoneCalculator::zonesForMetric(metric, m_colorContext);
+    for (const Zone& zone : zones)
+    {
+        auto* swatch = new QLabel(legendHost);
+        swatch->setFixedSize(12, 12);
+        swatch->setStyleSheet(QString("background: %1; border: 1px solid rgba(15,23,42,0.15);")
+                                  .arg(zone.color.name()));
+
+        auto* text = new QLabel(zone.name, legendHost);
+
+        auto* chip = new QWidget(legendHost);
+        auto* chipLayout = new QHBoxLayout(chip);
+        chipLayout->setContentsMargins(0, 0, 0, 0);
+        chipLayout->setSpacing(4);
+        chipLayout->addWidget(swatch);
+        chipLayout->addWidget(text);
+        m_colorLegendLayout->addWidget(chip);
+    }
+
+    m_colorLegendLayout->addItem(new QSpacerItem(0, 0, QSizePolicy::Expanding, QSizePolicy::Minimum));
 }
 
 /**
@@ -529,7 +571,9 @@ void ChartController::handleWorkoutLoaded()
  */
 void ChartController::applyColorMetric()
 {
-    // TODO: Extract color metric application from MainWindow
+    updateCharts();
+    updateColorLegend();
+    updateZoneAvailability();
 }
 
 /**
@@ -657,48 +701,7 @@ void ChartController::updatePowerCurve()
  */
 void ChartController::updateColorLegend()
 {
-    if (!m_colorLegendLayout)
-        return;
-
-    QWidget* legendHost = m_colorLegendLayout->parentWidget();
-
-    while (QLayoutItem* item = m_colorLegendLayout->takeAt(0))
-    {
-        if (QWidget* widget = item->widget())
-            widget->deleteLater();
-        delete item;
-    }
-
-    const ColorMetric metric = static_cast<ColorMetric>(m_colorMetric);
-    if (metric == ColorMetric::None)
-    {
-        auto* label = new QLabel(QStringLiteral("Coloring disabled"), legendHost);
-        label->setStyleSheet(QStringLiteral("color: #64748b;"));
-        m_colorLegendLayout->addWidget(label);
-        m_colorLegendLayout->addItem(new QSpacerItem(0, 0, QSizePolicy::Expanding, QSizePolicy::Minimum));
-        return;
-    }
-
-    const std::vector<Zone> zones = ZoneCalculator::zonesForMetric(metric, m_colorContext);
-    for (const Zone& zone : zones)
-    {
-        auto* swatch = new QLabel(legendHost);
-        swatch->setFixedSize(12, 12);
-        swatch->setStyleSheet(QString("background: %1; border: 1px solid rgba(15,23,42,0.15);")
-                                  .arg(zone.color.name()));
-
-        auto* text = new QLabel(zone.name, legendHost);
-
-        auto* chip = new QWidget(legendHost);
-        auto* chipLayout = new QHBoxLayout(chip);
-        chipLayout->setContentsMargins(0, 0, 0, 0);
-        chipLayout->setSpacing(4);
-        chipLayout->addWidget(swatch);
-        chipLayout->addWidget(text);
-        m_colorLegendLayout->addWidget(chip);
-    }
-
-    m_colorLegendLayout->addItem(new QSpacerItem(0, 0, QSizePolicy::Expanding, QSizePolicy::Minimum));
+    updateColorLegendDisplay();
 }
 
 /**
