@@ -3183,24 +3183,6 @@ void MainWindow::updateZonesTab()
     m_chartController->updateZonesTab();
 }
 
-void MainWindow::updateHistogram()
-{
-    if (!m_chartController)
-        return;
-
-    syncChartContextToController(false);
-    m_chartController->updateHistogram();
-}
-
-void MainWindow::updatePowerCurve()
-{
-    if (!m_chartController)
-        return;
-
-    syncChartContextToController(false);
-    m_chartController->updatePowerCurve();
-}
-
 double MainWindow::estimatedFtpFromCurrentRide() const
 {
     const double best20m = PowerCurve::bestMeanPower(m_controller->rideData(), 20.0 * 60.0);
@@ -3244,15 +3226,6 @@ void MainWindow::applyEstimatedFtpForCurrentAthlete()
     m_controller->setCurrentAthlete(m_currentAthleteId);
     updateStatsLabel();
     statusBar()->showMessage(QString("Estimated FTP applied: %1 W").arg(estimated), 3500);
-}
-
-void MainWindow::updateFitnessChart()
-{
-    if (!m_chartController)
-        return;
-
-    syncChartContextToController(false);
-    m_chartController->updateFitnessChart();
 }
 
 void MainWindow::onIntervalSelectionChanged()

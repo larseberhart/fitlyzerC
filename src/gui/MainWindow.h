@@ -137,9 +137,6 @@ private:
     void updateCharts();
     void applyChartSmoothing();
     void updateZonesTab();
-    void updateHistogram();
-    void updatePowerCurve();
-    void updateFitnessChart();
     void updateAnalysisEmptyStates();
     void updateIntervals();
     void updateClimbingTab();
