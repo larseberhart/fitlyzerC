@@ -87,15 +87,22 @@ void NavigationController::saveNavigationState()
 
 /**
  * @brief Restores the active page from QSettings.
+ *
+ * Clamps the stored value to the valid Page range so that stale settings
+ * written by an older version of the application cannot cause out-of-bounds
+ * access.  When new Page values are added, update the upper bound here.
  */
 void NavigationController::restoreNavigationState()
 {
     QSettings settings("Fitlyzer", "FitlyzerC");
     const int raw = settings.value("activePage", static_cast<int>(Page::Activities)).toInt();
 
-    // Clamp to the valid range so stale settings cannot crash.
-    const auto page = (raw >= static_cast<int>(Page::Activities) &&
-                       raw <= static_cast<int>(Page::Video))
+    // Valid range: Activities (0) through Video (7).
+    // Update the upper bound when new pages are appended to the Page enum.
+    static constexpr int kFirstPage = static_cast<int>(Page::Activities);
+    static constexpr int kLastPage  = static_cast<int>(Page::Video);
+
+    const auto page = (raw >= kFirstPage && raw <= kLastPage)
                       ? static_cast<Page>(raw)
                       : Page::Activities;
 
