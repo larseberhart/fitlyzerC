@@ -3650,30 +3650,7 @@ void MainWindow::refreshClimbViews(double preferredStartSeconds, double preferre
     m_climbsTable->setSortingEnabled(true);
     m_climbsTable->sortItems(0, Qt::AscendingOrder);
 
-    int targetRow = -1;
-    if (preferredStartSeconds >= 0.0 && preferredEndSeconds >= 0.0)
-    {
-        for (int row = 0; row < m_climbsTable->rowCount(); ++row)
-        {
-            auto* item = m_climbsTable->item(row, 0);
-            if (!item)
-                continue;
-            const double s = item->data(kClimbStartRole).toDouble();
-            const double e = item->data(kClimbEndRole).toDouble();
-            if (std::abs(s - preferredStartSeconds) < 0.75 &&
-                std::abs(e - preferredEndSeconds) < 0.75)
-            {
-                targetRow = row;
-                break;
-            }
-        }
-    }
-
-    if (targetRow < 0 && m_climbsTable->rowCount() > 0)
-        targetRow = std::clamp(previousRow >= 0 ? previousRow : 0, 0, m_climbsTable->rowCount() - 1);
-
-    if (targetRow >= 0)
-        m_climbsTable->setCurrentCell(targetRow, 0);
+    restoreClimbSelection(previousRow, preferredStartSeconds, preferredEndSeconds);
 
     blocker.unblock();
     updateClimbRowStyles();
@@ -3700,6 +3677,37 @@ void MainWindow::applyDetectedClimbsToCharts()
     applyClimbOverlays(m_climbCadenceChart);
     applyClimbOverlays(m_climbSpeedChart);
     applyClimbOverlays(m_climbAltitudeChart);
+}
+
+void MainWindow::restoreClimbSelection(int previousRow, double preferredStartSeconds, double preferredEndSeconds)
+{
+    if (!m_climbsTable)
+        return;
+
+    int targetRow = -1;
+    if (preferredStartSeconds >= 0.0 && preferredEndSeconds >= 0.0)
+    {
+        for (int row = 0; row < m_climbsTable->rowCount(); ++row)
+        {
+            auto* item = m_climbsTable->item(row, 0);
+            if (!item)
+                continue;
+            const double s = item->data(kClimbStartRole).toDouble();
+            const double e = item->data(kClimbEndRole).toDouble();
+            if (std::abs(s - preferredStartSeconds) < 0.75 &&
+                std::abs(e - preferredEndSeconds) < 0.75)
+            {
+                targetRow = row;
+                break;
+            }
+        }
+    }
+
+    if (targetRow < 0 && m_climbsTable->rowCount() > 0)
+        targetRow = std::clamp(previousRow >= 0 ? previousRow : 0, 0, m_climbsTable->rowCount() - 1);
+
+    if (targetRow >= 0)
+        m_climbsTable->setCurrentCell(targetRow, 0);
 }
 
 void MainWindow::updateClimbQuarterCharts(const Climb* climb)
