@@ -3507,19 +3507,7 @@ void MainWindow::updateIntervals()
         populateIntervalsFromRecords();
 
     m_intervalsTable->resizeColumnsToContents();
-
-    if (m_intervalsTable->rowCount() > 0)
-    {
-        const int targetRow = std::clamp(previousRow >= 0 ? previousRow : 0, 0, m_intervalsTable->rowCount() - 1);
-        m_intervalsTable->setCurrentCell(targetRow, 0);
-    }
-
-    selectionBlocker.unblock();
-    updateIntervalRowStyles();
-    if (m_intervalsTable->currentRow() >= 0)
-        onIntervalSelectionChanged();
-    else
-        clearIntervalSummary();
+    finalizeIntervalSelectionAndSummary(previousRow);
 
     updateLapsSummaryFromCurrentActivity();
     updateActivityNotesFromCurrentActivity();
@@ -3535,6 +3523,24 @@ void MainWindow::updateLapsSummaryFromCurrentActivity()
     m_lapsTable->setItem(0, 1, new QTableWidgetItem("0:00"));
     m_lapsTable->setItem(0, 2, new QTableWidgetItem(fmtDur(m_controller->statistics().durationSeconds)));
     m_lapsTable->resizeColumnsToContents();
+}
+
+void MainWindow::finalizeIntervalSelectionAndSummary(int previousRow)
+{
+    if (!m_intervalsTable)
+        return;
+
+    if (m_intervalsTable->rowCount() > 0)
+    {
+        const int targetRow = std::clamp(previousRow >= 0 ? previousRow : 0, 0, m_intervalsTable->rowCount() - 1);
+        m_intervalsTable->setCurrentCell(targetRow, 0);
+    }
+
+    updateIntervalRowStyles();
+    if (m_intervalsTable->currentRow() >= 0)
+        onIntervalSelectionChanged();
+    else
+        clearIntervalSummary();
 }
 
 void MainWindow::updateActivityNotesFromCurrentActivity()

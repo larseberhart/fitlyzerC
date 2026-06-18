@@ -160,6 +160,7 @@ private:
     void navigateToInterval(double startSeconds, double endSeconds, bool exactZoom);
     void selectIntervalRowOffset(int delta);
     void updateIntervalRowStyles();
+    void finalizeIntervalSelectionAndSummary(int previousRow);
     void updateIntervalSummary(double startSeconds, double endSeconds);
     void clearIntervalSummary();
     void updateLapsSummaryFromCurrentActivity();
