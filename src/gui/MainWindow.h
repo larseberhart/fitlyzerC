@@ -200,6 +200,9 @@ private:
     void scanWatchDirectories(bool initialScan);
     void onWatchDirectoryChanged(const QString& path);
 
+    /// @brief Syncs athlete context to all controllers that need it.
+    void syncAthleteContextToControllers();
+
         // -- Undo/Redo ----------------------------------------------------------
         UndoManager*   m_undoManager    = nullptr;
 

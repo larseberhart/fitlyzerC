@@ -385,6 +385,10 @@ MainWindow::MainWindow(QWidget* parent)
     m_navigationController->setNavigationSidebar(nullptr); // TODO: wire sidebar when available
 
     m_activityViewController = new ActivityViewController(m_controller, &m_dbManager, this);
+    m_activityViewController->setAthleteHeaderWidget(m_athleteHeader);
+    m_activityViewController->setStatusBarLabels(
+        m_dbStatusLabel, m_athleteStatusLabel, m_activityCountLabel);
+    m_activityViewController->setAthleteContext(m_currentAthleteId, m_currentAthleteName);
 
     m_chartController = new ChartController(m_controller, &m_dbManager, this);
     m_chartController->setChartWidgets(
@@ -2628,6 +2632,18 @@ void MainWindow::updateStatusBarInfo()
 
     if (m_activityCountLabel)
         m_activityCountLabel->setText(QString("Activities: %1").arg(activityCount));
+
+    // Sync athlete context to activity controller for status display
+    syncAthleteContextToControllers();
+}
+
+void MainWindow::syncAthleteContextToControllers()
+{
+    if (m_activityViewController)
+    {
+        m_activityViewController->setAthleteContext(m_currentAthleteId, m_currentAthleteName);
+        m_activityViewController->updateStatusBarInformation();
+    }
 }
 
 // ── Slots ─────────────────────────────────────────────────────────────────────

@@ -4,6 +4,13 @@
 
 #include "../WorkoutController.h"
 #include "../../database/DatabaseManager.h"
+#include "../../database/ActivityRepository.h"
+#include "../../database/AthleteRepository.h"
+#include "../../core/settings/DateFormatter.h"
+#include "../AthleteHeaderWidget.h"
+
+#include <QLabel>
+#include <QFileInfo>
 
 /**
  * @brief Constructs the activity view controller.
@@ -19,12 +26,48 @@ ActivityViewController::ActivityViewController(
     , m_controller(controller)
     , m_dbManager(dbManager)
 {
+    // Listen to workout controller signals
+    if (m_controller)
+    {
+        connect(m_controller, &WorkoutController::workoutLoaded,
+                this, &ActivityViewController::onWorkoutLoaded);
+    }
 }
 
 /**
  * @brief Destructor.
  */
 ActivityViewController::~ActivityViewController() = default;
+
+/**
+ * @brief Sets the athlete context information.
+ */
+void ActivityViewController::setAthleteContext(int athleteId, const QString& athleteName)
+{
+    m_currentAthleteId = athleteId;
+    m_currentAthleteName = athleteName;
+}
+
+/**
+ * @brief Sets the athlete header widget for display updates.
+ */
+void ActivityViewController::setAthleteHeaderWidget(AthleteHeaderWidget* athleteHeader)
+{
+    m_athleteHeader = athleteHeader;
+}
+
+/**
+ * @brief Sets the status bar widgets for updates.
+ */
+void ActivityViewController::setStatusBarLabels(
+    QLabel* dbStatusLabel,
+    QLabel* athleteStatusLabel,
+    QLabel* activityCountLabel)
+{
+    m_dbStatusLabel = dbStatusLabel;
+    m_athleteStatusLabel = athleteStatusLabel;
+    m_activityCountLabel = activityCountLabel;
+}
 
 /**
  * @brief Loads an activity by ID.
@@ -43,7 +86,6 @@ bool ActivityViewController::loadActivity(int activityId, QString& outError)
     if (!m_controller->loadActivity(activityId, outError))
         return false;
 
-    updateActivityDisplay();
     emit activityLoaded(activityId);
     return true;
 }
@@ -59,8 +101,6 @@ void ActivityViewController::refreshActivity()
 
 /**
  * @brief Updates all activity-related UI elements.
- *
- * Called after loading a new activity or when data changes.
  */
 void ActivityViewController::updateActivityDisplay()
 {
@@ -70,11 +110,68 @@ void ActivityViewController::updateActivityDisplay()
 }
 
 /**
+ * @brief Updates activity metadata and stats display.
+ */
+void ActivityViewController::updateStatsDisplay()
+{
+    updateActivityMetadata();
+}
+
+/**
+ * @brief Updates status bar information.
+ */
+void ActivityViewController::updateStatusBarInformation()
+{
+    if (m_dbStatusLabel)
+        m_dbStatusLabel->setText(
+            m_dbManager && m_dbManager->isOpen()
+                ? QString("Database: %1").arg(QFileInfo(m_dbManager->path()).fileName())
+                : "Database: none");
+
+    if (m_athleteStatusLabel)
+    {
+        m_athleteStatusLabel->setText(
+            m_currentAthleteName.isEmpty()
+                ? "Athlete: none"
+                : QString("Athlete: %1").arg(m_currentAthleteName));
+    }
+
+    if (m_activityCountLabel)
+    {
+        int activityCount = 0;
+        if (m_dbManager && m_dbManager->isOpen() && m_currentAthleteId > 0)
+        {
+            auto db = m_dbManager->database();
+            ActivityRepository repo(db);
+            activityCount = repo.listActivities(m_currentAthleteId).size();
+        }
+        m_activityCountLabel->setText(QString("Activities: %1").arg(activityCount));
+    }
+}
+
+/**
+ * @brief Slot for when WorkoutController loads a new activity.
+ */
+void ActivityViewController::onWorkoutLoaded()
+{
+    updateActivityDisplay();
+    emit activityDisplayUpdated();
+}
+
+/**
  * @brief Helper to update activity metadata in UI.
  */
 void ActivityViewController::updateActivityMetadata()
 {
-    // TODO: Extract metadata update logic from MainWindow
+    if (!m_athleteHeader || !m_controller)
+        return;
+
+    // TODO: Extract full metadata update from MainWindow::updateStatsLabel
+    // This requires access to:
+    // - m_currentAthleteId
+    // - m_currentAthleteName
+    // - Activity database queries
+    // For now, this is a placeholder
 }
 
 /**
@@ -91,4 +188,16 @@ void ActivityViewController::populateActivityDetails()
 void ActivityViewController::syncAnalysisViews()
 {
     // TODO: Extract analysis view synchronization from MainWindow
+    // This will delegate to ChartController and MapController once available
+}
+
+/**
+ * @brief Helper to format activity date for display.
+ */
+QString ActivityViewController::formatActivityDateLabel(const QString& rawDate) const
+{
+    QDate date = QDate::fromString(rawDate, Qt::ISODate);
+    if (!date.isValid())
+        return "-";
+    return DateFormatter::toIsoDate(date);
 }

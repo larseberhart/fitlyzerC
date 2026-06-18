@@ -59,6 +59,40 @@ public:
      */
     void updateActivityDisplay();
 
+    /**
+     * @brief Sets the athlete context information.
+     * @param athleteId Current athlete ID.
+     * @param athleteName Current athlete name.
+     */
+    void setAthleteContext(int athleteId, const QString& athleteName);
+
+    /**
+     * @brief Sets the athlete header widget for display updates.
+     * @param athleteHeader Pointer to athlete header widget.
+     */
+    void setAthleteHeaderWidget(class AthleteHeaderWidget* athleteHeader);
+
+    /**
+     * @brief Sets the status bar widgets for updates.
+     * @param dbStatusLabel Label for database status.
+     * @param athleteStatusLabel Label for athlete status.
+     * @param activityCountLabel Label for activity count.
+     */
+    void setStatusBarLabels(
+        class QLabel* dbStatusLabel,
+        class QLabel* athleteStatusLabel,
+        class QLabel* activityCountLabel);
+
+    /**
+     * @brief Updates activity metadata and stats display.
+     */
+    void updateStatsDisplay();
+
+    /**
+     * @brief Updates status bar information.
+     */
+    void updateStatusBarInformation();
+
 signals:
     /// @brief Emitted when an activity has been successfully loaded.
     void activityLoaded(int activityId);
@@ -69,6 +103,10 @@ signals:
     /// @brief Emitted when an error occurs during activity operations.
     void errorOccurred(const QString& message);
 
+private slots:
+    /// @brief Slot for when WorkoutController loads a new activity.
+    void onWorkoutLoaded();
+
 private:
     /// @brief Helper to update activity metadata in UI.
     void updateActivityMetadata();
@@ -78,6 +116,19 @@ private:
 
     /// @brief Helper to sync charts and map with current activity.
     void syncAnalysisViews();
+
+    /// @brief Helper to format activity date for display.
+    QString formatActivityDateLabel(const QString& rawDate) const;
+
+    // UI widget pointers
+    class AthleteHeaderWidget* m_athleteHeader = nullptr;
+    class QLabel* m_dbStatusLabel = nullptr;
+    class QLabel* m_athleteStatusLabel = nullptr;
+    class QLabel* m_activityCountLabel = nullptr;
+
+    // Athlete context
+    int m_currentAthleteId = -1;
+    QString m_currentAthleteName;
 
     WorkoutController* m_controller;
     DatabaseManager* m_dbManager;
