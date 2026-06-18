@@ -2,9 +2,11 @@
 
 #pragma once
 
-#include <QObject>
-#include <memory>
 #include <vector>
+
+#include <QObject>
+#include <QString>
+
 #include "core/zones/ZoneDefinition.h"
 
 class WorkoutController;
@@ -13,50 +15,33 @@ class RideChartWidget;
 class PowerCurveWidget;
 class PowerHistogramWidget;
 class FitnessChartWidget;
+class ColorLegendWidget;
+class QTabWidget;
+class QStackedLayout;
+class QTableWidget;
+class QComboBox;
+class QCheckBox;
+class QLayout;
+class QWidget;
+class Interval;
+class Climb;
 
 /**
- * @brief Manages chart widgets and their synchronization.
- *
- * Handles:
- * - RideChartWidget (power, HR, cadence, speed, altitude)
- * - PowerCurveWidget
- * - PowerHistogramWidget
- * - FitnessChartWidget
- * - Chart updates and refresh
- * - Chart synchronization (zoom, crosshair, selection)
- * - Chart zoom handling
+ * @brief Manages all chart widgets in the analysis view.
  */
 class ChartController : public QObject
 {
     Q_OBJECT
 
 public:
-    /**
-     * @brief Constructs the chart controller.
-     * @param controller Pointer to WorkoutController for data access.
-     * @param dbManager Pointer to DatabaseManager for queries.
-     * @param parent Parent object.
-     */
     explicit ChartController(
         WorkoutController* controller,
         DatabaseManager* dbManager,
         QObject* parent = nullptr);
-
-    /**
-     * @brief Destructor.
-     */
     ~ChartController() override;
 
     /**
-     * @brief Sets the chart widgets managed by this controller.
-     * @param powerChart Power chart widget.
-     * @param hrChart Heart rate chart widget.
-     * @param cadenceChart Cadence chart widget.
-     * @param speedChart Speed chart widget.
-     * @param altitudeChart Altitude chart widget.
-     * @param histogram Power histogram widget.
-     * @param powerCurve Power duration curve widget.
-     * @param fitnessChart Fitness/fatigue/form chart widget.
+     * @brief Sets the main ride chart widgets managed by this controller.
      */
     void setChartWidgets(
         RideChartWidget* powerChart,
@@ -69,25 +54,48 @@ public:
         FitnessChartWidget* fitnessChart);
 
     /**
-     * @brief Sets the analysis tab-related widgets.
-     * @param analysisTabWidget Main analysis tab widget.
-     * @param colorLegend Color legend widget.
-     * @param activityTabStack Stacked layout for activity tab.
-     * @param zonesTabStack Stacked layout for zones tab.
-     * @param histogramTabStack Stacked layout for histogram tab.
-     * @param powerCurveTabStack Stacked layout for power curve tab.
-     * @param calendarTabStack Stacked layout for calendar tab.
-     * @param fitnessTabStack Stacked layout for fitness tab.
+     * @brief Sets the analysis tab container and layout widgets.
      */
     void setAnalysisTabWidgets(
-        class QTabWidget* analysisTabWidget,
-        class ColorLegendWidget* colorLegend,
-        class QStackedLayout* activityTabStack,
-        class QStackedLayout* zonesTabStack,
-        class QStackedLayout* histogramTabStack,
-        class QStackedLayout* powerCurveTabStack,
-        class QStackedLayout* calendarTabStack,
-        class QStackedLayout* fitnessTabStack);
+        QTabWidget* analysisTabWidget,
+        ColorLegendWidget* colorLegend,
+        QStackedLayout* activityTabStack,
+        QStackedLayout* zonesTabStack,
+        QStackedLayout* histogramTabStack,
+        QStackedLayout* powerCurveTabStack,
+        QStackedLayout* calendarTabStack,
+        QStackedLayout* fitnessTabStack);
+
+    /**
+     * @brief Sets the zones table widget for zone distribution display.
+     */
+    void setZonesTable(QTableWidget* zonesTable);
+
+    /**
+     * @brief Sets the climb chart widgets.
+     */
+    void setClimbCharts(
+        RideChartWidget* climbPowerChart,
+        RideChartWidget* climbHrChart,
+        RideChartWidget* climbCadenceChart,
+        RideChartWidget* climbSpeedChart,
+        RideChartWidget* climbAltitudeChart);
+
+    /**
+     * @brief Sets the chart control widgets.
+     */
+    void setChartControls(
+        QComboBox* colorMetricCombo,
+        QComboBox* powerSmoothingCombo,
+        QCheckBox* autoSmoothingCheck,
+        QCheckBox* climbOverlayEnabledCheck,
+        QComboBox* climbOverlayMetricCombo,
+        QLayout* colorLegendLayout);
+
+    /**
+     * @brief Sets athlete context for power curve queries.
+     */
+    void setAthleteId(int athleteId);
 
     /**
      * @brief Updates all managed charts with current activity data.
@@ -105,19 +113,9 @@ public:
     void resetAllZoom();
 
     /**
-     * @brief Updates zones tab display.
-     */
-    void updateZonesTab();
-
-    /**
      * @brief Updates power histogram display.
      */
     void updateHistogram();
-
-    /**
-     * @brief Updates power curve display.
-     */
-    void updatePowerCurve();
 
     /**
      * @brief Updates fitness chart display.
@@ -130,16 +128,46 @@ public:
     void updateAnalysisEmptyStates();
 
     /**
+     * @brief Updates zones table with zone distribution.
+     */
+    void updateZonesTab();
+
+    /**
+     * @brief Updates power curve with historical athlete data.
+     */
+    void updatePowerCurve();
+
+    /**
+     * @brief Updates color legend with zone colors.
+     */
+    void updateColorLegend();
+
+    /**
+     * @brief Applies chart smoothing settings to all charts.
+     */
+    void applyChartSmoothing();
+
+    /**
+     * @brief Synchronizes chart zoom levels across all ride charts.
+     */
+    void syncChartZoom();
+
+    /**
+     * @brief Synchronizes crosshair position across all ride charts.
+     */
+    void syncChartCrosshair();
+
+    /**
      * @brief Sets intervals for display on power chart.
      * @param intervals List of intervals to display.
      */
-    void setIntervals(const std::vector<class Interval>& intervals);
+    void setIntervals(const std::vector<Interval>& intervals);
 
     /**
      * @brief Sets climbs for display on charts.
      * @param climbs List of climbs to display.
      */
-    void setClimbs(const std::vector<class Climb>& climbs);
+    void setClimbs(const std::vector<Climb>& climbs);
 
     /**
      * @brief Sets the color metric for chart visualization.
@@ -151,27 +179,12 @@ public:
      * @brief Sets the color context for chart rendering.
      * @param colorContext Color context structure.
      */
-    void setColorContext(const class ColorContext& colorContext);
-
-    /**
-     * @brief Updates the color legend display.
-     */
-    void updateColorLegend();
+    void setColorContext(const ColorContext& colorContext);
 
     /**
      * @brief Updates zone availability display.
      */
     void updateZoneAvailability();
-
-    /**
-     * @brief Synchronizes chart zoom levels across all ride charts.
-     */
-    void syncChartZoom();
-
-    /**
-     * @brief Synchronizes crosshair position across all ride charts.
-     */
-    void syncChartCrosshair();
 
 signals:
     /// @brief Emitted when charts have been successfully updated.
@@ -197,9 +210,11 @@ private:
     /// @brief Retrieves current color metric from stored value.
     int currentColorMetric() const;
 
+    // Data members
     WorkoutController* m_controller;
     DatabaseManager* m_dbManager;
 
+    // Main chart widgets
     RideChartWidget* m_powerChart = nullptr;
     RideChartWidget* m_hrChart = nullptr;
     RideChartWidget* m_cadenceChart = nullptr;
@@ -208,20 +223,41 @@ private:
     PowerHistogramWidget* m_histogram = nullptr;
     PowerCurveWidget* m_powerCurve = nullptr;
     FitnessChartWidget* m_fitnessChart = nullptr;
-    class QStackedLayout* m_activityTabStack = nullptr;
-    class QStackedLayout* m_zonesTabStack = nullptr;
-    class QStackedLayout* m_histogramTabStack = nullptr;
-    class QStackedLayout* m_powerCurveTabStack = nullptr;
-    class QStackedLayout* m_calendarTabStack = nullptr;
-    class QStackedLayout* m_fitnessTabStack = nullptr;
-    class QTabWidget* m_analysisTabWidget = nullptr;
-    class ColorLegendWidget* m_colorLegend = nullptr;
+
+    // Analysis tab widgets
+    QTabWidget* m_analysisTabWidget = nullptr;
+    ColorLegendWidget* m_colorLegend = nullptr;
+    QStackedLayout* m_activityTabStack = nullptr;
+    QStackedLayout* m_zonesTabStack = nullptr;
+    QStackedLayout* m_histogramTabStack = nullptr;
+    QStackedLayout* m_powerCurveTabStack = nullptr;
+    QStackedLayout* m_calendarTabStack = nullptr;
+    QStackedLayout* m_fitnessTabStack = nullptr;
 
     // Chart data
-    std::vector<class Interval> m_intervals;
-    std::vector<class Climb> m_climbs;
+    std::vector<Interval> m_intervals;
+    std::vector<Climb> m_climbs;
     int m_colorMetric = 0;
-    class ColorContext m_colorContext;
+    ColorContext m_colorContext;
     bool m_smoothingEnabled = false;
     int m_smoothingAmount = 0;
+
+    // Additional chart widgets
+    RideChartWidget* m_climbPowerChart = nullptr;
+    RideChartWidget* m_climbHrChart = nullptr;
+    RideChartWidget* m_climbCadenceChart = nullptr;
+    RideChartWidget* m_climbSpeedChart = nullptr;
+    RideChartWidget* m_climbAltitudeChart = nullptr;
+    QTableWidget* m_zonesTable = nullptr;
+
+    // Chart controls
+    QComboBox* m_colorMetricCombo = nullptr;
+    QComboBox* m_powerSmoothingCombo = nullptr;
+    QCheckBox* m_autoSmoothingCheck = nullptr;
+    QCheckBox* m_climbOverlayEnabledCheck = nullptr;
+    QComboBox* m_climbOverlayMetricCombo = nullptr;
+    QLayout* m_colorLegendLayout = nullptr;
+
+    // Athlete context
+    int m_currentAthleteId = -1;
 };

@@ -12,6 +12,10 @@
 
 #include <QTabWidget>
 #include <QStackedLayout>
+#include <QTableWidget>
+#include <QComboBox>
+#include <QCheckBox>
+#include <QLayout>
 
 /**
  * @brief Constructs the chart controller.
@@ -88,11 +92,124 @@ void ChartController::setAnalysisTabWidgets(
 }
 
 /**
+ * @brief Sets the zones table widget for zone distribution display.
+ */
+void ChartController::setZonesTable(QTableWidget* zonesTable)
+{
+    m_zonesTable = zonesTable;
+}
+
+/**
+ * @brief Sets the climb chart widgets.
+ */
+void ChartController::setClimbCharts(
+    RideChartWidget* climbPowerChart,
+    RideChartWidget* climbHrChart,
+    RideChartWidget* climbCadenceChart,
+    RideChartWidget* climbSpeedChart,
+    RideChartWidget* climbAltitudeChart)
+{
+    m_climbPowerChart = climbPowerChart;
+    m_climbHrChart = climbHrChart;
+    m_climbCadenceChart = climbCadenceChart;
+    m_climbSpeedChart = climbSpeedChart;
+    m_climbAltitudeChart = climbAltitudeChart;
+}
+
+/**
+ * @brief Sets the chart control widgets.
+ */
+void ChartController::setChartControls(
+    QComboBox* colorMetricCombo,
+    QComboBox* powerSmoothingCombo,
+    QCheckBox* autoSmoothingCheck,
+    QCheckBox* climbOverlayEnabledCheck,
+    QComboBox* climbOverlayMetricCombo,
+    QLayout* colorLegendLayout)
+{
+    m_colorMetricCombo = colorMetricCombo;
+    m_powerSmoothingCombo = powerSmoothingCombo;
+    m_autoSmoothingCheck = autoSmoothingCheck;
+    m_climbOverlayEnabledCheck = climbOverlayEnabledCheck;
+    m_climbOverlayMetricCombo = climbOverlayMetricCombo;
+    m_colorLegendLayout = colorLegendLayout;
+}
+
+/**
+ * @brief Sets athlete context for power curve queries.
+ */
+void ChartController::setAthleteId(int athleteId)
+{
+    m_currentAthleteId = athleteId;
+}
+
+/**
  * @brief Updates all managed charts with current activity data.
  */
 void ChartController::updateCharts()
 {
-    // TODO: Extract updateCharts logic from MainWindow
+    if (!m_controller)
+        return;
+
+    const int colorMetricValue = m_colorMetricCombo ? m_colorMetricCombo->currentData().toInt() : 0;
+    const ColorMetric colorMetric = static_cast<ColorMetric>(colorMetricValue);
+
+    if (!m_powerChart)
+        return;
+
+    // Determine which climbs to show (filtered or all)
+    const std::vector<Climb>& climbsForView = m_climbs.empty() ? m_controller->climbs() : m_climbs;
+
+    // Apply smoothing settings first
+    applyChartSmoothing();
+
+    // Disable updates during population
+    auto* parentWidget = qobject_cast<QWidget*>(parent());
+    if (parentWidget)
+        parentWidget->setUpdatesEnabled(false);
+
+    // Update main ride charts
+    m_powerChart->setIntervals(m_controller->intervals());
+    m_powerChart->setClimbs(climbsForView);
+    if (m_hrChart) m_hrChart->setClimbs(climbsForView);
+    if (m_cadenceChart) m_cadenceChart->setClimbs(climbsForView);
+    if (m_speedChart) m_speedChart->setClimbs(climbsForView);
+    if (m_altitudeChart) m_altitudeChart->setClimbs(climbsForView);
+
+    m_powerChart->setRideData(m_controller->rideData(), colorMetric, m_colorContext);
+    if (m_hrChart) m_hrChart->setRideData(m_controller->rideData(), colorMetric, m_colorContext);
+    if (m_cadenceChart) m_cadenceChart->setRideData(m_controller->rideData(), colorMetric, m_colorContext);
+    if (m_speedChart) m_speedChart->setRideData(m_controller->rideData(), colorMetric, m_colorContext);
+    if (m_altitudeChart) m_altitudeChart->setRideData(m_controller->rideData(), colorMetric, m_colorContext);
+
+    // Update climb-specific charts if available
+    if (m_climbPowerChart)
+    {
+        m_climbPowerChart->setClimbs(climbsForView);
+        if (m_climbHrChart) m_climbHrChart->setClimbs(climbsForView);
+        if (m_climbCadenceChart) m_climbCadenceChart->setClimbs(climbsForView);
+        if (m_climbSpeedChart) m_climbSpeedChart->setClimbs(climbsForView);
+        if (m_climbAltitudeChart) m_climbAltitudeChart->setClimbs(climbsForView);
+
+        m_climbPowerChart->setRideData(m_controller->rideData(), colorMetric, m_colorContext);
+        if (m_climbHrChart) m_climbHrChart->setRideData(m_controller->rideData(), colorMetric, m_colorContext);
+        if (m_climbCadenceChart) m_climbCadenceChart->setRideData(m_controller->rideData(), colorMetric, m_colorContext);
+        if (m_climbSpeedChart) m_climbSpeedChart->setRideData(m_controller->rideData(), colorMetric, m_colorContext);
+        if (m_climbAltitudeChart) m_climbAltitudeChart->setRideData(m_controller->rideData(), colorMetric, m_colorContext);
+
+        // Apply climb overlay if enabled
+        if (m_climbAltitudeChart && m_climbOverlayEnabledCheck && m_climbOverlayMetricCombo)
+        {
+            const ColorMetric overlayMetric = static_cast<ColorMetric>(m_climbOverlayMetricCombo->currentData().toInt());
+            m_climbAltitudeChart->setMetricOverlay(
+                overlayMetric,
+                m_climbOverlayEnabledCheck->isChecked());
+        }
+    }
+
+    if (parentWidget)
+        parentWidget->setUpdatesEnabled(true);
+
     emit chartsUpdated();
 }
 
@@ -118,27 +235,11 @@ void ChartController::resetAllZoom()
 }
 
 /**
- * @brief Updates zones tab display.
- */
-void ChartController::updateZonesTab()
-{
-    // TODO: Extract updateZonesTab logic from MainWindow
-}
-
-/**
  * @brief Updates power histogram display.
  */
 void ChartController::updateHistogram()
 {
     // TODO: Extract updateHistogram logic from MainWindow
-}
-
-/**
- * @brief Updates power curve display.
- */
-void ChartController::updatePowerCurve()
-{
-    // TODO: Extract updatePowerCurve logic from MainWindow
 }
 
 /**
@@ -230,14 +331,6 @@ void ChartController::setColorContext(const ColorContext& colorContext)
 }
 
 /**
- * @brief Updates the color legend display.
- */
-void ChartController::updateColorLegend()
-{
-    updateColorLegendDisplay();
-}
-
-/**
  * @brief Updates zone availability display.
  */
 void ChartController::updateZoneAvailability()
@@ -258,12 +351,7 @@ void ChartController::updateZoneAvailability()
  */
 void ChartController::onWorkoutLoaded()
 {
-    // Coordinate chart updates - to be delegated to MainWindow for now
-    // updateAnalysisEmptyStates();
-    // updateCharts();
-    // updateColorLegend();
-    // updateZoneAvailability();
-
+    // Coordinate chart updates
     const bool hasPower = m_controller && m_controller->statistics().maximumPower > 0.0;
     if (hasPower)
     {
@@ -281,4 +369,65 @@ void ChartController::onWorkoutLoaded()
 void ChartController::applyColorMetric()
 {
     // TODO: Extract color metric application from MainWindow
+}
+
+/**
+ * @brief Updates zones table with zone distribution for current activity.
+ */
+void ChartController::updateZonesTab()
+{
+    if (!m_zonesTable || !m_controller || !m_dbManager)
+        return;
+
+    // Clear existing rows
+    m_zonesTable->setRowCount(0);
+
+    // TODO: Extract zone distribution logic from MainWindow
+    // This includes computing zone hits and populating table with color-coded zones
+}
+
+/**
+ * @brief Updates power curve display with athlete's historical power data.
+ */
+void ChartController::updatePowerCurve()
+{
+    if (!m_powerCurve || !m_controller || !m_dbManager || m_currentAthleteId < 0)
+        return;
+
+    // TODO: Extract power curve computation logic from MainWindow
+    // This includes querying activities, computing power curves (90d, YTD, All-time)
+    // and updating the power curve widget
+}
+
+/**
+ * @brief Updates color legend widget with current zone colors.
+ */
+void ChartController::updateColorLegend()
+{
+    if (!m_colorLegend)
+        return;
+
+    // TODO: Extract color legend logic from MainWindow
+    // This includes populating legend based on current color metric and zones
+}
+
+/**
+ * @brief Helper to apply smoothing settings to all charts.
+ */
+void ChartController::applyChartSmoothing()
+{
+    const std::initializer_list<RideChartWidget*> all =
+        { m_powerChart, m_hrChart, m_cadenceChart, m_speedChart, m_altitudeChart,
+          m_climbPowerChart, m_climbHrChart, m_climbCadenceChart, m_climbSpeedChart, m_climbAltitudeChart };
+
+    const int smoothingSeconds = m_powerSmoothingCombo ? m_powerSmoothingCombo->currentData().toInt() : 0;
+    const bool autoSmoothing = m_autoSmoothingCheck ? m_autoSmoothingCheck->isChecked() : false;
+
+    for (auto* chart : all)
+    {
+        if (!chart)
+            continue;
+        chart->setPowerSmoothingSeconds(smoothingSeconds);
+        chart->setAutoSmoothingEnabled(autoSmoothing);
+    }
 }

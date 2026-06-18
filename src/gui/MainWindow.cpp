@@ -398,6 +398,15 @@ MainWindow::MainWindow(QWidget* parent)
         m_analysisTabWidget, nullptr,  // ColorLegendWidget - TODO: wire when available
         m_activityTabStack, m_zonesTabStack, m_histogramTabStack,
         m_powerCurveTabStack, m_calendarTabStack, m_fitnessTabStack);
+    m_chartController->setZonesTable(m_zonesTable);
+    m_chartController->setClimbCharts(
+        m_climbPowerChart, m_climbHrChart, m_climbCadenceChart,
+        m_climbSpeedChart, m_climbAltitudeChart);
+    m_chartController->setChartControls(
+        m_colorMetricCombo, m_powerSmoothingCombo,
+        m_autoSmoothingCheck, m_climbOverlayEnabledCheck,
+        m_climbOverlayMetricCombo, nullptr);  // colorLegendLayout - TODO: wire when available
+    m_chartController->setAthleteId(m_currentAthleteId);
 
     m_mapController = new MapController(m_controller, &m_dbManager, this);
     m_mapController->setMapRenderer(m_mapRenderer);
