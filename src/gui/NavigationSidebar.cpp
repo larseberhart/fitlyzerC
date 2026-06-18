@@ -9,8 +9,35 @@
 NavigationSidebar::NavigationSidebar(QWidget* parent)
     : QWidget(parent)
 {
+    setObjectName("navigationSidebar");
+    setStyleSheet(
+        "QWidget#navigationSidebar {"
+        "  background: #1e293b;"
+        "}"
+        "QListWidget {"
+        "  background: transparent;"
+        "  border: none;"
+        "  outline: none;"
+        "  color: #94a3b8;"
+        "  font-size: 13px;"
+        "  font-weight: 500;"
+        "}"
+        "QListWidget::item {"
+        "  padding: 9px 14px;"
+        "  border-radius: 6px;"
+        "  margin: 1px 6px;"
+        "}"
+        "QListWidget::item:selected {"
+        "  background: #334155;"
+        "  color: #f1f5f9;"
+        "}"
+        "QListWidget::item:hover:!selected {"
+        "  background: #273449;"
+        "  color: #e2e8f0;"
+        "}");
+
     auto* layout = new QVBoxLayout(this);
-    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setContentsMargins(0, 8, 0, 8);
 
     m_list = new QListWidget(this);
     // Items must be added in the same order as the Page enum.
