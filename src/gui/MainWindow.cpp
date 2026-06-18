@@ -12,6 +12,7 @@
 #include <QFileInfo>
 #include "ActivityBrowser.h"
 #include "NavigationSidebar.h"
+#include "pages/ActivitiesPage.h"
 #include "controllers/ActivityViewController.h"
 #include "controllers/ChartController.h"
 #include "controllers/MapController.h"
@@ -41,6 +42,26 @@ MainWindow::MainWindow(QWidget* parent)
     m_navigationController = new NavigationController(this);
     m_navigationController->setPageStack(m_pageStack);
     m_navigationController->setNavigationSidebar(m_navigationSidebar);
+
+    // Wire ActivitiesPage context toolbar signals.
+    if (m_activitiesPage)
+    {
+        connect(m_activitiesPage, &ActivitiesPage::importRequested,
+                this, &MainWindow::importActivities);
+        connect(m_activitiesPage, &ActivitiesPage::detectClimbsRequested,
+                this, &MainWindow::triggerDetectClimbs);
+        connect(m_activitiesPage, &ActivitiesPage::detectIntervalsRequested,
+                this, &MainWindow::triggerDetectIntervals);
+        connect(m_activitiesPage, &ActivitiesPage::editActivityRequested,
+                this, &MainWindow::editCurrentActivityProperties);
+        // Recalculate metrics: run analysis queue on selected activity.
+        connect(m_activitiesPage, &ActivitiesPage::recalculateMetricsRequested,
+                this, [this]
+        {
+            if (m_controller && m_controller->currentActivityId() > 0 && m_analysisQueue)
+                m_analysisQueue->enqueue(m_controller->currentActivityId());
+        });
+    }
 
     m_activityViewController = new ActivityViewController(m_controller, &m_dbManager, this);
     m_activityViewController->setAthleteHeaderWidget(m_athleteHeader);

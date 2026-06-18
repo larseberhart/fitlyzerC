@@ -1092,7 +1092,8 @@ void MainWindow::buildUI()
     m_pageStack = new QStackedWidget(central);
 
     // [0] Activities
-    m_pageStack->addWidget(new ActivitiesPage(m_activityBrowser, m_pageStack));
+    m_activitiesPage = new ActivitiesPage(m_activityBrowser, m_pageStack);
+    m_pageStack->addWidget(m_activitiesPage);
 
     // [1] Charts — ride charts, map, intervals, laps, and notes
     {

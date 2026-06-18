@@ -410,6 +410,9 @@ private:
     // Activities tab
     ActivityBrowser* m_activityBrowser = nullptr;
 
+    // -- Page references (for connecting signals / enabling actions) ----------
+    class ActivitiesPage* m_activitiesPage = nullptr;
+
     struct ImportBatchSummary
     {
         int queued = 0;
