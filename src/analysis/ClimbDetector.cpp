@@ -3,6 +3,9 @@
 
 #include "ClimbDetector.h"
 
+#include "analysis/climb/ClimbClassifier.h"
+#include "analysis/climb/ClimbMerger.h"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -311,19 +314,7 @@ ClimbCategory ClimbDetector::categorizeClimb(
     double lengthKm,
     double averageGrade)
 {
-    // Major: > 100m gain, > 2km length, > 3% avg grade
-    if (gainMeters > 100.0 && lengthKm > 2.0 && averageGrade > 3.0)
-        return ClimbCategory::Major;
-    
-    // Medium: > 40m gain, > 500m length, > 3% avg grade
-    if (gainMeters > 40.0 && lengthKm > 0.5 && averageGrade > 3.0)
-        return ClimbCategory::Medium;
-    
-    // Punchy: > 10m gain, > 100m length, > 5% avg grade (short steep)
-    if (gainMeters > 10.0 && lengthKm > 0.1 && averageGrade > 5.0)
-        return ClimbCategory::Punchy;
-    
-    return ClimbCategory::FalsePositive;
+    return ClimbClassifier::categorize(gainMeters, lengthKm, averageGrade);
 }
 
 // Phase 7: Merge fragmented climbs
@@ -331,66 +322,7 @@ std::vector<Climb> ClimbDetector::mergeFragmentedClimbs(
     std::vector<Climb>& candidates,
     const Config& config)
 {
-    if (!config.enableClimbMerging || candidates.size() < 2)
-        return candidates;
-    
-    std::vector<Climb> merged;
-    std::vector<bool> processed(candidates.size(), false);
-    
-    for (size_t i = 0; i < candidates.size(); ++i)
-    {
-        if (processed[i])
-            continue;
-        
-        Climb combined = candidates[i];
-        processed[i] = true;
-        
-        // Try to merge nearby climbs
-        size_t nextIdx = i + 1;
-        while (nextIdx < candidates.size())
-        {
-            if (processed[nextIdx])
-            {
-                ++nextIdx;
-                continue;
-            }
-            
-            const Climb& next = candidates[nextIdx];
-
-            const double gapMeters = next.startDistanceKm * 1000.0 - combined.endDistanceKm * 1000.0;
-            const double elevationGapM = std::abs(next.startElevationM - combined.endElevationM);
-                        const bool overlaps = gapMeters <= 0.0;
-
-                        if (overlaps ||
-                            gapMeters <= config.mergeMaxGapMeters ||
-                            elevationGapM <= config.mergeMaxGapElevationM)
-            {
-                const double bridgingGainM = std::max(0.0, next.startElevationM - combined.endElevationM);
-                            combined.endSeconds = std::max(combined.endSeconds, next.endSeconds);
-                            combined.endDistanceKm = std::max(combined.endDistanceKm, next.endDistanceKm);
-                combined.durationSeconds = combined.endSeconds - combined.startSeconds;
-                combined.lengthKm = combined.endDistanceKm - combined.startDistanceKm;
-                            if (next.endDistanceKm >= combined.endDistanceKm)
-                                combined.endElevationM = next.endElevationM;
-
-                            combined.elevationGainM += overlaps ? next.elevationGainM : bridgingGainM + next.elevationGainM;
-
-                if (combined.lengthKm > 0.0)
-                    combined.averageGradient = (combined.elevationGainM / (combined.lengthKm * 1000.0)) * 100.0;
-
-                processed[nextIdx] = true;
-                ++nextIdx;
-            }
-            else
-            {
-                break;
-            }
-        }
-        
-        merged.push_back(combined);
-    }
-    
-    return merged;
+    return ClimbMerger::merge(candidates, config);
 }
 
 std::vector<Climb> ClimbDetector::detect(const RideData& rideData, const Config& config)
