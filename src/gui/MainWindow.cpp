@@ -3588,22 +3588,7 @@ void MainWindow::refreshClimbViews(double preferredStartSeconds, double preferre
     if (!m_climbsTable)
         return;
 
-    const auto applyClimbOverlays = [this](RideChartWidget* chart)
-    {
-        if (chart)
-            chart->setClimbs(m_detectedClimbs);
-    };
-
-    applyClimbOverlays(m_powerChart);
-    applyClimbOverlays(m_hrChart);
-    applyClimbOverlays(m_cadenceChart);
-    applyClimbOverlays(m_speedChart);
-    applyClimbOverlays(m_altitudeChart);
-    applyClimbOverlays(m_climbPowerChart);
-    applyClimbOverlays(m_climbHrChart);
-    applyClimbOverlays(m_climbCadenceChart);
-    applyClimbOverlays(m_climbSpeedChart);
-    applyClimbOverlays(m_climbAltitudeChart);
+    applyDetectedClimbsToCharts();
 
     const int previousRow = m_climbsTable->currentRow();
     QSignalBlocker blocker(m_climbsTable);
@@ -3687,6 +3672,26 @@ void MainWindow::refreshClimbViews(double preferredStartSeconds, double preferre
     m_suppressClimbAutoZoom = true;
     onClimbSelectionChanged();
     m_suppressClimbAutoZoom = false;
+}
+
+void MainWindow::applyDetectedClimbsToCharts()
+{
+    const auto applyClimbOverlays = [this](RideChartWidget* chart)
+    {
+        if (chart)
+            chart->setClimbs(m_detectedClimbs);
+    };
+
+    applyClimbOverlays(m_powerChart);
+    applyClimbOverlays(m_hrChart);
+    applyClimbOverlays(m_cadenceChart);
+    applyClimbOverlays(m_speedChart);
+    applyClimbOverlays(m_altitudeChart);
+    applyClimbOverlays(m_climbPowerChart);
+    applyClimbOverlays(m_climbHrChart);
+    applyClimbOverlays(m_climbCadenceChart);
+    applyClimbOverlays(m_climbSpeedChart);
+    applyClimbOverlays(m_climbAltitudeChart);
 }
 
 void MainWindow::updateClimbQuarterCharts(const Climb* climb)

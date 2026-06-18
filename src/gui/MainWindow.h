@@ -138,6 +138,7 @@ private:
     void updateClimbingTab();
     void detectClimbsAndRefresh();
     void refreshClimbViews(double preferredStartSeconds = -1.0, double preferredEndSeconds = -1.0);
+    void applyDetectedClimbsToCharts();
     void updateClimbQuarterCharts(const Climb* climb);
     double resolveActiveActivityWeightKg() const;
     void assignClimbWeightMetrics(Climb& climb, double riderWeightKg) const;
