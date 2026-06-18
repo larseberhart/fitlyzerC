@@ -20,6 +20,7 @@
 #include "maps/MapFitMath.h"
 #include "video/VideoTileProvider.h"
 #include "video/encoding/VideoEncoder.h"
+#include "video/overlay/OverlayRenderer.h"
 #include "utils/FfmpegPath.h"
 
 #include <algorithm>
@@ -170,55 +171,6 @@ bool interpolateGpsAtTime(const std::vector<const RideRecord*>& gpsRecords,
     return true;
 }
 
-QString fmtDuration(double seconds)
-{
-    const int total = static_cast<int>(std::round(std::max(0.0, seconds)));
-    const int h = total / 3600;
-    const int m = (total % 3600) / 60;
-    const int s = total % 60;
-    if (h > 0)
-        return QString("%1:%2:%3").arg(h).arg(m, 2, 10, QChar('0')).arg(s, 2, 10, QChar('0'));
-    return QString("%1:%2").arg(m, 2, 10, QChar('0')).arg(s, 2, 10, QChar('0'));
-}
-
-QString formatLegendValue(double value, ColorMetric metric)
-{
-    switch (metric)
-    {
-        case ColorMetric::Speed:
-            return QString::number(value, 'f', 1);
-        case ColorMetric::Power:
-        case ColorMetric::HeartRate:
-        case ColorMetric::Cadence:
-        case ColorMetric::Altitude:
-            return QString::number(static_cast<int>(std::round(value)));
-        case ColorMetric::Gradient:
-        case ColorMetric::None:
-            return QString::number(value, 'f', 1);
-    }
-
-    return QString::number(value, 'f', 1);
-}
-
-QString zoneLegendText(const Zone& zone, ColorMetric metric)
-{
-    const QString unit = colorMetricUnit(metric);
-    const bool hasUnit = !unit.isEmpty();
-    const QString valueSuffix = hasUnit ? QString(" %1").arg(unit) : QString();
-    const double hugeThreshold = std::numeric_limits<double>::max() * 0.5;
-    const bool openEnded = !std::isfinite(zone.maxValue) || zone.maxValue >= hugeThreshold;
-
-    if (openEnded)
-        return QString("%1 > %2%3").arg(zone.name, formatLegendValue(zone.minValue, metric), valueSuffix);
-    if (zone.minValue <= 0.0)
-        return QString("%1 < %2%3").arg(zone.name, formatLegendValue(zone.maxValue, metric), valueSuffix);
-    return QString("%1 %2-%3%4")
-        .arg(zone.name,
-             formatLegendValue(zone.minValue, metric),
-             formatLegendValue(zone.maxValue, metric),
-             valueSuffix);
-}
-
 QColor routeColor(const RideRecord& rec,
                   ColorMetric metric,
                   const ColorContext& context,
@@ -252,6 +204,8 @@ private:
     VideoTileProvider& m_provider;
 };
 }
+
+using namespace OverlayRenderer;
 
 VideoRenderJob::VideoRenderJob(VideoExportSettings settings, QObject* parent)
     : QObject(parent)
@@ -717,7 +671,7 @@ void VideoRenderJob::run()
             };
 
             if (m_settings.overlayTime)
-                drawLine(QString("Time  %1").arg(fmtDuration(sourceSeconds - startSec)));
+                drawLine(QString("Time  %1").arg(formatDuration(sourceSeconds - startSec)));
             if (m_settings.overlayPower && now.hasPower)
                 drawLine(QString("Power %1 W").arg(static_cast<int>(std::round(now.power))));
             if (m_settings.overlayHeartRate && now.hasHeartRate)
@@ -892,7 +846,7 @@ void VideoRenderJob::run()
         const int done = frame + 1;
         const double avgPerFrameMs = done > 0 ? static_cast<double>(elapsedMs) / static_cast<double>(done) : 0.0;
         const double remainingMs = avgPerFrameMs * static_cast<double>(totalFrames - done);
-        const QString eta = fmtDuration(remainingMs / 1000.0);
+        const QString eta = formatDuration(remainingMs / 1000.0);
 
         if (done == 1 || done % 60 == 0 || done == totalFrames)
         {
