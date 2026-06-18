@@ -201,6 +201,9 @@ private:
     /// @brief Applies controller chart updates based on current UI control state.
     void applyChartControlDrivenUpdates(bool includeLegendLayout, bool applySmoothing = false);
 
+    /// @brief Refreshes map route coloring based on current ride data and metric.
+    void refreshMapRideDataFromCurrentState();
+
         // -- Undo/Redo ----------------------------------------------------------
         UndoManager*   m_undoManager    = nullptr;
 

@@ -1612,8 +1612,7 @@ void MainWindow::buildUI()
             m_chartController->updateCharts();
             m_chartController->updateZonesTab();
         }
-        if (m_mapRenderer)
-            m_mapRenderer->setRideData(m_controller->rideData(), currentColorMetric(), buildColorContext());
+        refreshMapRideDataFromCurrentState();
     });
 
     resize(1050, 860);
@@ -2638,6 +2637,14 @@ void MainWindow::applyChartControlDrivenUpdates(bool includeLegendLayout, bool a
     m_chartController->updateZonesTab();
 }
 
+void MainWindow::refreshMapRideDataFromCurrentState()
+{
+    if (!m_mapRenderer)
+        return;
+
+    m_mapRenderer->setRideData(m_controller->rideData(), currentColorMetric(), buildColorContext());
+}
+
 // ── Slots ─────────────────────────────────────────────────────────────────────
 
 void MainWindow::importActivities()
@@ -3032,8 +3039,7 @@ void MainWindow::onWorkoutLoaded()
 
     updateClimbingTab();
 
-    if (m_mapRenderer)
-        m_mapRenderer->setRideData(m_controller->rideData(), currentColorMetric(), buildColorContext());
+    refreshMapRideDataFromCurrentState();
 
 }
 
@@ -3154,8 +3160,7 @@ void MainWindow::applyChartPreset(int presetId)
 
     m_powerSmoothingCombo->setEnabled(!m_autoSmoothingCheck->isChecked());
     applyChartControlDrivenUpdates(true, true);
-    if (m_mapRenderer)
-        m_mapRenderer->setRideData(m_controller->rideData(), currentColorMetric(), buildColorContext());
+    refreshMapRideDataFromCurrentState();
 }
 
 double MainWindow::estimatedFtpFromCurrentRide() const
