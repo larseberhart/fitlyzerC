@@ -2401,21 +2401,30 @@ void MainWindow::importFilesInternal(const QStringList& filePaths,
                                      bool showResultDialog,
                                      const QString& sourceLabel)
 {
+    const QStringList prepared = prepareImportFileBatch(filePaths);
+    if (prepared.isEmpty())
+        return;
+
+    enqueueImportBatch(prepared, showResultDialog, sourceLabel);
+}
+
+QStringList MainWindow::prepareImportFileBatch(const QStringList& filePaths)
+{
     QStringList deduped = filePaths;
     deduped.removeDuplicates();
     if (deduped.isEmpty())
-        return;
+        return {};
 
     if (!ensureImportReady())
     {
         updateImportAvailability();
-        return;
+        return {};
     }
 
     if (!m_importQueue)
-        return;
+        return {};
 
-    enqueueImportBatch(deduped, showResultDialog, sourceLabel);
+    return deduped;
 }
 
 void MainWindow::enqueueImportBatch(const QStringList& filePaths,
