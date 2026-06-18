@@ -3019,23 +3019,20 @@ void MainWindow::onWorkoutLoaded()
 
 void MainWindow::updateAnalysisEmptyStates()
 {
-    const bool hasActivity = !m_controller->rideData().records.empty();
-    const int page = hasActivity ? 1 : 0;
+    if (!m_chartController)
+        return;
 
-    const std::initializer_list<QStackedLayout*> stacks =
-        { m_activityTabStack,
-          m_zonesTabStack,
-          m_histogramTabStack,
-          m_powerCurveTabStack,
-          m_calendarTabStack,
-          m_fitnessTabStack,
-          m_climbingTabStack };
-
-    for (auto* stack : stacks)
-    {
-        if (stack)
-            stack->setCurrentIndex(page);
-    }
+    m_chartController->setAnalysisTabWidgets(
+        m_analysisTabWidget,
+        nullptr,
+        m_activityTabStack,
+        m_zonesTabStack,
+        m_histogramTabStack,
+        m_powerCurveTabStack,
+        m_calendarTabStack,
+        m_fitnessTabStack);
+    m_chartController->setClimbingTabStack(m_climbingTabStack);
+    m_chartController->updateAnalysisEmptyStates();
 }
 
 // ── Update helpers ────────────────────────────────────────────────────────────

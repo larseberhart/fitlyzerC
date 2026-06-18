@@ -129,6 +129,14 @@ void ChartController::setAnalysisTabWidgets(
 }
 
 /**
+ * @brief Sets climbing tab stacked layout.
+ */
+void ChartController::setClimbingTabStack(QStackedLayout* climbingTabStack)
+{
+    m_climbingTabStack = climbingTabStack;
+}
+
+/**
  * @brief Sets the zones table widget for zone distribution display.
  */
 void ChartController::setZonesTable(QTableWidget* zonesTable)
@@ -348,7 +356,26 @@ void ChartController::updateFitnessChart()
  */
 void ChartController::updateAnalysisEmptyStates()
 {
-    // TODO: Extract updateAnalysisEmptyStates logic from MainWindow
+    if (!m_controller)
+        return;
+
+    const bool hasActivity = !m_controller->rideData().records.empty();
+    const int page = hasActivity ? 1 : 0;
+
+    const std::initializer_list<QStackedLayout*> stacks =
+        { m_activityTabStack,
+          m_zonesTabStack,
+          m_histogramTabStack,
+          m_powerCurveTabStack,
+          m_calendarTabStack,
+          m_fitnessTabStack,
+          m_climbingTabStack };
+
+    for (auto* stack : stacks)
+    {
+        if (stack)
+            stack->setCurrentIndex(page);
+    }
 }
 
 /**

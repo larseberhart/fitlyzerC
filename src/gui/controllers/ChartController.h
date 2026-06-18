@@ -67,6 +67,11 @@ public:
         QStackedLayout* fitnessTabStack);
 
     /**
+     * @brief Sets the climbing tab stacked layout.
+     */
+    void setClimbingTabStack(QStackedLayout* climbingTabStack);
+
+    /**
      * @brief Sets the zones table widget for zone distribution display.
      */
     void setZonesTable(QTableWidget* zonesTable);
@@ -238,6 +243,7 @@ private:
     QStackedLayout* m_powerCurveTabStack = nullptr;
     QStackedLayout* m_calendarTabStack = nullptr;
     QStackedLayout* m_fitnessTabStack = nullptr;
+    QStackedLayout* m_climbingTabStack = nullptr;
 
     // Chart data
     std::vector<Interval> m_intervals;
