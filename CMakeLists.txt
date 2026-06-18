@@ -386,6 +386,8 @@ set(FITLYZERC_SOURCES
     "${CMAKE_SOURCE_DIR}/src/maps/MapRenderer.h"
     "${CMAKE_SOURCE_DIR}/src/maps/TileCache.cpp"
     "${CMAKE_SOURCE_DIR}/src/maps/TileCache.h"
+    "${CMAKE_SOURCE_DIR}/src/maps/providers/TileProviderRegistry.cpp"
+    "${CMAKE_SOURCE_DIR}/src/maps/providers/TileProviderRegistry.h"
     "${CMAKE_SOURCE_DIR}/src/model/RideDataLoader.cpp"
     "${CMAKE_SOURCE_DIR}/src/model/RideDataLoader.h"
     "${CMAKE_SOURCE_DIR}/src/model/RideDataSerializer.cpp"

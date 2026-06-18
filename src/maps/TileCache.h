@@ -112,9 +112,6 @@ private:
                                        int x,
                                        int y);
     QString diskTilePath(int z, int x, int y) const;
-    static QString styleKey(MapStyle style);
-    static QString styleDisplayName(MapStyle style);
-    static TileProvider providerForStyle(MapStyle style);
 
     void dispatchNextDownloads();
 

@@ -14,6 +14,8 @@
 
 #include <algorithm>
 
+#include "maps/providers/TileProviderRegistry.h"
+
 namespace
 {
 QString defaultDiskCacheRoot()
@@ -25,99 +27,6 @@ QString defaultDiskCacheRoot()
 }
 }
 
-QString TileCache::styleKey(MapStyle style)
-{
-    switch (style)
-    {
-        case MapStyle::Street:      return "street";
-        case MapStyle::Light:       return "light";
-        case MapStyle::Dark:        return "dark";
-        case MapStyle::Satellite:   return "satellite";
-        case MapStyle::Terrain:     return "terrain";
-        case MapStyle::Topographic: return "topographic";
-        case MapStyle::Minimal:     return "minimal";
-    }
-    return "street";
-}
-
-QString TileCache::styleDisplayName(MapStyle style)
-{
-    switch (style)
-    {
-        case MapStyle::Street:      return "Street Map";
-        case MapStyle::Light:       return "Light";
-        case MapStyle::Dark:        return "Dark";
-        case MapStyle::Satellite:   return "Satellite";
-        case MapStyle::Terrain:     return "Terrain";
-        case MapStyle::Topographic: return "Topographic";
-        case MapStyle::Minimal:     return "Minimal";
-    }
-    return "Street Map";
-}
-
-TileProvider TileCache::providerForStyle(MapStyle style)
-{
-    switch (style)
-    {
-        case MapStyle::Street:
-            return {
-                "OpenStreetMap Standard",
-                "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-                19,
-                "© OpenStreetMap contributors"
-            };
-        case MapStyle::Light:
-            return {
-                "Carto Positron",
-                "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-                20,
-                "© OpenStreetMap contributors © CARTO"
-            };
-        case MapStyle::Dark:
-            return {
-                "Carto Dark Matter",
-                "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-                20,
-                "© OpenStreetMap contributors © CARTO"
-            };
-        case MapStyle::Satellite:
-            return {
-                "Esri World Imagery",
-                "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-                18,
-                "Tiles © Esri"
-            };
-        case MapStyle::Terrain:
-            return {
-                "OpenTopoMap",
-                "https://a.tile.opentopomap.org/{z}/{x}/{y}.png",
-                17,
-                "© OpenStreetMap contributors, SRTM | © OpenTopoMap"
-            };
-        case MapStyle::Topographic:
-            return {
-                "OpenTopoMap",
-                "https://a.tile.opentopomap.org/{z}/{x}/{y}.png",
-                17,
-                "© OpenStreetMap contributors, SRTM | © OpenTopoMap"
-            };
-        case MapStyle::Minimal:
-            return {
-                "Carto Positron No Labels",
-                "https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png",
-                20,
-                "© OpenStreetMap contributors © CARTO"
-            };
-    }
-
-    return {
-        "OpenStreetMap Standard",
-        "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-        19,
-        "© OpenStreetMap contributors"
-    };
-}
-
 TileCache::TileCache(const TileCacheConfig& config, QObject* parent)
     : QObject(parent)
     , m_cache(std::max(1, config.maxTilesInMemory))
@@ -126,14 +35,14 @@ TileCache::TileCache(const TileCacheConfig& config, QObject* parent)
           : config.diskCacheRoot)
     , m_diskFallbackRoots(config.diskFallbackRoots)
 {
-    m_provider = providerForStyle(m_mapStyle);
+    m_provider = TileProviderRegistry::providerForStyle(m_mapStyle);
     connect(&m_nam, &QNetworkAccessManager::finished,
             this,   &TileCache::onReplyFinished);
 }
 
 QString TileCache::key(int z, int x, int y) const
 {
-    return keyForStyle(styleKey(m_mapStyle), z, x, y);
+    return keyForStyle(TileProviderRegistry::styleKey(m_mapStyle), z, x, y);
 }
 
 QString TileCache::keyForStyle(const QString& style, int z, int x, int y)
@@ -143,7 +52,7 @@ QString TileCache::keyForStyle(const QString& style, int z, int x, int y)
 
 QString TileCache::diskTilePathForRoot(const QString& root, int z, int x, int y) const
 {
-    return diskTilePathForRoot(root, styleKey(m_mapStyle), z, x, y);
+    return diskTilePathForRoot(root, TileProviderRegistry::styleKey(m_mapStyle), z, x, y);
 }
 
 QString TileCache::diskTilePathForRoot(const QString& root,
@@ -213,13 +122,13 @@ void TileCache::setMapStyle(MapStyle style)
     }
 
     m_mapStyle = style;
-    m_provider = providerForStyle(style);
+    m_provider = TileProviderRegistry::providerForStyle(style);
     clearMemoryCache();
 }
 
 QString TileCache::mapStyleName() const
 {
-    return styleDisplayName(m_mapStyle);
+    return TileProviderRegistry::styleDisplayName(m_mapStyle);
 }
 
 QString TileCache::attribution() const
@@ -369,7 +278,7 @@ void TileCache::dispatchNextDownloads()
         reply->setProperty("z", req.z);
         reply->setProperty("x", req.x);
         reply->setProperty("y", req.y);
-        reply->setProperty("style", styleKey(m_mapStyle));
+        reply->setProperty("style", TileProviderRegistry::styleKey(m_mapStyle));
 
         ++m_activeDownloads;
     }
@@ -396,7 +305,7 @@ void TileCache::onReplyFinished(QNetworkReply* reply)
     dispatchNextDownloads();
 
     // Skip processing aborted or stale-style replies
-    if (wasAbortedForStyleChange || replyStyle != styleKey(m_mapStyle))
+    if (wasAbortedForStyleChange || replyStyle != TileProviderRegistry::styleKey(m_mapStyle))
         return;
 
     if (reply->error() != QNetworkReply::NoError)
