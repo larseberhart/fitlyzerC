@@ -400,6 +400,8 @@ set(FITLYZERC_SOURCES
     "${CMAKE_SOURCE_DIR}/src/model/RideDataLoader.h"
     "${CMAKE_SOURCE_DIR}/src/model/RideDataSerializer.cpp"
     "${CMAKE_SOURCE_DIR}/src/model/RideDataSerializer.h"
+    "${CMAKE_SOURCE_DIR}/src/workouts/WorkoutPersistenceService.cpp"
+    "${CMAKE_SOURCE_DIR}/src/workouts/WorkoutPersistenceService.h"
     "${CMAKE_SOURCE_DIR}/src/platform/Platform.cpp"
     "${CMAKE_SOURCE_DIR}/src/platform/Platform.h"
     "${CMAKE_SOURCE_DIR}/src/platform/Platform_linux.cpp"

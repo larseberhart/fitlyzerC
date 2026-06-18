@@ -25,6 +25,7 @@
 #include "database/IntervalRepository.h"
 #include "fit/FitParser.h"
 #include "model/RideDataSerializer.h"
+#include "workouts/WorkoutPersistenceService.h"
 
 namespace
 {
@@ -185,7 +186,7 @@ int WorkoutController::importFile(const QString& path, QString& errorOut,
     ActivityRepository actRepo(db);
     ImportRepository   impRepo(db);
 
-    const int activityId = RideDataSerializer::saveRideToDatabase(
+    const int activityId = WorkoutPersistenceService::saveRide(
         ride, stats, m_currentAthleteId, path, fitHash,
         np, *m_dbManager, actRepo, impRepo, &errorOut);
 
@@ -229,7 +230,7 @@ bool WorkoutController::loadActivity(int activityId, QString& errorOut)
         return false;
     }
 
-    m_rideData = RideDataSerializer::loadRideFromDatabase(activityId, *m_dbManager);
+    m_rideData = WorkoutPersistenceService::loadRide(activityId, *m_dbManager);
     if (m_rideData.records.empty())
     {
         errorOut = "Activity has no samples in the database.";
