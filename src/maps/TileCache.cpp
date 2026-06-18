@@ -14,6 +14,7 @@
 
 #include <algorithm>
 
+#include "maps/cache/DiskTileCache.h"
 #include "maps/providers/TileProviderRegistry.h"
 
 namespace
@@ -61,11 +62,7 @@ QString TileCache::diskTilePathForRoot(const QString& root,
                                        int x,
                                        int y)
 {
-    return QDir(root).filePath(QString("%1/%2/%3/%4.png")
-                                   .arg(style)
-                                   .arg(z)
-                                   .arg(x)
-                                   .arg(y));
+    return DiskTileCache::diskTilePathForRoot(root, style, z, x, y);
 }
 
 QString TileCache::diskTilePath(int z, int x, int y) const
@@ -76,18 +73,13 @@ QString TileCache::diskTilePath(int z, int x, int y) const
 bool TileCache::isTileCachedOnDisk(int z, int x, int y) const
 {
     z = std::clamp(z, 1, m_provider.maxZoom);
-    if (QFileInfo::exists(diskTilePath(z, x, y)))
-        return true;
-
-    for (const QString& fallbackRoot : m_diskFallbackRoots)
-    {
-        if (fallbackRoot.trimmed().isEmpty())
-            continue;
-        if (QFileInfo::exists(diskTilePathForRoot(fallbackRoot, z, x, y)))
-            return true;
-    }
-
-    return false;
+    return DiskTileCache::isTileCachedOnDisk(
+        m_diskCacheRoot,
+        m_diskFallbackRoots,
+        TileProviderRegistry::styleKey(m_mapStyle),
+        z,
+        x,
+        y);
 }
 
 void TileCache::clearMemoryCache()

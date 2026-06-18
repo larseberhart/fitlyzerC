@@ -394,6 +394,8 @@ set(FITLYZERC_SOURCES
     "${CMAKE_SOURCE_DIR}/src/maps/MapFitMath.h"
     "${CMAKE_SOURCE_DIR}/src/maps/MapRenderer.cpp"
     "${CMAKE_SOURCE_DIR}/src/maps/MapRenderer.h"
+    "${CMAKE_SOURCE_DIR}/src/maps/cache/DiskTileCache.cpp"
+    "${CMAKE_SOURCE_DIR}/src/maps/cache/DiskTileCache.h"
     "${CMAKE_SOURCE_DIR}/src/maps/cache/GpsCacheBuilder.cpp"
     "${CMAKE_SOURCE_DIR}/src/maps/cache/GpsCacheBuilder.h"
     "${CMAKE_SOURCE_DIR}/src/maps/rendering/RouteColorizer.cpp"
