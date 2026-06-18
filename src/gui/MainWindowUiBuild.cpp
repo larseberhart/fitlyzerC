@@ -55,6 +55,7 @@
 #include "pages/IntervalsPage.h"
 #include "pages/PlaceholderPage.h"
 #include "pages/PowerPage.h"
+#include "pages/VideoPage.h"
 #include "analysis/IntervalDetector.h"
 #include "charts/FitnessChartWidget.h"
 #include "charts/PowerCurveWidget.h"
@@ -1136,8 +1137,12 @@ void MainWindow::buildUI()
     // [6] Calendar — activity and workout planning
     m_pageStack->addWidget(new CalendarPage(m_calendarWidget, m_pageStack));
 
-    // [7] Video — placeholder (Phase 10)
-    m_pageStack->addWidget(new PlaceholderPage("Video — coming in Phase 10", m_pageStack));
+    // [7] Video — video creation and export page
+    {
+        auto* videoPage = new VideoPage(m_pageStack);
+        connect(videoPage, &VideoPage::createVideoRequested, this, &MainWindow::createVideo);
+        m_pageStack->addWidget(videoPage);
+    }
 
     // Sidebar (fixed width, left) | page stack (stretching, right)
     auto* contentRow = new QHBoxLayout;

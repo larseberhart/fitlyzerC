@@ -411,6 +411,8 @@ set(FITLYZERC_SOURCES
     "${CMAKE_SOURCE_DIR}/src/gui/pages/IntervalsPage.h"
     "${CMAKE_SOURCE_DIR}/src/gui/pages/PowerPage.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/pages/PowerPage.h"
+    "${CMAKE_SOURCE_DIR}/src/gui/pages/VideoPage.cpp"
+    "${CMAKE_SOURCE_DIR}/src/gui/pages/VideoPage.h"
     "${CMAKE_SOURCE_DIR}/src/gui/PlannedWorkoutDialog.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/PlannedWorkoutDialog.h"
     "${CMAKE_SOURCE_DIR}/src/gui/WelcomeWidget.cpp"
