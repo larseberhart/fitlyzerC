@@ -251,6 +251,8 @@ target_include_directories(FitSDK PUBLIC
 set(FITLYZERC_SOURCES
     "${CMAKE_SOURCE_DIR}/src/analysis/ClimbDetector.cpp"
     "${CMAKE_SOURCE_DIR}/src/analysis/ClimbDetector.h"
+    "${CMAKE_SOURCE_DIR}/src/analysis/climb/ClimbCandidateFinder.cpp"
+    "${CMAKE_SOURCE_DIR}/src/analysis/climb/ClimbCandidateFinder.h"
     "${CMAKE_SOURCE_DIR}/src/analysis/climb/ClimbClassifier.cpp"
     "${CMAKE_SOURCE_DIR}/src/analysis/climb/ClimbClassifier.h"
     "${CMAKE_SOURCE_DIR}/src/analysis/climb/ClimbMerger.cpp"
