@@ -6,11 +6,13 @@
 #include <QComboBox>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QDoubleSpinBox>
 #include <QFile>
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QMessageBox>
+#include <QPushButton>
 #include <QSettings>
 #include <QSqlQuery>
 #include <QVBoxLayout>
@@ -21,6 +23,20 @@
 #include "core/settings/AppSettings.h"
 #include "maps/MapRenderer.h"
 #include "platform/Platform.h"
+
+// ── Settings helpers ─────────────────────────────────────────────────────────
+
+/// Default climb detection values (mirrors ClimbDetector defaults).
+namespace ClimbDefaults
+{
+    static constexpr double kMinLength    = 0.15;
+    static constexpr double kMinGain      = 10.0;
+    static constexpr double kMinGradient  = 4.0;
+    static constexpr double kStartGrad    = 1.5;
+    static constexpr double kDipMeters    = 10.0;
+    static constexpr double kDipDistance  = 200.0;
+    static constexpr double kSmoothing    = 50.0;
+}
 
 void MainWindow::manageAthletes()
 {
@@ -89,6 +105,60 @@ void MainWindow::openSettingsDialog()
     mapsForm->addRow("Tile Memory Cache:", tileCacheCombo);
     layout->addWidget(mapsGroup);
 
+    // Climb Detection group
+    // Parameters are persisted in QSettings and also reflected in the live
+    // spinboxes on ClimbsPage.
+    auto* climbGroup = new QGroupBox("Climb Detection", &dialog);
+    auto* climbForm  = new QFormLayout(climbGroup);
+
+    QSettings climbSettings("Fitlyzer", "FitlyzerC");
+    auto makeSpin = [&climbSettings, &climbGroup](
+        const QString& key, double defaultVal, double min, double max, int decimals) -> QDoubleSpinBox*
+    {
+        auto* spin = new QDoubleSpinBox(climbGroup);
+        spin->setRange(min, max);
+        spin->setDecimals(decimals);
+        spin->setValue(climbSettings.value(key, defaultVal).toDouble());
+        return spin;
+    };
+
+    auto* csMinLen  = makeSpin("climb/minLength",   ClimbDefaults::kMinLength,    0.1, 20.0,   2);
+    auto* csMinGain = makeSpin("climb/minGain",     ClimbDefaults::kMinGain,      1.0, 2000.0, 0);
+    auto* csMinGrad = makeSpin("climb/minGradient", ClimbDefaults::kMinGradient,  0.5, 20.0,   1);
+    auto* csStGrad  = makeSpin("climb/startGrad",   ClimbDefaults::kStartGrad,    0.5, 20.0,   1);
+    auto* csDipM    = makeSpin("climb/dipMeters",   ClimbDefaults::kDipMeters,    0.0, 200.0,  1);
+    auto* csDipD    = makeSpin("climb/dipDistance", ClimbDefaults::kDipDistance,  10.0,2000.0, 0);
+    auto* csSmooth  = makeSpin("climb/smoothing",   ClimbDefaults::kSmoothing,    1.0, 500.0,  0);
+
+    csMinLen->setSuffix(" km");
+    csMinGain->setSuffix(" m");
+    csMinGrad->setSuffix(" %");
+    csStGrad->setSuffix(" %");
+    csDipM->setSuffix(" m");
+    csDipD->setSuffix(" m");
+
+    climbForm->addRow("Minimum Length:",    csMinLen);
+    climbForm->addRow("Minimum Gain:",      csMinGain);
+    climbForm->addRow("Average Gradient:",  csMinGrad);
+    climbForm->addRow("Start Gradient:",    csStGrad);
+    climbForm->addRow("Dip Elevation:",     csDipM);
+    climbForm->addRow("Dip Distance:",      csDipD);
+    climbForm->addRow("Smoothing:",         csSmooth);
+
+    auto* restoreDefaultsBtn = new QPushButton("Restore Defaults", climbGroup);
+    climbForm->addRow("", restoreDefaultsBtn);
+    connect(restoreDefaultsBtn, &QPushButton::clicked, this, [=]() {
+        csMinLen->setValue(ClimbDefaults::kMinLength);
+        csMinGain->setValue(ClimbDefaults::kMinGain);
+        csMinGrad->setValue(ClimbDefaults::kMinGradient);
+        csStGrad->setValue(ClimbDefaults::kStartGrad);
+        csDipM->setValue(ClimbDefaults::kDipMeters);
+        csDipD->setValue(ClimbDefaults::kDipDistance);
+        csSmooth->setValue(ClimbDefaults::kSmoothing);
+    });
+
+    layout->addWidget(climbGroup);
+
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
     layout->addWidget(buttons);
 
@@ -111,6 +181,30 @@ void MainWindow::openSettingsDialog()
         if (m_mapRenderer)
             m_mapRenderer->setTileCacheSize(selectedCacheSize);
     }
+
+    // Apply climb detection settings and update the live spinboxes on ClimbsPage.
+    QSettings cs("Fitlyzer", "FitlyzerC");
+    cs.setValue("climb/minLength",   csMinLen->value());
+    cs.setValue("climb/minGain",     csMinGain->value());
+    cs.setValue("climb/minGradient", csMinGrad->value());
+    cs.setValue("climb/startGrad",   csStGrad->value());
+    cs.setValue("climb/dipMeters",   csDipM->value());
+    cs.setValue("climb/dipDistance", csDipD->value());
+    cs.setValue("climb/smoothing",   csSmooth->value());
+
+    // Sync the live ClimbsPage spinboxes (they auto-trigger detection on change).
+    auto applyIfChanged = [](QDoubleSpinBox* spin, double newVal)
+    {
+        if (spin && !qFuzzyCompare(spin->value(), newVal))
+            spin->setValue(newVal);
+    };
+    applyIfChanged(m_climbMinLengthSpin,    csMinLen->value());
+    applyIfChanged(m_climbMinGainSpin,      csMinGain->value());
+    applyIfChanged(m_climbMinGradientSpin,  csMinGrad->value());
+    applyIfChanged(m_climbStartGradientSpin, csStGrad->value());
+    applyIfChanged(m_climbDipMetersSpin,    csDipM->value());
+    applyIfChanged(m_climbDipDistanceSpin,  csDipD->value());
+    applyIfChanged(m_climbSmoothingSpin,    csSmooth->value());
 
     if (selectedFormat == currentFormat)
         return;

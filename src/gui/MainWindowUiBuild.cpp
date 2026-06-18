@@ -911,6 +911,18 @@ void MainWindow::buildUI()
         m_climbSmoothingSpin->setSingleStep(5.0);
         m_climbSmoothingSpin->setValue(50.0);
 
+        // Override spinbox defaults with persisted settings (set in Settings dialog).
+        {
+            QSettings cs("Fitlyzer", "FitlyzerC");
+            m_climbMinLengthSpin->setValue(   cs.value("climb/minLength",    0.15).toDouble());
+            m_climbMinGainSpin->setValue(      cs.value("climb/minGain",     10.0).toDouble());
+            m_climbMinGradientSpin->setValue(  cs.value("climb/minGradient",  4.0).toDouble());
+            m_climbStartGradientSpin->setValue(cs.value("climb/startGrad",    1.5).toDouble());
+            m_climbDipMetersSpin->setValue(    cs.value("climb/dipMeters",   10.0).toDouble());
+            m_climbDipDistanceSpin->setValue(  cs.value("climb/dipDistance", 200.0).toDouble());
+            m_climbSmoothingSpin->setValue(    cs.value("climb/smoothing",   50.0).toDouble());
+        }
+
         m_climbOverlayEnabledCheck = new QCheckBox("Overlay", climbingTab);
         m_climbOverlayEnabledCheck->setChecked(false);
         m_climbOverlayEnabledCheck->setStyleSheet(
