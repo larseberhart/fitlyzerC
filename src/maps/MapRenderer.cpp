@@ -11,6 +11,7 @@
 
 #include "core/settings/AppSettings.h"
 #include "core/zones/ColorProvider.h"
+#include "maps/cache/GpsCacheBuilder.h"
 #include "maps/MapFitMath.h"
 #include "maps/rendering/RouteColorizer.h"
 
@@ -147,21 +148,10 @@ void MapRenderer::rebuildSegmentColors()
 
 void MapRenderer::rebuildGpsCache()
 {
-    m_gpsRecords.clear();
-    m_gpsRecords.reserve(m_rideData.records.size());
-    m_firstGpsRecord = nullptr;
-    m_lastGpsRecord  = nullptr;
-
-    for (const auto& r : m_rideData.records)
-    {
-        if (!r.hasGps)
-            continue;
-        m_gpsRecords.push_back(&r);
-        if (!m_firstGpsRecord)
-            m_firstGpsRecord = &r;
-        m_lastGpsRecord = &r;
-    }
-    // Records are already in elapsedSeconds order from FIT parsing.
+    const GpsCacheData cache = GpsCacheBuilder::build(m_rideData);
+    m_gpsRecords = cache.records;
+    m_firstGpsRecord = cache.firstRecord;
+    m_lastGpsRecord = cache.lastRecord;
 }
 
 // Nearest GPS record to a given elapsed time: O(log N).
