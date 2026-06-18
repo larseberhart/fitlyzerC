@@ -369,6 +369,7 @@ set(FITLYZERC_SOURCES
     "${CMAKE_SOURCE_DIR}/src/gui/MainWindowAthlete.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/MainWindowCharts.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/MainWindowChartActions.cpp"
+    "${CMAKE_SOURCE_DIR}/src/gui/MainWindowClimbViews.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/MainWindowClimbInteractions.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/MainWindowDatabase.cpp"
         "${CMAKE_SOURCE_DIR}/src/gui/MainWindowContext.cpp"
