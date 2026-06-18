@@ -2624,12 +2624,14 @@ void MainWindow::syncChartContextToController(bool includeLegendLayout)
     m_chartController->setClimbingTabStack(m_climbingTabStack);
 }
 
-void MainWindow::applyChartControlDrivenUpdates(bool includeLegendLayout)
+void MainWindow::applyChartControlDrivenUpdates(bool includeLegendLayout, bool applySmoothing)
 {
     if (!m_chartController)
         return;
 
     syncChartContextToController(includeLegendLayout);
+    if (applySmoothing)
+        m_chartController->applyChartSmoothing();
     m_chartController->updateColorLegend();
     m_chartController->updateZoneAvailability();
     m_chartController->updateCharts();
@@ -3151,9 +3153,7 @@ void MainWindow::applyChartPreset(int presetId)
     }
 
     m_powerSmoothingCombo->setEnabled(!m_autoSmoothingCheck->isChecked());
-    syncChartContextToController(true);
-    m_chartController->applyChartSmoothing();
-    applyChartControlDrivenUpdates(true);
+    applyChartControlDrivenUpdates(true, true);
     if (m_mapRenderer)
         m_mapRenderer->setRideData(m_controller->rideData(), currentColorMetric(), buildColorContext());
 }

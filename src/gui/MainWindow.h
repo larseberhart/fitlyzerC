@@ -199,7 +199,7 @@ private:
     void syncChartContextToController(bool includeLegendLayout);
 
     /// @brief Applies controller chart updates based on current UI control state.
-    void applyChartControlDrivenUpdates(bool includeLegendLayout);
+    void applyChartControlDrivenUpdates(bool includeLegendLayout, bool applySmoothing = false);
 
         // -- Undo/Redo ----------------------------------------------------------
         UndoManager*   m_undoManager    = nullptr;
