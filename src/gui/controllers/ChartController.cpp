@@ -494,14 +494,6 @@ void ChartController::handleWorkoutLoaded()
 }
 
 /**
- * @brief Slot for when WorkoutController loads a new activity.
- */
-void ChartController::onWorkoutLoaded()
-{
-    handleWorkoutLoaded();
-}
-
-/**
  * @brief Helper to apply current color metric to charts.
  */
 void ChartController::applyColorMetric()

@@ -203,10 +203,6 @@ signals:
     /// @brief Emitted when an error occurs during chart operations.
     void errorOccurred(const QString& message);
 
-private slots:
-    /// @brief Slot for when WorkoutController loads a new activity.
-    void onWorkoutLoaded();
-
 private:
     /// @brief Helper to connect chart widget signals for synchronization.
     void connectChartSignals();
