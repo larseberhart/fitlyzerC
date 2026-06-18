@@ -348,6 +348,8 @@ set(FITLYZERC_SOURCES
     "${CMAKE_SOURCE_DIR}/src/gui/ImportStatusWidget.h"
     "${CMAKE_SOURCE_DIR}/src/gui/MainWindow.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/MainWindow.h"
+    "${CMAKE_SOURCE_DIR}/src/gui/controllers/ActivityViewController.cpp"
+    "${CMAKE_SOURCE_DIR}/src/gui/controllers/ActivityViewController.h"
     "${CMAKE_SOURCE_DIR}/src/gui/NavigationSidebar.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/NavigationSidebar.h"
     "${CMAKE_SOURCE_DIR}/src/gui/PlannedWorkoutDialog.cpp"
