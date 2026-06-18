@@ -1605,13 +1605,7 @@ void MainWindow::buildUI()
             [this](int)
     {
         if (m_chartController)
-        {
-            syncChartContextToController(true);
-            m_chartController->updateColorLegend();
-            m_chartController->updateZoneAvailability();
-            m_chartController->updateCharts();
-            m_chartController->updateZonesTab();
-        }
+            applyChartControlDrivenUpdates(true, false);
         refreshMapRideDataFromCurrentState();
     });
 
