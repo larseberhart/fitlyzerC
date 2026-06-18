@@ -377,6 +377,7 @@ set(FITLYZERC_SOURCES
     "${CMAKE_SOURCE_DIR}/src/gui/MainWindowIntervals.cpp"
         "${CMAKE_SOURCE_DIR}/src/gui/MainWindowReadiness.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/MainWindowStatus.cpp"
+    "${CMAKE_SOURCE_DIR}/src/gui/MainWindowUi.cpp"
         "${CMAKE_SOURCE_DIR}/src/gui/MainWindowVideo.cpp"
         "${CMAKE_SOURCE_DIR}/src/gui/MainWindowWatch.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/controllers/ChartController.cpp"
