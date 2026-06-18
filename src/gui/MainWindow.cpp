@@ -2984,22 +2984,30 @@ void MainWindow::onAthleteSelectionChanged(int index)
 
 void MainWindow::onWorkoutLoaded()
 {
-    const bool hasPower =
-        m_controller->statistics().maximumPower > 0.0;
-
     updateStatsLabel();
     updateAnalysisEmptyStates();
-    updateCharts();
-    updateColorLegend();
-    updateZoneAvailability();
+
+    const bool hasPower = m_controller->statistics().maximumPower > 0.0;
+    if (m_chartController)
+    {
+        const std::vector<Climb>& climbsForView =
+            m_climbMinLengthSpin ? m_detectedClimbs : m_controller->climbs();
+
+        m_chartController->setClimbs(climbsForView);
+        m_chartController->setColorMetric(static_cast<int>(currentColorMetric()));
+        m_chartController->setColorContext(buildColorContext());
+        m_chartController->setAthleteId(m_currentAthleteId);
+        m_chartController->setZonesTable(m_zonesTable);
+        m_chartController->setChartControls(
+            m_colorMetricCombo, m_powerSmoothingCombo,
+            m_autoSmoothingCheck, m_climbOverlayEnabledCheck,
+            m_climbOverlayMetricCombo, m_colorLegendLayout);
+        m_chartController->handleWorkoutLoaded();
+    }
 
     if (hasPower)
     {
-        updateZonesTab();
-        updateHistogram();
-        updatePowerCurve();
         updateIntervals();
-        updateFitnessChart();
     }
 
     updateClimbingTab();
@@ -3007,8 +3015,6 @@ void MainWindow::onWorkoutLoaded()
     if (m_mapRenderer)
         m_mapRenderer->setRideData(m_controller->rideData(), currentColorMetric(), buildColorContext());
 
-    // Activity selection should always start from the full-ride chart extent.
-    resetAllZoom();
 }
 
 void MainWindow::updateAnalysisEmptyStates()

@@ -186,6 +186,11 @@ public:
      */
     void updateZoneAvailability();
 
+    /**
+     * @brief Runs full chart update sequence after a workout is loaded.
+     */
+    void handleWorkoutLoaded();
+
 signals:
     /// @brief Emitted when charts have been successfully updated.
     void chartsUpdated();

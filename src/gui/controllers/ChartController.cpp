@@ -73,11 +73,6 @@ ChartController::ChartController(
     , m_controller(controller)
     , m_dbManager(dbManager)
 {
-    if (m_controller)
-    {
-        connect(m_controller, &WorkoutController::workoutLoaded,
-                this, &ChartController::onWorkoutLoaded);
-    }
 }
 
 /**
@@ -450,20 +445,33 @@ void ChartController::updateZoneAvailability()
 }
 
 /**
- * @brief Slot for when WorkoutController loads a new activity.
+ * @brief Runs full chart update sequence after workout load.
  */
-void ChartController::onWorkoutLoaded()
+void ChartController::handleWorkoutLoaded()
 {
-    // Coordinate chart updates
     const bool hasPower = m_controller && m_controller->statistics().maximumPower > 0.0;
+
+    updateCharts();
+    updateColorLegend();
+    updateZoneAvailability();
+
     if (hasPower)
     {
+        updateZonesTab();
         updateHistogram();
+        updatePowerCurve();
         updateFitnessChart();
     }
 
     resetAllZoom();
-    emit chartsUpdated();
+}
+
+/**
+ * @brief Slot for when WorkoutController loads a new activity.
+ */
+void ChartController::onWorkoutLoaded()
+{
+    handleWorkoutLoaded();
 }
 
 /**
