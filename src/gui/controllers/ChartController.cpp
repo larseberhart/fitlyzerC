@@ -3,19 +3,59 @@
 #include "ChartController.h"
 
 #include "../WorkoutController.h"
+#include "../../analysis/PowerCurve.h"
+#include "../../core/zones/ZoneCalculator.h"
+#include "../../database/ActivityRepository.h"
 #include "../../database/DatabaseManager.h"
+#include "../../model/RideDataSerializer.h"
 #include "charts/RideChartWidget.h"
 #include "charts/PowerCurveWidget.h"
 #include "charts/PowerHistogramWidget.h"
 #include "charts/FitnessChartWidget.h"
 #include "core/zones/ZoneDefinition.h"
 
+#include <QDate>
 #include <QTabWidget>
 #include <QStackedLayout>
 #include <QTableWidget>
+#include <QTableWidgetItem>
 #include <QComboBox>
 #include <QCheckBox>
 #include <QLayout>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QSpacerItem>
+#include <QSizePolicy>
+
+#include <cfloat>
+
+namespace
+{
+QString fmtDur(double seconds)
+{
+    const int total = static_cast<int>(seconds);
+    const int h = total / 3600;
+    const int m = (total % 3600) / 60;
+    const int s = total % 60;
+    return h > 0
+        ? QString("%1:%2:%3")
+              .arg(h).arg(m, 2, 10, QChar('0')).arg(s, 2, 10, QChar('0'))
+        : QString("%1:%2")
+              .arg(m).arg(s, 2, 10, QChar('0'));
+}
+
+QString rangeLabelForZone(const Zone& zone, ColorMetric metric)
+{
+    const QString unit = colorMetricUnit(metric);
+    const QString minText = QString::number(zone.minValue, 'f', metric == ColorMetric::Speed ? 1 : 0);
+    const QString maxText = QString::number(zone.maxValue, 'f', metric == ColorMetric::Speed ? 1 : 0);
+
+    if (zone.maxValue >= DBL_MAX / 2.0)
+        return QString("> %1 %2").arg(minText, unit).trimmed();
+
+    return QString("%1 - %2 %3").arg(minText, maxText, unit).trimmed();
+}
+}
 
 /**
  * @brief Constructs the chart controller.
@@ -376,14 +416,43 @@ void ChartController::applyColorMetric()
  */
 void ChartController::updateZonesTab()
 {
-    if (!m_zonesTable || !m_controller || !m_dbManager)
+    if (!m_zonesTable || !m_controller)
         return;
 
-    // Clear existing rows
-    m_zonesTable->setRowCount(0);
+    const ColorMetric metric = static_cast<ColorMetric>(m_colorMetric);
+    const std::vector<ZoneDistribution> distributions = ZoneCalculator::computeDistribution(
+        m_controller->rideData(),
+        metric,
+        m_colorContext);
 
-    // TODO: Extract zone distribution logic from MainWindow
-    // This includes computing zone hits and populating table with color-coded zones
+    m_zonesTable->setRowCount(static_cast<int>(distributions.size()));
+
+    for (int row = 0; row < static_cast<int>(distributions.size()); ++row)
+    {
+        const ZoneDistribution& distribution = distributions[static_cast<size_t>(row)];
+
+        auto mkItem = [](const QString& text)
+        {
+            auto* item = new QTableWidgetItem(text);
+            item->setTextAlignment(Qt::AlignCenter);
+            return item;
+        };
+
+        auto* zoneItem = mkItem(QString("Z%1").arg(row + 1));
+        zoneItem->setBackground(distribution.zone.color);
+        zoneItem->setForeground(QColor("#111827"));
+        m_zonesTable->setItem(row, 0, zoneItem);
+
+        auto* nameItem = new QTableWidgetItem(distribution.zone.name);
+        nameItem->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+        m_zonesTable->setItem(row, 1, nameItem);
+
+        m_zonesTable->setItem(row, 2, mkItem(rangeLabelForZone(distribution.zone, metric)));
+        m_zonesTable->setItem(row, 3, mkItem(fmtDur(distribution.seconds)));
+        m_zonesTable->setItem(row, 4, mkItem(QString::number(distribution.percent * 100.0, 'f', 0) + "%"));
+    }
+
+    m_zonesTable->resizeColumnsToContents();
 }
 
 /**
@@ -391,12 +460,75 @@ void ChartController::updateZonesTab()
  */
 void ChartController::updatePowerCurve()
 {
-    if (!m_powerCurve || !m_controller || !m_dbManager || m_currentAthleteId < 0)
+    if (!m_powerCurve || !m_controller)
         return;
 
-    // TODO: Extract power curve computation logic from MainWindow
-    // This includes querying activities, computing power curves (90d, YTD, All-time)
-    // and updating the power curve widget
+    std::vector<PowerCurvePoint> last90;
+    std::vector<PowerCurvePoint> currentYear;
+    std::vector<PowerCurvePoint> allTime;
+
+    if (m_dbManager && m_dbManager->isOpen() && m_currentAthleteId > 0)
+    {
+        auto db = m_dbManager->database();
+        ActivityRepository repo(db);
+        const QList<Activity> activities = repo.listActivities(m_currentAthleteId);
+        const std::vector<double> durations = PowerCurve::standardDurations();
+
+        auto aggregate = [&](auto predicate)
+        {
+            std::vector<double> best(durations.size(), 0.0);
+            for (const Activity& activity : activities)
+            {
+                QString raw = !activity.startTime.isEmpty() ? activity.startTime.left(10) : activity.importedAt.left(10);
+                const QDate day = QDate::fromString(raw, Qt::ISODate);
+                if (!predicate(day))
+                    continue;
+
+                const RideData ride = RideDataSerializer::loadRideFromDatabase(activity.id, *m_dbManager);
+                if (ride.records.empty())
+                    continue;
+
+                for (size_t i = 0; i < durations.size(); ++i)
+                {
+                    const double p = PowerCurve::bestMeanPower(ride, durations[i]);
+                    if (p > best[i])
+                        best[i] = p;
+                }
+            }
+
+            std::vector<PowerCurvePoint> out;
+            for (size_t i = 0; i < durations.size(); ++i)
+            {
+                if (best[i] > 0.0)
+                    out.push_back({durations[i], best[i]});
+            }
+            return out;
+        };
+
+        const QDate today = QDate::currentDate();
+        const QDate ninetyAgo = today.addDays(-90);
+        const int year = today.year();
+
+        last90 = aggregate([&](const QDate& day)
+        {
+            return day.isValid() && day >= ninetyAgo;
+        });
+        currentYear = aggregate([&](const QDate& day)
+        {
+            return day.isValid() && day.year() == year;
+        });
+        allTime = aggregate([&](const QDate& day)
+        {
+            return day.isValid();
+        });
+    }
+
+    m_powerCurve->setRideDataWithComparisons(
+        m_controller->rideData(),
+        last90,
+        currentYear,
+        allTime,
+        m_controller->ftp());
 }
 
 /**
@@ -404,11 +536,48 @@ void ChartController::updatePowerCurve()
  */
 void ChartController::updateColorLegend()
 {
-    if (!m_colorLegend)
+    if (!m_colorLegendLayout)
         return;
 
-    // TODO: Extract color legend logic from MainWindow
-    // This includes populating legend based on current color metric and zones
+    QWidget* legendHost = m_colorLegendLayout->parentWidget();
+
+    while (QLayoutItem* item = m_colorLegendLayout->takeAt(0))
+    {
+        if (QWidget* widget = item->widget())
+            widget->deleteLater();
+        delete item;
+    }
+
+    const ColorMetric metric = static_cast<ColorMetric>(m_colorMetric);
+    if (metric == ColorMetric::None)
+    {
+        auto* label = new QLabel(QStringLiteral("Coloring disabled"), legendHost);
+        label->setStyleSheet(QStringLiteral("color: #64748b;"));
+        m_colorLegendLayout->addWidget(label);
+        m_colorLegendLayout->addItem(new QSpacerItem(0, 0, QSizePolicy::Expanding, QSizePolicy::Minimum));
+        return;
+    }
+
+    const std::vector<Zone> zones = ZoneCalculator::zonesForMetric(metric, m_colorContext);
+    for (const Zone& zone : zones)
+    {
+        auto* swatch = new QLabel(legendHost);
+        swatch->setFixedSize(12, 12);
+        swatch->setStyleSheet(QString("background: %1; border: 1px solid rgba(15,23,42,0.15);")
+                                  .arg(zone.color.name()));
+
+        auto* text = new QLabel(zone.name, legendHost);
+
+        auto* chip = new QWidget(legendHost);
+        auto* chipLayout = new QHBoxLayout(chip);
+        chipLayout->setContentsMargins(0, 0, 0, 0);
+        chipLayout->setSpacing(4);
+        chipLayout->addWidget(swatch);
+        chipLayout->addWidget(text);
+        m_colorLegendLayout->addWidget(chip);
+    }
+
+    m_colorLegendLayout->addItem(new QSpacerItem(0, 0, QSizePolicy::Expanding, QSizePolicy::Minimum));
 }
 
 /**
