@@ -19,6 +19,7 @@
 #include "core/zones/ZoneCalculator.h"
 #include "maps/MapFitMath.h"
 #include "video/VideoTileProvider.h"
+#include "video/encoding/VideoEncoder.h"
 #include "utils/FfmpegPath.h"
 
 #include <algorithm>
@@ -453,35 +454,10 @@ void VideoRenderJob::run()
     emit stageChanged("Encoding video...");
 
     QProcess ffmpeg;
-    ffmpeg.setProgram(ffmpegPath);
-    ffmpeg.setArguments({
-        "-y",
-        "-f", "rawvideo",
-        "-pixel_format", "rgba",
-        "-video_size", QString("%1x%2").arg(m_settings.width).arg(m_settings.height),
-        "-framerate", QString::number(fps),
-        "-i", "-",
-        "-an",
-        "-c:v", "libx264",
-        "-preset", "medium",
-        "-crf", "20",
-        "-pix_fmt", "yuv420p",
-        m_settings.outputPath
-    });
-    ffmpeg.setProcessChannelMode(QProcess::MergedChannels);
-    ffmpeg.start();
-
-    if (!ffmpeg.waitForStarted())
+    QString ffmpegStartError;
+    if (!VideoEncoder::startFfmpeg(ffmpeg, ffmpegPath, m_settings, fps, ffmpegStartError))
     {
-        const QString detail = ffmpeg.errorString().trimmed();
-        if (detail.isEmpty())
-        {
-            emit finished(false, QString("Failed to start FFmpeg at '%1'.").arg(ffmpegPath), false);
-        }
-        else
-        {
-            emit finished(false, QString("Failed to start FFmpeg at '%1': %2").arg(ffmpegPath, detail), false);
-        }
+        emit finished(false, ffmpegStartError, false);
         return;
     }
 

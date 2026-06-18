@@ -403,6 +403,8 @@ set(FITLYZERC_SOURCES
     "${CMAKE_SOURCE_DIR}/src/video/VideoExportSettings.h"
     "${CMAKE_SOURCE_DIR}/src/video/VideoRenderJob.cpp"
     "${CMAKE_SOURCE_DIR}/src/video/VideoRenderJob.h"
+        "${CMAKE_SOURCE_DIR}/src/video/encoding/VideoEncoder.cpp"
+        "${CMAKE_SOURCE_DIR}/src/video/encoding/VideoEncoder.h"
     "${CMAKE_SOURCE_DIR}/src/video/VideoTileProvider.cpp"
     "${CMAKE_SOURCE_DIR}/src/video/VideoTileProvider.h"
 )
