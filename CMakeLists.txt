@@ -384,6 +384,8 @@ set(FITLYZERC_SOURCES
     "${CMAKE_SOURCE_DIR}/src/maps/MapFitMath.h"
     "${CMAKE_SOURCE_DIR}/src/maps/MapRenderer.cpp"
     "${CMAKE_SOURCE_DIR}/src/maps/MapRenderer.h"
+    "${CMAKE_SOURCE_DIR}/src/maps/rendering/RouteColorizer.cpp"
+    "${CMAKE_SOURCE_DIR}/src/maps/rendering/RouteColorizer.h"
     "${CMAKE_SOURCE_DIR}/src/maps/TileCache.cpp"
     "${CMAKE_SOURCE_DIR}/src/maps/TileCache.h"
     "${CMAKE_SOURCE_DIR}/src/maps/providers/TileProviderRegistry.cpp"
