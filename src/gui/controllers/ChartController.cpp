@@ -4,6 +4,7 @@
 
 #include "../WorkoutController.h"
 #include "../../analysis/PowerCurve.h"
+#include "../../analysis/TrainingLoad.h"
 #include "../../core/zones/ZoneCalculator.h"
 #include "../../database/ActivityRepository.h"
 #include "../../database/DatabaseManager.h"
@@ -27,6 +28,7 @@
 #include <QSpacerItem>
 #include <QSizePolicy>
 
+#include <map>
 #include <cfloat>
 
 namespace
@@ -279,7 +281,10 @@ void ChartController::resetAllZoom()
  */
 void ChartController::updateHistogram()
 {
-    // TODO: Extract updateHistogram logic from MainWindow
+    if (!m_histogram || !m_controller)
+        return;
+
+    m_histogram->setRideData(m_controller->rideData());
 }
 
 /**
@@ -287,7 +292,60 @@ void ChartController::updateHistogram()
  */
 void ChartController::updateFitnessChart()
 {
-    // TODO: Extract updateFitnessChart logic from MainWindow
+    if (!m_fitnessChart || !m_controller)
+        return;
+
+    if (!m_dbManager || !m_dbManager->isOpen() || m_currentAthleteId <= 0)
+    {
+        m_fitnessChart->clearChart();
+        return;
+    }
+
+    auto db = m_dbManager->database();
+    ActivityRepository repo(db);
+    const QList<Activity> activities = repo.listActivities(m_currentAthleteId);
+    if (activities.isEmpty())
+    {
+        m_fitnessChart->clearChart();
+        return;
+    }
+
+    std::map<QDate, double> tssPerDay;
+    for (const Activity& activity : activities)
+    {
+        QString raw = !activity.startTime.isEmpty() ? activity.startTime.left(10) : activity.importedAt.left(10);
+        QDate day = QDate::fromString(raw, Qt::ISODate);
+        if (!day.isValid())
+            continue;
+
+        const double tss = TrainingLoad::trainingStressScore(
+            activity.durationSec,
+            activity.normalizedPower,
+            m_controller->ftp());
+        tssPerDay[day] += tss;
+    }
+
+    if (tssPerDay.empty())
+    {
+        m_fitnessChart->clearChart();
+        return;
+    }
+
+    const QDate first = tssPerDay.begin()->first;
+    const QDate last = tssPerDay.rbegin()->first;
+    std::vector<DailyLoadPoint> daily;
+    daily.reserve(static_cast<size_t>(first.daysTo(last) + 1));
+    for (QDate day = first; day <= last; day = day.addDays(1))
+    {
+        DailyLoadPoint point;
+        auto it = tssPerDay.find(day);
+        if (it != tssPerDay.end())
+            point.tss = it->second;
+        daily.push_back(point);
+    }
+
+    const std::vector<FitnessMetricsPoint> timeline = TrainingLoad::fitnessTimeline(daily);
+    m_fitnessChart->setTimeline(timeline);
 }
 
 /**
@@ -378,12 +436,11 @@ void ChartController::updateZoneAvailability()
     if (!m_analysisTabWidget)
         return;
 
-    const bool hasPower = m_controller && m_controller->statistics().maximumPower > 0.0;
-
-    m_analysisTabWidget->setTabEnabled(2, hasPower);  // Histogram tab
-    m_analysisTabWidget->setTabEnabled(3, hasPower);  // PDC tab
-    m_analysisTabWidget->setTabEnabled(4, true);      // Calendar tab
-    m_analysisTabWidget->setTabEnabled(5, true);      // Fitness tab
+    const ColorMetric metric = static_cast<ColorMetric>(m_colorMetric);
+    const bool hasSelectedMetric = m_controller
+        && ZoneCalculator::hasMetricSamples(m_controller->rideData(), metric);
+    m_analysisTabWidget->setTabEnabled(1,
+        metric != ColorMetric::None && hasSelectedMetric);
 }
 
 /**

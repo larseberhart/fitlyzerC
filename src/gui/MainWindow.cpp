@@ -2438,13 +2438,11 @@ void MainWindow::updateColorLegend()
 
 void MainWindow::updateZoneAvailability()
 {
-    if (!m_analysisTabWidget)
+    if (!m_chartController)
         return;
 
-    const ColorMetric metric = currentColorMetric();
-    const bool hasSelectedMetric = ZoneCalculator::hasMetricSamples(m_controller->rideData(), metric);
-    m_analysisTabWidget->setTabEnabled(kAnalysisTabZones,
-                                       metric != ColorMetric::None && hasSelectedMetric);
+    m_chartController->setColorMetric(static_cast<int>(currentColorMetric()));
+    m_chartController->updateZoneAvailability();
 }
 
 void MainWindow::importFiles(const QStringList& filePaths)
@@ -3213,7 +3211,10 @@ void MainWindow::updateZonesTab()
 
 void MainWindow::updateHistogram()
 {
-    m_histogram->setRideData(m_controller->rideData());
+    if (!m_chartController)
+        return;
+
+    m_chartController->updateHistogram();
 }
 
 void MainWindow::updatePowerCurve()
@@ -3272,60 +3273,11 @@ void MainWindow::applyEstimatedFtpForCurrentAthlete()
 
 void MainWindow::updateFitnessChart()
 {
-    if (!m_fitnessChart)
+    if (!m_chartController)
         return;
 
-    if (!m_dbManager.isOpen() || m_currentAthleteId <= 0)
-    {
-        m_fitnessChart->clearChart();
-        return;
-    }
-
-    auto db = m_dbManager.database();
-    ActivityRepository repo(db);
-    const QList<Activity> activities = repo.listActivities(m_currentAthleteId);
-    if (activities.isEmpty())
-    {
-        m_fitnessChart->clearChart();
-        return;
-    }
-
-    std::map<QDate, double> tssPerDay;
-    for (const Activity& activity : activities)
-    {
-        QString raw = !activity.startTime.isEmpty() ? activity.startTime.left(10) : activity.importedAt.left(10);
-        QDate day = QDate::fromString(raw, Qt::ISODate);
-        if (!day.isValid())
-            continue;
-
-        const double tss = TrainingLoad::trainingStressScore(
-            activity.durationSec,
-            activity.normalizedPower,
-            m_controller->ftp());
-        tssPerDay[day] += tss;
-    }
-
-    if (tssPerDay.empty())
-    {
-        m_fitnessChart->clearChart();
-        return;
-    }
-
-    const QDate first = tssPerDay.begin()->first;
-    const QDate last = tssPerDay.rbegin()->first;
-    std::vector<DailyLoadPoint> daily;
-    daily.reserve(static_cast<size_t>(first.daysTo(last) + 1));
-    for (QDate day = first; day <= last; day = day.addDays(1))
-    {
-        DailyLoadPoint p;
-        auto it = tssPerDay.find(day);
-        if (it != tssPerDay.end())
-            p.tss = it->second;
-        daily.push_back(p);
-    }
-
-    const std::vector<FitnessMetricsPoint> timeline = TrainingLoad::fitnessTimeline(daily);
-    m_fitnessChart->setTimeline(timeline);
+    m_chartController->setAthleteId(m_currentAthleteId);
+    m_chartController->updateFitnessChart();
 }
 
 void MainWindow::onIntervalSelectionChanged()
