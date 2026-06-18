@@ -1598,10 +1598,14 @@ void MainWindow::buildUI()
             this,
             [this](int)
     {
-        updateColorLegend();
-        updateZoneAvailability();
-        updateCharts();
-        updateZonesTab();
+        if (m_chartController)
+        {
+            syncChartContextToController(true);
+            m_chartController->updateColorLegend();
+            m_chartController->updateZoneAvailability();
+            m_chartController->updateCharts();
+            m_chartController->updateZonesTab();
+        }
         if (m_mapRenderer)
             m_mapRenderer->setRideData(m_controller->rideData(), currentColorMetric(), buildColorContext());
     });
@@ -2402,24 +2406,6 @@ ColorContext MainWindow::buildColorContext() const
     return context;
 }
 
-void MainWindow::updateColorLegend()
-{
-    if (!m_chartController)
-        return;
-
-    syncChartContextToController(true);
-    m_chartController->updateColorLegend();
-}
-
-void MainWindow::updateZoneAvailability()
-{
-    if (!m_chartController)
-        return;
-
-    syncChartContextToController(false);
-    m_chartController->updateZoneAvailability();
-}
-
 void MainWindow::importFiles(const QStringList& filePaths)
 {
     importFilesInternal(filePaths, true, QStringLiteral("Manual import"));
@@ -3092,15 +3078,6 @@ void MainWindow::updateStatsLabel()
     m_athleteHeader->setRideMetrics(rideText);
 }
 
-void MainWindow::updateCharts()
-{
-    if (!m_chartController)
-        return;
-
-    syncChartContextToController(false);
-    m_chartController->updateCharts();
-}
-
 void MainWindow::applyChartPreset(int presetId)
 {
     if (!m_colorMetricCombo || !m_powerSmoothingCombo || !m_autoSmoothingCheck)
@@ -3172,15 +3149,6 @@ void MainWindow::applyChartSmoothing()
         return;
 
     m_chartController->applyChartSmoothing();
-}
-
-void MainWindow::updateZonesTab()
-{
-    if (!m_chartController)
-        return;
-
-    syncChartContextToController(false);
-    m_chartController->updateZonesTab();
 }
 
 double MainWindow::estimatedFtpFromCurrentRide() const

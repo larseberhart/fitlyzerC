@@ -134,9 +134,7 @@ private:
     void decreaseChartHeight();
     void applyChartHeight();
     void updateStatsLabel();
-    void updateCharts();
     void applyChartSmoothing();
-    void updateZonesTab();
     void updateAnalysisEmptyStates();
     void updateIntervals();
     void updateClimbingTab();
@@ -178,8 +176,6 @@ private:
     void updateStatusBarInfo();
     ColorMetric currentColorMetric() const;
     ColorContext buildColorContext() const;
-    void updateColorLegend();
-    void updateZoneAvailability();
     void applyChartPreset(int presetId);
     void editCurrentActivityProperties();
     double estimatedFtpFromCurrentRide() const;
