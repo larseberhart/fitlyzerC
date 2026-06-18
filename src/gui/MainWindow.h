@@ -213,6 +213,14 @@ private:
     // -- Controller ---------------------------------------------------------
     WorkoutController* m_controller = nullptr;
 
+    // -- UI Controllers (decomposed from MainWindow) ----------------------
+    class ActivityViewController* m_activityViewController = nullptr;
+    class ChartController* m_chartController = nullptr;
+    class MapController* m_mapController = nullptr;
+    class ImportController* m_importController = nullptr;
+    class NavigationController* m_navigationController = nullptr;
+    class MainWindowActions* m_actionsManager = nullptr;
+
     // -- Database -----------------------------------------------------------
     DatabaseManager m_dbManager;
     int             m_currentAthleteId = -1;

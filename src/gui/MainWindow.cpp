@@ -72,6 +72,12 @@
 #include "ImportStatusWidget.h"
 #include "IntervalEditorDialog.h"
 #include "WelcomeWidget.h"
+#include "controllers/ActivityViewController.h"
+#include "controllers/ChartController.h"
+#include "controllers/MapController.h"
+#include "controllers/ImportController.h"
+#include "controllers/NavigationController.h"
+#include "controllers/MainWindowActions.h"
 #include "charts/FitnessChartWidget.h"
 #include "charts/PowerCurveWidget.h"
 #include "charts/PowerHistogramWidget.h"
@@ -372,6 +378,29 @@ MainWindow::MainWindow(QWidget* parent)
 
     buildUI();
 
+    // Instantiate and configure UI controllers
+    m_navigationController = new NavigationController(this);
+    m_navigationController->setMainTabWidget(m_tabWidget);
+    m_navigationController->setAnalysisTabWidget(m_analysisTabWidget);
+    m_navigationController->setNavigationSidebar(nullptr); // TODO: wire sidebar when available
+
+    m_activityViewController = new ActivityViewController(m_controller, &m_dbManager, this);
+
+    m_chartController = new ChartController(m_controller, &m_dbManager, this);
+    m_chartController->setChartWidgets(
+        m_powerChart, m_hrChart, m_cadenceChart, m_speedChart, m_altitudeChart,
+        m_histogram, m_pdcWidget, m_fitnessChart);
+
+    m_mapController = new MapController(m_controller, &m_dbManager, this);
+    m_mapController->setMapRenderer(m_mapRenderer);
+
+    m_importController = new ImportController(m_controller, &m_dbManager, this);
+    m_importController->setImportQueue(nullptr); // Set after queue is created below
+    m_importController->setProgressModel(nullptr); // Set after model is created below
+    m_importController->setStatusWidget(m_importStatusWidget);
+
+    m_actionsManager = new MainWindowActions(this, this);
+
     connect(m_controller, &WorkoutController::workoutLoaded,
             this, &MainWindow::onWorkoutLoaded);
     connect(m_controller, &WorkoutController::activityImported,
@@ -383,6 +412,13 @@ MainWindow::MainWindow(QWidget* parent)
     m_importQueue = new ImportQueue(this);
     m_importProgressModel = new ImportProgressModel(this);
     m_importProgressModel->attachQueue(m_importQueue);
+
+    // Wire import queue and model to import controller
+    if (m_importController)
+    {
+        m_importController->setImportQueue(m_importQueue);
+        m_importController->setProgressModel(m_importProgressModel);
+    }
 
     m_importRefreshTimer = new QTimer(this);
     m_importRefreshTimer->setSingleShot(true);
