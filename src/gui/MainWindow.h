@@ -126,6 +126,7 @@ private:
                             bool showResultDialog,
                             const QString& sourceLabel);
     QStringList prepareImportFileBatch(const QStringList& filePaths);
+    QString importQueuedStatusMessage(int queuedCount) const;
 
     /// @brief Returns deduplicated local `.fit` files from MIME drop/paste data.
     QStringList fitFilesFromMimeData(const QMimeData* mimeData) const;

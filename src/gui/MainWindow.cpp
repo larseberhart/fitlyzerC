@@ -2453,10 +2453,14 @@ void MainWindow::enqueueImportBatch(const QStringList& filePaths,
                                importSource);
     }
 
-    const QString submitMessage = QString("Queued %1 FIT file%2 for background import.")
-        .arg(filePaths.size())
-        .arg(filePaths.size() == 1 ? QString() : QStringLiteral("s"));
-    statusBar()->showMessage(submitMessage, 2500);
+    statusBar()->showMessage(importQueuedStatusMessage(filePaths.size()), 2500);
+}
+
+QString MainWindow::importQueuedStatusMessage(int queuedCount) const
+{
+    return QString("Queued %1 FIT file%2 for background import.")
+        .arg(queuedCount)
+        .arg(queuedCount == 1 ? QString() : QStringLiteral("s"));
 }
 
 void MainWindow::scheduleActivityBrowserRefresh()
