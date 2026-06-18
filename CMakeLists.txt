@@ -356,6 +356,8 @@ set(FITLYZERC_SOURCES
     "${CMAKE_SOURCE_DIR}/src/gui/controllers/ImportController.h"
     "${CMAKE_SOURCE_DIR}/src/gui/controllers/MapController.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/controllers/MapController.h"
+    "${CMAKE_SOURCE_DIR}/src/gui/controllers/NavigationController.cpp"
+    "${CMAKE_SOURCE_DIR}/src/gui/controllers/NavigationController.h"
     "${CMAKE_SOURCE_DIR}/src/gui/NavigationSidebar.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/NavigationSidebar.h"
     "${CMAKE_SOURCE_DIR}/src/gui/PlannedWorkoutDialog.cpp"
