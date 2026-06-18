@@ -203,6 +203,9 @@ private:
     /// @brief Syncs athlete context to all controllers that need it.
     void syncAthleteContextToControllers();
 
+    /// @brief Syncs current chart-related context to ChartController.
+    void syncChartContextToController(bool includeLegendLayout);
+
         // -- Undo/Redo ----------------------------------------------------------
         UndoManager*   m_undoManager    = nullptr;
 
