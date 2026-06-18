@@ -35,12 +35,58 @@ MainWindow::MainWindow(QWidget* parent)
 
     buildUI();
 
-    // Instantiate and configure UI controllers
+    // Instantiate and configure UI controllers.
+    // m_navigationSidebar and m_pageStack are created inside buildUI().
+    // NavigationController manages the page stack and sidebar connection.
     m_navigationController = new NavigationController(this);
-    m_navigationController->setMainTabWidget(m_tabWidget);
-    m_navigationController->setAnalysisTabWidget(m_analysisTabWidget);
-    m_navigationSidebar = new NavigationSidebar(this);
+    m_navigationController->setPageStack(m_pageStack);
     m_navigationController->setNavigationSidebar(m_navigationSidebar);
+
+    // Phase 1 bridge: map sidebar page selection to the existing tab hierarchy.
+    // During the transition period the page stack contains only one widget
+    // (m_tabWidget). Sidebar navigation is therefore translated into tab
+    // index changes on the legacy widgets until Phase 2 migrates each page
+    // into its own dedicated QWidget in m_pageStack.
+    connect(m_navigationSidebar, &NavigationSidebar::pageSelected, this,
+            [this](NavigationSidebar::Page page)
+    {
+        using Page = NavigationSidebar::Page;
+        switch (page)
+        {
+        case Page::Activities:
+            if (m_tabWidget)
+                m_tabWidget->setCurrentIndex(kTabActivities);
+            break;
+        case Page::Charts:
+            if (m_tabWidget) m_tabWidget->setCurrentIndex(kTabAnalysis);
+            if (m_analysisTabWidget) m_analysisTabWidget->setCurrentIndex(kAnalysisTabCharts);
+            break;
+        case Page::Power:
+            if (m_tabWidget) m_tabWidget->setCurrentIndex(kTabAnalysis);
+            if (m_analysisTabWidget) m_analysisTabWidget->setCurrentIndex(kAnalysisTabZones);
+            break;
+        case Page::Intervals:
+            // Intervals share the Charts view for now; navigate to Charts.
+            if (m_tabWidget) m_tabWidget->setCurrentIndex(kTabAnalysis);
+            if (m_analysisTabWidget) m_analysisTabWidget->setCurrentIndex(kAnalysisTabCharts);
+            break;
+        case Page::Climbs:
+            if (m_tabWidget) m_tabWidget->setCurrentIndex(kTabAnalysis);
+            if (m_analysisTabWidget) m_analysisTabWidget->setCurrentIndex(kAnalysisTabClimbing);
+            break;
+        case Page::Fitness:
+            if (m_tabWidget) m_tabWidget->setCurrentIndex(kTabAnalysis);
+            if (m_analysisTabWidget) m_analysisTabWidget->setCurrentIndex(kAnalysisTabFitness);
+            break;
+        case Page::Calendar:
+            if (m_tabWidget) m_tabWidget->setCurrentIndex(kTabAnalysis);
+            if (m_analysisTabWidget) m_analysisTabWidget->setCurrentIndex(kAnalysisTabCalendar);
+            break;
+        case Page::Video:
+            // Video page not yet implemented; stay on current view.
+            break;
+        }
+    });
 
     m_activityViewController = new ActivityViewController(m_controller, &m_dbManager, this);
     m_activityViewController->setAthleteHeaderWidget(m_athleteHeader);

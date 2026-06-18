@@ -13,6 +13,7 @@
 #include <QMenu>
 #include <QSplitter>
 #include <QStackedLayout>
+#include <QStackedWidget>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSet>
@@ -285,7 +286,14 @@ private:
     // -- Stats panel --------------------------------------------------------
     AthleteHeaderWidget* m_athleteHeader = nullptr;
 
-    // -- Tab widget ---------------------------------------------------------
+    // -- Page navigation ----------------------------------------------------
+    // m_pageStack holds one widget per NavigationSidebar::Page value.
+    // The sidebar and NavigationController keep them in sync.
+    QStackedWidget* m_pageStack = nullptr;
+
+    // -- Legacy tab widgets (kept during incremental migration) ------------
+    // TODO(phase2): Remove once all page content has been moved into
+    //               dedicated page widgets under m_pageStack.
     QTabWidget* m_tabWidget = nullptr;
     QTabWidget* m_analysisTabWidget = nullptr;
     QStackedLayout* m_activityTabStack = nullptr;
@@ -296,6 +304,8 @@ private:
     QStackedLayout* m_fitnessTabStack = nullptr;
     QStackedLayout* m_climbingTabStack = nullptr;
 
+    // Legacy tab indices — kept for backward compatibility during migration.
+    // TODO(phase2): Remove these constants when tab widgets are replaced.
     static constexpr int kTabActivities = 0;
     static constexpr int kTabAnalysis   = 1;
 

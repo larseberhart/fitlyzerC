@@ -2,9 +2,8 @@
 
 #include "NavigationController.h"
 
-#include <QTabWidget>
 #include <QSettings>
-#include "../NavigationSidebar.h"
+#include <QStackedWidget>
 
 /**
  * @brief Constructs the navigation controller.
@@ -21,137 +20,85 @@ NavigationController::NavigationController(QObject* parent)
 NavigationController::~NavigationController() = default;
 
 /**
- * @brief Sets the main tab widget.
- * @param tabWidget Pointer to the main QTabWidget.
+ * @brief Sets the page stacked widget.
+ * @param stack Pointer to the QStackedWidget that hosts one widget per page.
  */
-void NavigationController::setMainTabWidget(QTabWidget* tabWidget)
+void NavigationController::setPageStack(QStackedWidget* stack)
 {
-    m_mainTabWidget = tabWidget;
-    connectTabSignals();
+    m_pageStack = stack;
 }
 
 /**
- * @brief Sets the analysis tab widget.
- * @param tabWidget Pointer to the analysis QTabWidget.
- */
-void NavigationController::setAnalysisTabWidget(QTabWidget* tabWidget)
-{
-    m_analysisTabWidget = tabWidget;
-    connectTabSignals();
-}
-
-/**
- * @brief Sets the navigation sidebar.
- * @param sidebar Pointer to NavigationSidebar widget.
+ * @brief Sets and wires the navigation sidebar.
+ *
+ * Selecting a row in the sidebar immediately navigates to the corresponding
+ * page in the stack.
+ * @param sidebar Pointer to NavigationSidebar.
  */
 void NavigationController::setNavigationSidebar(NavigationSidebar* sidebar)
 {
     m_sidebar = sidebar;
-}
-
-/**
- * @brief Switches to a main window tab.
- * @param tabIndex Index of tab to switch to.
- */
-void NavigationController::switchToMainTab(TabIndex tabIndex)
-{
-    if (!m_mainTabWidget)
+    if (!m_sidebar)
         return;
 
-    m_currentMainTabIndex = static_cast<int>(tabIndex);
-    m_mainTabWidget->setCurrentIndex(static_cast<int>(tabIndex));
-    emit mainTabChanged(static_cast<int>(tabIndex));
+    connect(m_sidebar, &NavigationSidebar::pageSelected,
+            this, &NavigationController::navigateTo);
 }
 
 /**
- * @brief Switches to an analysis sub-tab.
- * @param tabIndex Index of analysis tab to switch to.
+ * @brief Navigates to the given page.
+ *
+ * Updates the page stack and the sidebar selection, then emits pageChanged.
+ * @param page Target page.
  */
-void NavigationController::switchToAnalysisTab(AnalysisTabIndex tabIndex)
+void NavigationController::navigateTo(Page page)
 {
-    if (!m_analysisTabWidget)
-        return;
+    m_currentPage = page;
 
-    m_currentAnalysisTabIndex = static_cast<int>(tabIndex);
-    m_analysisTabWidget->setCurrentIndex(static_cast<int>(tabIndex));
-    emit analysisTabChanged(static_cast<int>(tabIndex));
+    if (m_pageStack)
+        m_pageStack->setCurrentIndex(static_cast<int>(page));
+
+    if (m_sidebar)
+    {
+        // Block signals to avoid a re-entrant navigateTo() call.
+        const QSignalBlocker blocker(m_sidebar);
+        m_sidebar->setCurrentPage(page);
+    }
+
+    emit pageChanged(page);
 }
 
 /**
- * @brief Gets the currently active main tab.
- * @return Index of active main tab.
+ * @brief Returns the currently active page.
  */
-NavigationController::TabIndex NavigationController::currentMainTab() const
+NavigationController::Page NavigationController::currentPage() const
 {
-    if (!m_mainTabWidget)
-        return TabActivities;
-
-    return static_cast<TabIndex>(m_mainTabWidget->currentIndex());
+    return m_currentPage;
 }
 
 /**
- * @brief Gets the currently active analysis tab.
- * @return Index of active analysis tab.
- */
-NavigationController::AnalysisTabIndex NavigationController::currentAnalysisTab() const
-{
-    if (!m_analysisTabWidget)
-        return AnalysisTabActivity;
-
-    return static_cast<AnalysisTabIndex>(m_analysisTabWidget->currentIndex());
-}
-
-/**
- * @brief Saves current navigation state to settings.
+ * @brief Saves the active page index to QSettings.
  */
 void NavigationController::saveNavigationState()
 {
     QSettings settings("Fitlyzer", "FitlyzerC");
-    settings.setValue("activeTab", m_currentMainTabIndex);
-    settings.setValue("analysisTab", m_currentAnalysisTabIndex);
+    settings.setValue("activePage", static_cast<int>(m_currentPage));
 }
 
 /**
- * @brief Restores navigation state from settings.
+ * @brief Restores the active page from QSettings.
  */
 void NavigationController::restoreNavigationState()
 {
     QSettings settings("Fitlyzer", "FitlyzerC");
-    
-    int mainTab = settings.value("activeTab", static_cast<int>(TabActivities)).toInt();
-    int analysisTab = settings.value("analysisTab", static_cast<int>(AnalysisTabActivity)).toInt();
+    const int raw = settings.value("activePage", static_cast<int>(Page::Activities)).toInt();
 
-    if (mainTab >= TabActivities && mainTab <= TabWorkouts)
-        switchToMainTab(static_cast<TabIndex>(mainTab));
+    // Clamp to the valid range so stale settings cannot crash.
+    const auto page = (raw >= static_cast<int>(Page::Activities) &&
+                       raw <= static_cast<int>(Page::Video))
+                      ? static_cast<Page>(raw)
+                      : Page::Activities;
 
-    if (analysisTab >= AnalysisTabActivity && analysisTab <= AnalysisTabClimbing)
-        switchToAnalysisTab(static_cast<AnalysisTabIndex>(analysisTab));
-
+    navigateTo(page);
     emit navigationStateRestored();
-}
-
-/**
- * @brief Helper to connect tab change signals.
- */
-void NavigationController::connectTabSignals()
-{
-    if (m_mainTabWidget)
-    {
-        connect(m_mainTabWidget, qOverload<int>(&QTabWidget::currentChanged),
-                this, [this](int index)
-        {
-            m_currentMainTabIndex = index;
-            emit mainTabChanged(index);
-        });
-    }
-
-    if (m_analysisTabWidget)
-    {
-        connect(m_analysisTabWidget, qOverload<int>(&QTabWidget::currentChanged),
-                this, [this](int index)
-        {
-            m_currentAnalysisTabIndex = index;
-            emit analysisTabChanged(index);
-        });
-    }
 }

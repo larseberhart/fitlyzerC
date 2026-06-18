@@ -23,6 +23,7 @@
 #include <QSizePolicy>
 #include <QSplitter>
 #include <QStackedLayout>
+#include <QStackedWidget>
 #include <QStyle>
 #include <QTableWidget>
 #include <QTextEdit>
@@ -44,6 +45,7 @@
 #include "AthleteHeaderWidget.h"
 #include "CalendarWidget.h"
 #include "IntervalEditorDialog.h"
+#include "NavigationSidebar.h"
 #include "WelcomeWidget.h"
 #include "analysis/IntervalDetector.h"
 #include "charts/FitnessChartWidget.h"
@@ -228,7 +230,11 @@ void MainWindow::buildUI()
             else
             {
                 QSettings("Fitlyzer", "FitlyzerC").setValue("lastActivityId", activityId);
-                m_tabWidget->setCurrentIndex(kTabAnalysis);
+                // Navigate to the Charts page via the sidebar (keeps sidebar in sync).
+                if (m_navigationSidebar)
+                    m_navigationSidebar->setCurrentPage(NavigationSidebar::Page::Charts);
+                // Bridge: also switch the underlying tabs during the Phase 1 transition.
+                if (m_tabWidget) m_tabWidget->setCurrentIndex(kTabAnalysis);
                 if (m_analysisTabWidget)
                     m_analysisTabWidget->setCurrentIndex(kAnalysisTabCharts);
             }
@@ -1092,7 +1098,25 @@ void MainWindow::buildUI()
     analysisLayout->addWidget(m_analysisTabWidget, 1);
     m_tabWidget->addTab(analysisContainer, "Analysis");
 
-    mainLayout->addWidget(m_tabWidget, 1);
+    // ── Navigation sidebar + page stack ─────────────────────────────────────
+    // The sidebar drives top-level navigation.  During the Phase 1 → Phase 2
+    // transition the old QTabWidget is wrapped as a single "page" in the stack.
+    // Each navigation item drives tab-switching via a bridge connection wired
+    // in the MainWindow constructor.  The stack will be expanded to one widget
+    // per page once content is migrated in Phase 2.
+
+    m_navigationSidebar = new NavigationSidebar(central);
+
+    m_pageStack = new QStackedWidget(central);
+    m_pageStack->addWidget(m_tabWidget);   // temporary single page during migration
+
+    auto* contentRow = new QHBoxLayout;
+    contentRow->setContentsMargins(0, 0, 0, 0);
+    contentRow->setSpacing(0);
+    contentRow->addWidget(m_navigationSidebar);
+    contentRow->addWidget(m_pageStack, 1);
+    mainLayout->addLayout(contentRow, 1);
+
     setCentralWidget(central);
 
     buildToolbar();
