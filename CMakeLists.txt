@@ -407,6 +407,8 @@ set(FITLYZERC_SOURCES
     "${CMAKE_SOURCE_DIR}/src/gui/pages/ClimbsPage.h"
     "${CMAKE_SOURCE_DIR}/src/gui/pages/FitnessPage.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/pages/FitnessPage.h"
+    "${CMAKE_SOURCE_DIR}/src/gui/pages/IntervalsPage.cpp"
+    "${CMAKE_SOURCE_DIR}/src/gui/pages/IntervalsPage.h"
     "${CMAKE_SOURCE_DIR}/src/gui/pages/PowerPage.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/pages/PowerPage.h"
     "${CMAKE_SOURCE_DIR}/src/gui/PlannedWorkoutDialog.cpp"

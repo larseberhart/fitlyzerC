@@ -52,6 +52,7 @@
 #include "pages/ChartsPage.h"
 #include "pages/ClimbsPage.h"
 #include "pages/FitnessPage.h"
+#include "pages/IntervalsPage.h"
 #include "pages/PlaceholderPage.h"
 #include "pages/PowerPage.h"
 #include "analysis/IntervalDetector.h"
@@ -561,6 +562,8 @@ void MainWindow::buildUI()
 
         // Wrap the charts/map/intervals content in an empty-state guard.
         // The resulting widget becomes the content area of ChartsPage.
+        // Intervals panel remains here for chart-context navigation (interval
+        // selection zooms the chart).  IntervalsPage shows a standalone view.
         m_chartsPageContent = wrapWithNoActivityState(chartsTab, &m_activityTabStack);
 
         auto makeVisToggle = [this](QCheckBox* cb, RideChartWidget* chart)
@@ -1116,8 +1119,13 @@ void MainWindow::buildUI()
         m_pageStack->addWidget(new PowerPage(m_analysisTabWidget, m_pageStack));
     }
 
-    // [3] Intervals — placeholder (Phase 6)
-    m_pageStack->addWidget(new PlaceholderPage("Intervals — coming in Phase 6", m_pageStack));
+    // [3] Intervals — shared view via intervalsPanel in the Charts content.
+    // The IntervalsPage provides a standalone entry point; clicking an interval
+    // navigates to the Charts page where the interval is highlighted in context.
+    //
+    // TODO(phase6-full): Move intervalsPanel out of chartsTab and host it here
+    //                    exclusively, wiring cross-page navigation back to Charts.
+    m_pageStack->addWidget(new IntervalsPage(nullptr, m_pageStack));
 
     // [4] Climbs — climb charts + climbs table + detection params bar
     m_pageStack->addWidget(new ClimbsPage(m_climbParamsBar, m_climbsPageContent, m_pageStack));
