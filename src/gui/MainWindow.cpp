@@ -2993,14 +2993,6 @@ void MainWindow::onWorkoutLoaded()
     updateColorLegend();
     updateZoneAvailability();
 
-    if (m_analysisTabWidget)
-    {
-        m_analysisTabWidget->setTabEnabled(kAnalysisTabHistogram, hasPower);
-        m_analysisTabWidget->setTabEnabled(kAnalysisTabPDC,       hasPower);
-        m_analysisTabWidget->setTabEnabled(kAnalysisTabCalendar,  true);
-        m_analysisTabWidget->setTabEnabled(kAnalysisTabFitness,   true);
-    }
-
     if (hasPower)
     {
         updateZonesTab();

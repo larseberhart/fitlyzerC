@@ -436,11 +436,17 @@ void ChartController::updateZoneAvailability()
     if (!m_analysisTabWidget)
         return;
 
+    const bool hasPower = m_controller && m_controller->statistics().maximumPower > 0.0;
     const ColorMetric metric = static_cast<ColorMetric>(m_colorMetric);
     const bool hasSelectedMetric = m_controller
         && ZoneCalculator::hasMetricSamples(m_controller->rideData(), metric);
+
     m_analysisTabWidget->setTabEnabled(1,
         metric != ColorMetric::None && hasSelectedMetric);
+    m_analysisTabWidget->setTabEnabled(2, hasPower);
+    m_analysisTabWidget->setTabEnabled(3, hasPower);
+    m_analysisTabWidget->setTabEnabled(4, true);
+    m_analysisTabWidget->setTabEnabled(5, true);
 }
 
 /**
