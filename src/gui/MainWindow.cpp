@@ -394,6 +394,10 @@ MainWindow::MainWindow(QWidget* parent)
     m_chartController->setChartWidgets(
         m_powerChart, m_hrChart, m_cadenceChart, m_speedChart, m_altitudeChart,
         m_histogram, m_pdcWidget, m_fitnessChart);
+    m_chartController->setAnalysisTabWidgets(
+        m_analysisTabWidget, nullptr,  // ColorLegendWidget - TODO: wire when available
+        m_activityTabStack, m_zonesTabStack, m_histogramTabStack,
+        m_powerCurveTabStack, m_calendarTabStack, m_fitnessTabStack);
 
     m_mapController = new MapController(m_controller, &m_dbManager, this);
     m_mapController->setMapRenderer(m_mapRenderer);
