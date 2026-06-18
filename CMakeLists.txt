@@ -367,6 +367,7 @@ set(FITLYZERC_SOURCES
     "${CMAKE_SOURCE_DIR}/src/gui/controllers/ActivityViewController.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/controllers/ActivityViewController.h"
     "${CMAKE_SOURCE_DIR}/src/gui/MainWindowCharts.cpp"
+    "${CMAKE_SOURCE_DIR}/src/gui/MainWindowDatabase.cpp"
         "${CMAKE_SOURCE_DIR}/src/gui/MainWindowImport.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/MainWindowStatus.cpp"
     "${CMAKE_SOURCE_DIR}/src/gui/controllers/ChartController.cpp"
