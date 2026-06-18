@@ -88,7 +88,6 @@
 #include "analysis/IntervalDetector.h"
 #include "core/settings/AppSettings.h"
 #include "core/settings/DateFormatter.h"
-#include "core/zones/ZoneCalculator.h"
 #include "database/AthleteRepository.h"
 #include "database/ClimbRepository.h"
 #include "database/IntervalRepository.h"
@@ -100,7 +99,6 @@
 #include "video/VideoExportSettings.h"
 #include "utils/FfmpegPath.h"
 
-#include <cfloat>
 #include <cmath>
 #include <functional>
 #include <map>
@@ -197,24 +195,6 @@ static constexpr int kClimbStartRole = Qt::UserRole + 3;
 
 /// @brief Model role for climb end time in minutes.
 static constexpr int kClimbEndRole = Qt::UserRole + 4;
-
-/**
- * @brief Formats a zone range label with units.
- * @param zone Zone definition with bounds.
- * @param metric Color metric for unit selection.
- * @return Formatted string like "50 - 75 W" or "> 180 bpm".
- */
-static QString rangeLabelForZone(const Zone& zone, ColorMetric metric)
-{
-    const QString unit = colorMetricUnit(metric);
-    const QString minText = QString::number(zone.minValue, 'f', metric == ColorMetric::Speed ? 1 : 0);
-    const QString maxText = QString::number(zone.maxValue, 'f', metric == ColorMetric::Speed ? 1 : 0);
-
-    if (zone.maxValue >= DBL_MAX / 2.0)
-        return QString("> %1 %2").arg(minText, unit).trimmed();
-
-    return QString("%1 - %2 %3").arg(minText, maxText, unit).trimmed();
-}
 
 /**
  * @brief Sanitizes string for use in video file names.
