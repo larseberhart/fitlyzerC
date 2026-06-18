@@ -21,6 +21,7 @@
 
 #include "analysis/TrainingLoad.h"
 #include "charts/data/RideChartDataBuilder.h"
+#include "charts/rendering/RideChartRenderer.h"
 #include "charts/selection/RideChartSelectionManager.h"
 #include "core/zones/ColorProvider.h"
 #include "core/zones/ZoneCalculator.h"
@@ -37,36 +38,7 @@ namespace
 using namespace RideChartDataBuilder;
 using namespace RideChartSelectionManager;
 
-// ── Nice axis helpers ────────────────────────────────────────────────────────
-
-// Return a "nice" step size for approximately 8 ticks over `range`.
-static double niceStep(double range)
-{
-    if (range <= 0.0) return 1.0;
-    const double rough     = range / 8.0;
-    const double magnitude = std::pow(10.0, std::floor(std::log10(rough)));
-    const double residual  = rough / magnitude;
-    double step;
-    if      (residual < 1.5) step = 1.0;
-    else if (residual < 3.5) step = 2.0;
-    else if (residual < 7.5) step = 5.0;
-    else                     step = 10.0;
-    return step * magnitude;
-}
-
-// Expand [dataMin, dataMax] outward to "nice" multiples of the step,
-// keeping the axis floor at 0 when data starts near there.
-static void niceRange(double dataMin, double dataMax,
-                      double& axisMin, double& axisMax)
-{
-    const double range = dataMax - dataMin;
-    const double step  = niceStep(range > 0.0 ? range : dataMax);
-    // Floor: use 0 when data starts within one step of 0, else snap down
-    axisMin = (dataMin < step) ? 0.0 : std::floor(dataMin / step) * step;
-    axisMax = std::ceil (dataMax / step) * step;
-    // Guarantee at least one step of headroom
-    if (axisMax <= axisMin) axisMax = axisMin + step;
-}
+using namespace RideChartRenderer;
 
 RideChartWidget::RideChartWidget(Metric metric, QWidget* parent)
     : QChartView(new QChart, parent)
