@@ -2415,9 +2415,19 @@ void MainWindow::importFilesInternal(const QStringList& filePaths,
     if (!m_importQueue)
         return;
 
+    enqueueImportBatch(deduped, showResultDialog, sourceLabel);
+}
+
+void MainWindow::enqueueImportBatch(const QStringList& filePaths,
+                                    bool showResultDialog,
+                                    const QString& sourceLabel)
+{
+    if (!m_importQueue || filePaths.isEmpty())
+        return;
+
     const QString batchId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     ImportBatchSummary summary;
-    summary.queued = deduped.size();
+    summary.queued = filePaths.size();
     summary.showResultDialog = showResultDialog;
     summary.sourceLabel = sourceLabel;
     m_importBatchSummaries.insert(batchId, summary);
@@ -2426,7 +2436,7 @@ void MainWindow::importFilesInternal(const QStringList& filePaths,
         ? QStringLiteral("manual_import")
         : QStringLiteral("directory_import");
 
-    for (const QString& filePath : deduped)
+    for (const QString& filePath : filePaths)
     {
         m_importQueue->enqueue(filePath,
                                QString::number(m_currentAthleteId),
@@ -2435,8 +2445,8 @@ void MainWindow::importFilesInternal(const QStringList& filePaths,
     }
 
     const QString submitMessage = QString("Queued %1 FIT file%2 for background import.")
-        .arg(deduped.size())
-        .arg(deduped.size() == 1 ? QString() : QStringLiteral("s"));
+        .arg(filePaths.size())
+        .arg(filePaths.size() == 1 ? QString() : QStringLiteral("s"));
     statusBar()->showMessage(submitMessage, 2500);
 }
 

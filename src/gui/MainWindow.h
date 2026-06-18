@@ -122,6 +122,9 @@ private:
 
     /// @brief Queues a batch of file paths for background import.
     void importFiles(const QStringList& filePaths);
+    void enqueueImportBatch(const QStringList& filePaths,
+                            bool showResultDialog,
+                            const QString& sourceLabel);
 
     /// @brief Returns deduplicated local `.fit` files from MIME drop/paste data.
     QStringList fitFilesFromMimeData(const QMimeData* mimeData) const;
