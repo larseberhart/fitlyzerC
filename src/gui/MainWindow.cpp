@@ -3436,7 +3436,7 @@ void MainWindow::updateIntervals()
         records = repo.listIntervalsForActivity(m_controller->currentActivityId());
     }
 
-    if (records.isEmpty())
+    const auto populateIntervalsFromController = [this]()
     {
         const auto& ivs = m_controller->intervals();
         m_intervalsTable->setRowCount(static_cast<int>(ivs.size()));
@@ -3476,8 +3476,9 @@ void MainWindow::updateIntervals()
             m_intervalsTable->setItem(row, 7, mkItem(iv.averageHeartRate > 0
                 ? QString("%1 bpm").arg(iv.averageHeartRate, 0, 'f', 0) : "\xe2\x80\x94"));
         }
-    }
-    else
+    };
+
+    const auto populateIntervalsFromRecords = [this, &records]()
     {
         m_intervalsTable->setRowCount(records.size());
         for (int row = 0; row < records.size(); ++row)
@@ -3498,7 +3499,12 @@ void MainWindow::updateIntervals()
             m_intervalsTable->setItem(row, 6, new QTableWidgetItem("\xe2\x80\x94"));
             m_intervalsTable->setItem(row, 7, new QTableWidgetItem(r.avgHr > 0 ? QString("%1 bpm").arg(r.avgHr, 0, 'f', 0) : "\xe2\x80\x94"));
         }
-    }
+    };
+
+    if (records.isEmpty())
+        populateIntervalsFromController();
+    else
+        populateIntervalsFromRecords();
 
     m_intervalsTable->resizeColumnsToContents();
 
