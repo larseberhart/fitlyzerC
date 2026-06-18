@@ -19,32 +19,42 @@
 
 void MainWindow::buildToolbar()
 {
+    // Global application toolbar.
+    // Contextual actions (per-page) live in each page widget's own toolbar.
     auto* tb = addToolBar("Main");
     tb->setMovable(false);
     tb->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
 
+    // Import
     m_toolbarImportAct = new QAction("Import", this);
     m_toolbarImportAct->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
     m_toolbarImportAct->setEnabled(false);
+    m_toolbarImportAct->setToolTip("Import FIT files (Ctrl+O)");
     connect(m_toolbarImportAct, &QAction::triggered, this, &MainWindow::importActivities);
     tb->addAction(m_toolbarImportAct);
 
+    tb->addSeparator();
+
+    // Settings — quick access to the settings dialog
+    auto* settingsAct = new QAction("Settings", this);
+    settingsAct->setIcon(style()->standardIcon(QStyle::SP_FileDialogInfoView));
+    settingsAct->setToolTip("Open Settings (Ctrl+,)");
+    connect(settingsAct, &QAction::triggered, this, &MainWindow::openSettingsDialog);
+    tb->addAction(settingsAct);
+
+    // Athletes — manage athletes
     auto* athleteManageAct = new QAction("Athletes", this);
     athleteManageAct->setIcon(style()->standardIcon(QStyle::SP_FileDialogDetailedView));
+    athleteManageAct->setToolTip("Manage athletes");
     connect(athleteManageAct, &QAction::triggered, this, &MainWindow::manageAthletes);
     tb->addAction(athleteManageAct);
 
-    auto* calendarAct = new QAction("Calendar", this);
-    calendarAct->setIcon(style()->standardIcon(QStyle::SP_FileDialogContentsView));
-    connect(calendarAct, &QAction::triggered, this, [this]
-    {
-        if (m_navigationSidebar)
-            m_navigationSidebar->setCurrentPage(NavigationSidebar::Page::Calendar);
-    });
-    tb->addAction(calendarAct);
+    tb->addSeparator();
 
+    // Search — navigate to Activities and focus the search field
     m_toolbarSearchAct = new QAction("Search", this);
     m_toolbarSearchAct->setIcon(style()->standardIcon(QStyle::SP_FileDialogContentsView));
+    m_toolbarSearchAct->setToolTip("Search activities");
     connect(m_toolbarSearchAct, &QAction::triggered, this, [this]
     {
         if (m_navigationSidebar)
@@ -55,7 +65,7 @@ void MainWindow::buildToolbar()
     tb->addAction(m_toolbarSearchAct);
 
     tb->addSeparator();
-    tb->addWidget(new QLabel("Current Athlete:"));
+    tb->addWidget(new QLabel("Athlete:"));
 
     m_athleteCombo = new QComboBox(tb);
     m_athleteCombo->setMinimumWidth(220);
