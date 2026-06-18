@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Compare icon: two overlapping charts -->
+  <polyline points="2,18 7,10 12,14 17,7 22,10"/>
+  <polyline points="2,21 7,16 12,18 17,14 22,16" stroke-dasharray="2,2"/>
+</svg>

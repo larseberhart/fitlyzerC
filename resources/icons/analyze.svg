@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Chart/analyze icon: bar chart with upward trend line -->
+  <rect x="2" y="14" width="4" height="7"/>
+  <rect x="9" y="9" width="4" height="12"/>
+  <rect x="16" y="4" width="4" height="17"/>
+  <polyline points="2,10 8,6 15,10 22,4"/>
+</svg>

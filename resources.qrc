@@ -1,10 +1,32 @@
 <RCC>
     <qresource prefix="/">
+        <!-- Application branding -->
         <file>resources/icons/fitlyzer_logo.png</file>
+
+        <!-- Legacy PNG icons (kept for backward compatibility) -->
         <file>resources/icons/import.png</file>
         <file>resources/icons/athlete.png</file>
         <file>resources/icons/calendar.png</file>
         <file>resources/icons/search.png</file>
+
+        <!-- SVG navigation and action icons -->
+        <file>resources/icons/import.svg</file>
+        <file>resources/icons/athlete.svg</file>
+        <file>resources/icons/calendar.svg</file>
+        <file>resources/icons/search.svg</file>
+        <file>resources/icons/analyze.svg</file>
+        <file>resources/icons/power.svg</file>
+        <file>resources/icons/interval.svg</file>
+        <file>resources/icons/climb.svg</file>
+        <file>resources/icons/fitness.svg</file>
+        <file>resources/icons/video.svg</file>
+        <file>resources/icons/settings.svg</file>
+        <file>resources/icons/compare.svg</file>
+        <file>resources/icons/chart_height_increase.svg</file>
+        <file>resources/icons/chart_height_decrease.svg</file>
+        <file>resources/icons/zoom_reset.svg</file>
+
+        <!-- Fonts -->
         <file>resources/fonts/Inter-Regular.ttf</file>
         <file>resources/fonts/Inter-Medium.ttf</file>
         <file>resources/fonts/Inter-Bold.ttf</file>
