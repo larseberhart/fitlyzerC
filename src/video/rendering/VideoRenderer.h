@@ -6,6 +6,7 @@
 
 #include <vector>
 
+#include "fit/RideData.h"
 #include "video/VideoTileProvider.h"
 
 namespace VideoRenderer
@@ -30,4 +31,9 @@ TileViewport computeTileViewport(const QPointF& centerTile, int width, int heigh
 std::vector<VideoTileId> tilesForViewport(const TileViewport& viewport, int zoom);
 QPointF latLonToTile(double lat, double lon, int zoom);
 QPointF tileToScreen(const QPointF& tilePt, const QPointF& centerTile, int width, int height);
+int nearestRecordIndex(const std::vector<RideRecord>& records, double elapsedSeconds);
+bool interpolateGpsAtTime(const std::vector<const RideRecord*>& gpsRecords,
+                          double elapsedSeconds,
+                          double& outLat,
+                          double& outLon);
 }
