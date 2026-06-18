@@ -1604,8 +1604,7 @@ void MainWindow::buildUI()
             this,
             [this](int)
     {
-        if (m_chartController)
-            applyChartAndMapUpdates(true, false);
+        applyChartAndMapUpdates(true, false);
     });
 
     resize(1050, 860);
