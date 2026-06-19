@@ -53,7 +53,6 @@
 #include "pages/ClimbsPage.h"
 #include "pages/FitnessPage.h"
 #include "pages/IntervalsPage.h"
-#include "pages/PlaceholderPage.h"
 #include "pages/PowerPage.h"
 #include "pages/VideoPage.h"
 #include "analysis/IntervalDetector.h"
@@ -144,20 +143,6 @@ void MainWindow::buildUI()
         connect(m_importAct, &QAction::triggered, this, &MainWindow::importActivities);
         actsMenu->addAction(m_importAct);
 
-        auto* createVideoAct = new QAction("Create Video...", this);
-        connect(createVideoAct, &QAction::triggered, this, &MainWindow::createVideo);
-        actsMenu->addAction(createVideoAct);
-
-        actsMenu->addSeparator();
-
-        auto* detectClimbsAct = new QAction("Detect Climbs...", this);
-        connect(detectClimbsAct, &QAction::triggered, this, &MainWindow::triggerDetectClimbs);
-        actsMenu->addAction(detectClimbsAct);
-
-        auto* detectIntervalsAct = new QAction("Detect Intervals...", this);
-        connect(detectIntervalsAct, &QAction::triggered, this, &MainWindow::triggerDetectIntervals);
-        actsMenu->addAction(detectIntervalsAct);
-
         m_athletesMenu = menuBar()->addMenu("&Athletes");
 
         auto* manageAct = new QAction("Manage Athletes...", this);
@@ -196,6 +181,7 @@ void MainWindow::buildUI()
     connect(m_welcomeWidget, &WelcomeWidget::importRequested, this, &MainWindow::importActivities);
     connect(m_welcomeWidget, &WelcomeWidget::openDatabaseRequested, this, &MainWindow::openDatabase);
     connect(m_welcomeWidget, &WelcomeWidget::createDatabaseRequested, this, &MainWindow::createDatabase);
+    connect(m_welcomeWidget, &WelcomeWidget::manageAthletesRequested, this, &MainWindow::manageAthletes);
 
     // Color-by metric control bar — placed at the top of ChartsPage.
     auto* colorBar = new QHBoxLayout;
@@ -546,12 +532,13 @@ void MainWindow::buildUI()
         });
 
         auto* bottomSplit = new QSplitter(Qt::Horizontal, chartsTab);
-        bottomSplit->addWidget(intervalsPanel);
         bottomSplit->addWidget(lapsPanel);
         bottomSplit->addWidget(notesPanel);
-        bottomSplit->setStretchFactor(0, 2);
-        bottomSplit->setStretchFactor(1, 1);
-        bottomSplit->setStretchFactor(2, 2);
+        bottomSplit->setStretchFactor(0, 1);
+        bottomSplit->setStretchFactor(1, 2);
+
+        // Intervals now live on the dedicated Intervals page.
+        m_intervalsPageContent = intervalsPanel;
 
         auto* activitySplit = new QSplitter(Qt::Vertical, chartsTab);
         activitySplit->addWidget(topSplit);
@@ -937,32 +924,6 @@ void MainWindow::buildUI()
         m_climbOverlayMetricCombo->setCurrentIndex(0);
         m_climbOverlayMetricCombo->setEnabled(false);
 
-        // Climb detection parameters bar — belongs to ClimbsPage, not the
-        // Charts color bar.  Will move to Settings in Phase 11.
-        m_climbParamsBar = new QWidget(this);
-        auto* climbParamsHL = new QHBoxLayout(m_climbParamsBar);
-        climbParamsHL->setContentsMargins(0, 0, 0, 0);
-        climbParamsHL->setSpacing(4);
-
-        auto addParam = [climbParamsHL](const QString& label, QDoubleSpinBox* spin)
-        {
-            auto* tag = new QLabel(label);
-            tag->setStyleSheet("color: #334155;");
-            spin->setButtonSymbols(QAbstractSpinBox::NoButtons);
-            spin->setFixedWidth(62);
-            climbParamsHL->addWidget(tag);
-            climbParamsHL->addWidget(spin);
-        };
-
-        climbParamsHL->addWidget(new QLabel("Climb:"));
-        addParam("Len", m_climbMinLengthSpin);
-        addParam("Gain", m_climbMinGainSpin);
-        addParam("AvgGrad", m_climbMinGradientSpin);
-        addParam("StartGrad", m_climbStartGradientSpin);
-        addParam("DipM", m_climbDipMetersSpin);
-        addParam("DipDist", m_climbDipDistanceSpin);
-        addParam("Smooth", m_climbSmoothingSpin);
-
         m_climbsTable = new QTableWidget(0, 19, climbingTab);
         m_climbsTable->setHorizontalHeaderLabels(
             { "Name", "Length (km)", "Gain (m)", "Avg Gradient %", "Max Gradient %",
@@ -1132,16 +1093,33 @@ void MainWindow::buildUI()
         m_pageStack->addWidget(new PowerPage(m_analysisTabWidget, m_pageStack));
     }
 
-    // [3] Intervals — shared view via intervalsPanel in the Charts content.
-    // The IntervalsPage provides a standalone entry point; clicking an interval
-    // navigates to the Charts page where the interval is highlighted in context.
-    //
-    // TODO(phase6-full): Move intervalsPanel out of chartsTab and host it here
-    //                    exclusively, wiring cross-page navigation back to Charts.
-    m_pageStack->addWidget(new IntervalsPage(nullptr, m_pageStack));
+    // [3] Intervals — dedicated page hosting interval controls and table.
+    m_pageStack->addWidget(new IntervalsPage(m_intervalsPageContent, m_pageStack));
 
-    // [4] Climbs — climb charts + climbs table + detection params bar
-    m_pageStack->addWidget(new ClimbsPage(m_climbParamsBar, m_climbsPageContent, m_pageStack));
+    // [4] Climbs — climb charts + climbs table
+    {
+        auto* climbsPage = new ClimbsPage(m_climbsPageContent, m_pageStack);
+        connect(climbsPage, &ClimbsPage::addRequested, this, [this]()
+        {
+            if (m_climbAltitudeChart)
+                m_climbAltitudeChart->setFocus();
+            statusBar()->showMessage("Use the climb chart to create a new climb boundary.", 2500);
+        });
+        connect(climbsPage, &ClimbsPage::editRequested, this, &MainWindow::editSelectedClimbBoundaries);
+        connect(climbsPage, &ClimbsPage::mergeRequested, this, &MainWindow::joinSelectedClimbs);
+        connect(climbsPage, &ClimbsPage::deleteRequested, this, &MainWindow::removeSelectedClimbs);
+        connect(climbsPage, &ClimbsPage::undoRequested, this, [this]()
+        {
+            if (m_undoManager)
+                m_undoManager->undo();
+        });
+        connect(climbsPage, &ClimbsPage::redoRequested, this, [this]()
+        {
+            if (m_undoManager)
+                m_undoManager->redo();
+        });
+        m_pageStack->addWidget(climbsPage);
+    }
 
     // [5] Fitness — CTL/ATL/TSB and FTP history
     m_pageStack->addWidget(new FitnessPage(m_fitnessChart, m_pageStack));
@@ -1152,7 +1130,9 @@ void MainWindow::buildUI()
     // [7] Video — video creation and export page
     {
         auto* videoPage = new VideoPage(m_pageStack);
-        connect(videoPage, &VideoPage::createVideoRequested, this, &MainWindow::createVideo);
+        connect(videoPage, &VideoPage::previewRequested, this, &MainWindow::createVideo);
+        connect(videoPage, &VideoPage::renderRequested, this, &MainWindow::createVideo);
+        connect(videoPage, &VideoPage::exportRequested, this, &MainWindow::createVideo);
         m_pageStack->addWidget(videoPage);
     }
 

@@ -13,6 +13,7 @@
 #include <QUuid>
 
 #include "ActivityBrowser.h"
+#include "controllers/NavigationController.h"
 
 void MainWindow::importFiles(const QStringList& filePaths)
 {
@@ -188,7 +189,10 @@ void MainWindow::onActivityImported(int activityId)
     if (m_activityBrowser)
     {
         m_activityBrowser->refresh(m_currentAthleteId);
-        m_tabWidget->setCurrentIndex(kTabActivities);
+        if (m_navigationController)
+            m_navigationController->navigateTo(NavigationController::Page::Activities);
+        else if (m_pageStack)
+            m_pageStack->setCurrentIndex(0);
     }
 
     updateStatusBarInfo();

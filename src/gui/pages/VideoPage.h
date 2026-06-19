@@ -25,6 +25,12 @@ public:
     explicit VideoPage(QWidget* parent = nullptr);
 
 signals:
-    /// @brief Emitted when the user requests the video creation dialog.
-    void createVideoRequested();
+    /// @brief Emitted when the user requests a preview workflow.
+    void previewRequested();
+
+    /// @brief Emitted when the user requests a render workflow.
+    void renderRequested();
+
+    /// @brief Emitted when the user requests an export workflow.
+    void exportRequested();
 };

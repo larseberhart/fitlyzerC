@@ -7,9 +7,11 @@
 #include <QEvent>
 #include <QKeySequence>
 #include <QLabel>
+#include <QMenu>
 #include <QStatusBar>
 #include <QStyle>
 #include <QToolBar>
+#include <QToolButton>
 
 #include "ActivityBrowser.h"
 #include "ImportStatusWidget.h"
@@ -35,34 +37,57 @@ void MainWindow::buildToolbar()
 
     tb->addSeparator();
 
-    // Settings — quick access to the settings dialog
+    tb->addSeparator();
+
+    // Analyze dropdown
+    auto* analyzeMenu = new QMenu(tb);
+
+    auto* detectClimbsAct = new QAction("Detect Climbs", analyzeMenu);
+    connect(detectClimbsAct, &QAction::triggered, this, &MainWindow::triggerDetectClimbs);
+    analyzeMenu->addAction(detectClimbsAct);
+
+    auto* detectIntervalsAct = new QAction("Detect Intervals", analyzeMenu);
+    connect(detectIntervalsAct, &QAction::triggered, this, &MainWindow::triggerDetectIntervals);
+    analyzeMenu->addAction(detectIntervalsAct);
+
+    auto* analyzeBtn = new QToolButton(tb);
+    analyzeBtn->setText("Analyze");
+    analyzeBtn->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
+    analyzeBtn->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    analyzeBtn->setPopupMode(QToolButton::MenuButtonPopup);
+    analyzeBtn->setMenu(analyzeMenu);
+    connect(analyzeBtn, &QToolButton::clicked, this, &MainWindow::triggerDetectClimbs);
+    tb->addWidget(analyzeBtn);
+
+    // Compare
+    auto* compareAct = new QAction("Compare", this);
+    compareAct->setIcon(style()->standardIcon(QStyle::SP_ArrowUp));
+    compareAct->setToolTip("Open power comparison workflows on the Power page");
+    connect(compareAct, &QAction::triggered, this, [this]
+    {
+        if (m_navigationSidebar)
+            m_navigationSidebar->setCurrentPage(NavigationSidebar::Page::Power);
+    });
+    tb->addAction(compareAct);
+
+    // Export
+    auto* exportAct = new QAction("Export", this);
+    exportAct->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton));
+    exportAct->setToolTip("Open video export workflows");
+    connect(exportAct, &QAction::triggered, this, [this]
+    {
+        if (m_navigationSidebar)
+            m_navigationSidebar->setCurrentPage(NavigationSidebar::Page::Video);
+        createVideo();
+    });
+    tb->addAction(exportAct);
+
+    // Settings
     auto* settingsAct = new QAction("Settings", this);
     settingsAct->setIcon(style()->standardIcon(QStyle::SP_FileDialogInfoView));
     settingsAct->setToolTip("Open Settings (Ctrl+,)");
     connect(settingsAct, &QAction::triggered, this, &MainWindow::openSettingsDialog);
     tb->addAction(settingsAct);
-
-    // Athletes — manage athletes
-    auto* athleteManageAct = new QAction("Athletes", this);
-    athleteManageAct->setIcon(style()->standardIcon(QStyle::SP_FileDialogDetailedView));
-    athleteManageAct->setToolTip("Manage athletes");
-    connect(athleteManageAct, &QAction::triggered, this, &MainWindow::manageAthletes);
-    tb->addAction(athleteManageAct);
-
-    tb->addSeparator();
-
-    // Search — navigate to Activities and focus the search field
-    m_toolbarSearchAct = new QAction("Search", this);
-    m_toolbarSearchAct->setIcon(style()->standardIcon(QStyle::SP_FileDialogContentsView));
-    m_toolbarSearchAct->setToolTip("Search activities");
-    connect(m_toolbarSearchAct, &QAction::triggered, this, [this]
-    {
-        if (m_navigationSidebar)
-            m_navigationSidebar->setCurrentPage(NavigationSidebar::Page::Activities);
-        if (m_activityBrowser)
-            m_activityBrowser->focusSearch();
-    });
-    tb->addAction(m_toolbarSearchAct);
 
     tb->addSeparator();
     tb->addWidget(new QLabel("Athlete:"));

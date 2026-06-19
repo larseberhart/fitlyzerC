@@ -13,6 +13,7 @@
 #include "ActivityBrowser.h"
 #include "CalendarWidget.h"
 #include "CreateDatabaseDialog.h"
+#include "controllers/NavigationController.h"
 #include "database/AthleteRepository.h"
 #include "maps/TileCache.h"
 #include "platform/Platform.h"
@@ -24,13 +25,64 @@ static constexpr int kMaxRecentDatabases = 8;
 
 /// @brief Default chart preset identifier value.
 static constexpr int kChartPresetCustom = 0;
+
+// Legacy tab indices from pre-page-stack navigation.
+static constexpr int kLegacyTabActivities = 0;
+static constexpr int kLegacyTabAnalysis = 1;
+
+// Legacy analysis sub-tab indices used when activeTab == Analysis.
+static constexpr int kLegacyAnalysisCharts = 0;
+static constexpr int kLegacyAnalysisZones = 1;
+static constexpr int kLegacyAnalysisHistogram = 2;
+static constexpr int kLegacyAnalysisPowerCurve = 3;
+static constexpr int kLegacyAnalysisCalendar = 4;
+static constexpr int kLegacyAnalysisFitness = 5;
+static constexpr int kLegacyAnalysisClimbing = 6;
+
+// Current top-level page indices (NavigationSidebar::Page values).
+static constexpr int kPageActivities = 0;
+static constexpr int kPageCharts = 1;
+static constexpr int kPagePower = 2;
+static constexpr int kPageIntervals = 3;
+static constexpr int kPageClimbs = 4;
+static constexpr int kPageFitness = 5;
+static constexpr int kPageCalendar = 6;
+static constexpr int kPageVideo = 7;
+
+/// @brief Maps legacy activeTab/analysisTab settings to the new page index.
+int mapLegacyTabsToPageIndex(int legacyActiveTab, int legacyAnalysisTab)
+{
+    if (legacyActiveTab == kLegacyTabActivities)
+        return kPageActivities;
+
+    if (legacyActiveTab == kLegacyTabAnalysis)
+    {
+        switch (legacyAnalysisTab)
+        {
+            case kLegacyAnalysisCharts:     return kPageCharts;
+            case kLegacyAnalysisZones:
+            case kLegacyAnalysisHistogram:
+            case kLegacyAnalysisPowerCurve: return kPagePower;
+            case kLegacyAnalysisCalendar:   return kPageCalendar;
+            case kLegacyAnalysisFitness:    return kPageFitness;
+            case kLegacyAnalysisClimbing:   return kPageClimbs;
+            default:                        return kPageCharts;
+        }
+    }
+
+    return kPageActivities;
+}
 }
 
 void MainWindow::saveSettings()
 {
     QSettings s("Fitlyzer", "FitlyzerC");
     s.setValue("geometry",           saveGeometry());
-    s.setValue("activeTab",          m_tabWidget->currentIndex());
+
+    // Persist page-based navigation state. Keep legacy keys out of new writes.
+    if (m_navigationController)
+        m_navigationController->saveNavigationState();
+
     if (m_analysisTabWidget)
         s.setValue("analysisTab",    m_analysisTabWidget->currentIndex());
     if (m_colorMetricCombo)
@@ -130,10 +182,30 @@ void MainWindow::loadSettings()
             m_colorMetricCombo->setCurrentIndex(comboIndex);
     }
 
-    if (s.contains("activeTab"))
-        m_tabWidget->setCurrentIndex(s.value("activeTab", 0).toInt());
+    // Restore top-level page selection.
+    // 1) Preferred: new page-based key handled by NavigationController.
+    // 2) Fallback: migrate legacy activeTab/analysisTab keys.
+    if (m_navigationController)
+    {
+        if (s.contains("activePage"))
+        {
+            m_navigationController->restoreNavigationState();
+        }
+        else if (s.contains("activeTab"))
+        {
+            const int legacyActiveTab = s.value("activeTab", kLegacyTabActivities).toInt();
+            const int legacyAnalysisTab = s.value("analysisTab", kLegacyAnalysisCharts).toInt();
+            const int pageIndex = mapLegacyTabsToPageIndex(legacyActiveTab, legacyAnalysisTab);
+            m_navigationController->navigateTo(static_cast<NavigationController::Page>(pageIndex));
+        }
+    }
+
     if (m_analysisTabWidget && s.contains("analysisTab"))
-        m_analysisTabWidget->setCurrentIndex(s.value("analysisTab", 0).toInt());
+    {
+        const int requested = s.value("analysisTab", 0).toInt();
+        const int clamped = std::clamp(requested, 0, m_analysisTabWidget->count() - 1);
+        m_analysisTabWidget->setCurrentIndex(clamped);
+    }
 }
 
 void MainWindow::addRecentDatabase(const QString& path)

@@ -13,8 +13,11 @@ class QPushButton;
  *
  * Layout:
  *   - App title and subtitle
+ *   - Database row:
+ *       Left:  Recently Used
+ *       Right: Pinned Databases
  *   - Two-column row:
- *       Left:  Quick Actions (Import / Open / Create)
+ *       Left:  Quick Actions (Import / Open / Create / Manage Athletes)
  *       Right: Recent Activities (placeholder — populated in a future update)
  *   - Sync Status section (Garmin Connect / Strava — coming in a future update)
  *
@@ -47,9 +50,13 @@ signals:
     /// @brief Emitted when the user clicks Create Database.
     void createDatabaseRequested();
 
+    /// @brief Emitted when the user clicks Manage Athletes.
+    void manageAthletesRequested();
+
 private:
     QLabel*      m_subtitleLabel  = nullptr;
     QPushButton* m_importButton   = nullptr;
     QPushButton* m_openDbButton   = nullptr;
     QPushButton* m_createDbButton = nullptr;
+    QPushButton* m_manageAthletesButton = nullptr;
 };

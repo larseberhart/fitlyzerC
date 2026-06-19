@@ -300,12 +300,9 @@ private:
     QWidget* m_calendarPageContent  = nullptr; ///< Calendar content
     QWidget* m_fitnessPageContent   = nullptr; ///< Fitness chart content
     QWidget* m_climbsPageContent    = nullptr; ///< Climb charts + table content
-    QWidget* m_climbParamsBar       = nullptr; ///< Climb detection params bar (ClimbsPage)
+    QWidget* m_intervalsPageContent = nullptr; ///< Intervals table + tools content
 
-    // -- Legacy tab widgets (kept during incremental migration) ------------
-    // TODO(phase2): Remove once all page content has been moved into
-    //               dedicated page widgets under m_pageStack.
-    QTabWidget* m_tabWidget = nullptr;
+    // -- Power sub-tabs (Zones/Histogram/Power Curve) ----------------------
     QTabWidget* m_analysisTabWidget = nullptr;
     QStackedLayout* m_activityTabStack = nullptr;
     QStackedLayout* m_zonesTabStack = nullptr;
@@ -314,19 +311,6 @@ private:
     QStackedLayout* m_calendarTabStack = nullptr;
     QStackedLayout* m_fitnessTabStack = nullptr;
     QStackedLayout* m_climbingTabStack = nullptr;
-
-    // Legacy tab indices — kept for backward compatibility during migration.
-    // TODO(phase2): Remove these constants when tab widgets are replaced.
-    static constexpr int kTabActivities = 0;
-    static constexpr int kTabAnalysis   = 1;
-
-    static constexpr int kAnalysisTabCharts     = 0;
-    static constexpr int kAnalysisTabZones      = 1;
-    static constexpr int kAnalysisTabHistogram  = 2;
-    static constexpr int kAnalysisTabPDC        = 3;
-    static constexpr int kAnalysisTabCalendar   = 4;
-    static constexpr int kAnalysisTabFitness    = 5;
-    static constexpr int kAnalysisTabClimbing   = 6;
 
     // Charts tab
     QScrollArea*     m_chartScroll      = nullptr;

@@ -111,6 +111,42 @@ void MainWindow::openSettingsDialog()
         dialog.setProperty("dateFormatCombo", QVariant::fromValue(static_cast<QObject*>(dateFormatCombo)));
     }
 
+    // ── Tab: Athletes ────────────────────────────────────────────────────
+    {
+        auto* page = new QWidget(tabs);
+        auto* vl   = new QVBoxLayout(page);
+        vl->setContentsMargins(12, 12, 12, 12);
+
+        auto* lbl = new QLabel(
+            "Athlete profile defaults and team settings are managed in this section.\n"
+            "Use the main Athletes manager for profile CRUD.",
+            page);
+        lbl->setWordWrap(true);
+        lbl->setStyleSheet("color: #64748b;");
+        vl->addWidget(lbl);
+        vl->addStretch(1);
+
+        tabs->addTab(page, "Athletes");
+    }
+
+    // ── Tab: Import ──────────────────────────────────────────────────────
+    {
+        auto* page = new QWidget(tabs);
+        auto* vl   = new QVBoxLayout(page);
+        vl->setContentsMargins(12, 12, 12, 12);
+
+        auto* lbl = new QLabel(
+            "Import defaults (auto-tagging, duplicate handling, file watchers)\n"
+            "will be consolidated here.",
+            page);
+        lbl->setWordWrap(true);
+        lbl->setStyleSheet("color: #64748b;");
+        vl->addWidget(lbl);
+        vl->addStretch(1);
+
+        tabs->addTab(page, "Import");
+    }
+
     // ── Tab: Maps ────────────────────────────────────────────────────────
     {
         auto* page = new QWidget(tabs);
@@ -209,6 +245,19 @@ void MainWindow::openSettingsDialog()
         tabs->addTab(page, "Analysis");
     }
 
+    // ── Tab: Charts (stub) ───────────────────────────────────────────────
+    {
+        auto* page  = new QWidget(tabs);
+        auto* vl    = new QVBoxLayout(page);
+        vl->setContentsMargins(12, 12, 12, 12);
+        auto* lbl   = new QLabel("Chart defaults and presets configuration — coming soon.", page);
+        lbl->setStyleSheet("color: #64748b;");
+        lbl->setWordWrap(true);
+        vl->addWidget(lbl);
+        vl->addStretch(1);
+        tabs->addTab(page, "Charts");
+    }
+
     // ── Tab: Video (stub) ────────────────────────────────────────────────
     {
         auto* page = new QWidget(tabs);
@@ -220,6 +269,19 @@ void MainWindow::openSettingsDialog()
         vl->addWidget(lbl);
         vl->addStretch(1);
         tabs->addTab(page, "Video");
+    }
+
+    // ── Tab: Advanced (stub) ─────────────────────────────────────────────
+    {
+        auto* page = new QWidget(tabs);
+        auto* vl   = new QVBoxLayout(page);
+        vl->setContentsMargins(12, 12, 12, 12);
+        auto* lbl  = new QLabel("Advanced diagnostics and storage options — coming soon.", page);
+        lbl->setStyleSheet("color: #64748b;");
+        lbl->setWordWrap(true);
+        vl->addWidget(lbl);
+        vl->addStretch(1);
+        tabs->addTab(page, "Advanced");
     }
 
     dlgLayout->addWidget(tabs, 1);

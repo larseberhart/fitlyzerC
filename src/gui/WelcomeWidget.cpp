@@ -94,6 +94,40 @@ WelcomeWidget::WelcomeWidget(QWidget* parent)
     m_subtitleLabel->setStyleSheet("font-size: 14px; color: #64748b;");
     rootLayout->addWidget(m_subtitleLabel);
 
+    // ── Database row: Recently Used | Pinned Databases ───────────────────
+    {
+        auto* dbRow = new QHBoxLayout;
+        dbRow->setSpacing(16);
+
+        auto* recentCard = makeCard(this);
+        auto* recentVL   = new QVBoxLayout(recentCard);
+        recentVL->setContentsMargins(16, 14, 16, 14);
+        recentVL->setSpacing(6);
+        recentVL->addWidget(makeHeading("Recently Used", recentCard));
+        auto* recentPlaceholder = new QLabel(
+            "Recent databases will appear here once opened.", recentCard);
+        recentPlaceholder->setWordWrap(true);
+        recentPlaceholder->setStyleSheet("color: #94a3b8; font-size: 12px;");
+        recentVL->addWidget(recentPlaceholder);
+        recentVL->addStretch(1);
+
+        auto* pinnedCard = makeCard(this);
+        auto* pinnedVL   = new QVBoxLayout(pinnedCard);
+        pinnedVL->setContentsMargins(16, 14, 16, 14);
+        pinnedVL->setSpacing(6);
+        pinnedVL->addWidget(makeHeading("Pinned Databases", pinnedCard));
+        auto* pinnedPlaceholder = new QLabel(
+            "Pin frequently used athlete databases for quick access.", pinnedCard);
+        pinnedPlaceholder->setWordWrap(true);
+        pinnedPlaceholder->setStyleSheet("color: #94a3b8; font-size: 12px;");
+        pinnedVL->addWidget(pinnedPlaceholder);
+        pinnedVL->addStretch(1);
+
+        dbRow->addWidget(recentCard, 1);
+        dbRow->addWidget(pinnedCard, 1);
+        rootLayout->addLayout(dbRow);
+    }
+
     // ── Two-column row: Quick Actions | Recent Activities ─────────────────
     auto* columnsLayout = new QHBoxLayout;
     columnsLayout->setSpacing(16);
@@ -110,10 +144,12 @@ WelcomeWidget::WelcomeWidget(QWidget* parent)
         m_importButton   = makePrimaryBtn("Import FIT Files", card);
         m_openDbButton   = makeSecondaryBtn("Open Database", card);
         m_createDbButton = makeSecondaryBtn("Create Database", card);
+        m_manageAthletesButton = makeSecondaryBtn("Manage Athletes", card);
 
         vl->addWidget(m_importButton);
         vl->addWidget(m_openDbButton);
         vl->addWidget(m_createDbButton);
+        vl->addWidget(m_manageAthletesButton);
         vl->addStretch(1);
 
         columnsLayout->addWidget(card, 1);
@@ -171,6 +207,7 @@ WelcomeWidget::WelcomeWidget(QWidget* parent)
     connect(m_importButton,   &QPushButton::clicked, this, &WelcomeWidget::importRequested);
     connect(m_openDbButton,   &QPushButton::clicked, this, &WelcomeWidget::openDatabaseRequested);
     connect(m_createDbButton, &QPushButton::clicked, this, &WelcomeWidget::createDatabaseRequested);
+    connect(m_manageAthletesButton, &QPushButton::clicked, this, &WelcomeWidget::manageAthletesRequested);
 
     setFirstLaunch(true);
 }

@@ -196,16 +196,16 @@ void MainWindow::showWelcomeScreen()
 {
     if (m_welcomeWidget)
         m_welcomeWidget->setVisible(true);
-    if (m_tabWidget)
-        m_tabWidget->setVisible(false);
+    if (m_pageStack)
+        m_pageStack->setVisible(false);
 }
 
 void MainWindow::hideWelcomeScreen()
 {
     if (m_welcomeWidget)
         m_welcomeWidget->setVisible(false);
-    if (m_tabWidget)
-        m_tabWidget->setVisible(true);
+    if (m_pageStack)
+        m_pageStack->setVisible(true);
 }
 
 int MainWindow::activityCount() const
